@@ -16,10 +16,8 @@ import React, {
 import { Physics, RigidBody, CuboidCollider } from "@react-three/rapier";
 import gsap from "gsap";
 import Link from "next/link";
-import { useSocket } from "../context/SocketContext";
 
 import PlayerController from "./PlayerController";
-import OpponentController from "./OpponentController";
 import Joystick from "./Joystick";
 import AttackButtons from "./AttackButtons";
 import Arena from "./Arena";
@@ -36,7 +34,6 @@ const keyboardMap = [
 ];
 
 const Experience = () => {
-  const socket = useSocket();
   const [joystickDirection, setJoystickDirection] = useState({ x: 0, y: 0 });
   const [punchPressed, setPunchPressed] = useState(false);
   const [kickPressed, setKickPressed] = useState(false);
@@ -47,69 +44,9 @@ const Experience = () => {
   const [username, setUsername] = useState("");
   const [showLobby, setShowLobby] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [roomId, setRoomId] = useState(null);
-  const [players, setPlayers] = useState([]);
-  const [opponentPosition, setOpponentPosition] = useState([0, 0, 0]);
-  const [opponentRotation, setOpponentRotation] = useState(0);
-  const [opponentAnimation, setOpponentAnimation] = useState("idle");
 
   const playerControllerRef = useRef();
   const welcomeTextRef = useRef();
-
-  // Socket event handlers
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on("roomJoined", ({ roomId, players }) => {
-      setRoomId(roomId);
-      setPlayers(players);
-      setShowLobby(true);
-    });
-
-    socket.on("playerJoined", (players) => {
-      setPlayers(players);
-    });
-
-    socket.on("playerReady", (players) => {
-      setPlayers(players);
-    });
-
-    socket.on("startGame", () => {
-      setIsReady(true);
-      setTimeout(() => {
-        setShowWelcomeScreen(false);
-        setIsGameStarted(true);
-        // Hide the lobby after game starts
-        setTimeout(() => setShowLobby(false), 500);
-      }, 1000);
-    });
-
-    socket.on("opponentMovement", ({ position, rotation }) => {
-      setOpponentPosition(position);
-      setOpponentRotation(rotation);
-    });
-
-    socket.on("opponentAction", ({ action }) => {
-      setOpponentAnimation(action);
-    });
-
-    socket.on("playerLeft", (players) => {
-      setPlayers(players);
-      if (players.length < 2) {
-        // Handle opponent disconnection
-      }
-    });
-
-    return () => {
-      socket.off("roomJoined");
-      socket.off("playerJoined");
-      socket.off("playerReady");
-      socket.off("startGame");
-      socket.off("opponentMovement");
-      socket.off("opponentAction");
-      socket.off("playerLeft");
-    };
-  }, [socket]);
 
   // Welcome screen animation
   useEffect(() => {
@@ -131,36 +68,32 @@ const Experience = () => {
     }
   }, [showWelcomeScreen]);
 
-  const handleJoinRoom = useCallback(() => {
-    if (username.trim() !== "" && socket) {
-      socket.emit("joinRoom", { username });
+  const handleStart = useCallback(() => {
+    if (!isGameStarted) {
+      setIsGameStarted(true);
     }
-  }, [username, socket]);
+  }, [isGameStarted]);
+
+  const handleInfoClick = useCallback(() => {
+    setShowInfoPopup(true);
+  }, []);
+
+  const handleJoinRoom = useCallback(() => {
+    if (username.trim() !== "") {
+      setShowLobby(true);
+    }
+  }, [username]);
 
   const handleReady = useCallback(() => {
-    if (socket && roomId) {
-      socket.emit("playerReady", { roomId });
-      setIsReady(true);
-    }
-  }, [socket, roomId]);
-
-  const handlePlayerUpdate = useCallback(
-    (position, rotation) => {
-      if (socket && roomId) {
-        socket.emit("playerMovement", { roomId, position, rotation });
-      }
-    },
-    [socket, roomId]
-  );
-
-  const handlePlayerAction = useCallback(
-    (action) => {
-      if (socket && roomId) {
-        socket.emit("playerAction", { roomId, action });
-      }
-    },
-    [socket, roomId]
-  );
+    setIsReady(true);
+    setTimeout(() => {
+      setShowWelcomeScreen(false);
+      setIsGameStarted(true);
+      handleStart();
+      // Hide the lobby after game starts
+      setTimeout(() => setShowLobby(false), 500);
+    }, 1000);
+  }, [handleStart]);
 
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
 
@@ -197,7 +130,7 @@ const Experience = () => {
               JOIN ROOM
             </div>
             <div
-              onClick={() => setShowInfoPopup(true)}
+              onClick={handleInfoClick}
               className="mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[80%] w-[90%] h-[30%] mx-auto rounded-lg transition-colors"
             >
               HOW TO PLAY?
@@ -214,27 +147,23 @@ const Experience = () => {
       {showLobby && (
         <div className="fixed bottom-4 right-4 bg-gray-800 bg-opacity-80 p-4 rounded-lg z-50">
           <h2 className="text-white font-choco text-xl mb-2 border-b border-gray-600 pb-2">
-            LOBBY ({players.length}/2)
+            LOBBY
           </h2>
-          {players.map((player, index) => (
-            <div key={index} className="flex items-center mb-2">
-              <span className="text-white font-choco text-lg mr-2">
-                {player.username}
-              </span>
-              {player.ready ? (
-                <span className="text-green-500">✓</span>
-              ) : (
-                player.id === socket.id && (
-                  <button
-                    onClick={handleReady}
-                    className="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                  >
-                    Ready
-                  </button>
-                )
-              )}
-            </div>
-          ))}
+          <div className="flex items-center">
+            <span className="text-white font-choco text-lg mr-2">
+              {username}
+            </span>
+            {isReady ? (
+              <span className="text-green-500">✓</span>
+            ) : (
+              <button
+                onClick={handleReady}
+                className="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              >
+                Ready
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -261,21 +190,12 @@ const Experience = () => {
           </directionalLight>
           <Physics>
             {isGameStarted && (
-              <>
-                <PlayerController
-                  ref={playerControllerRef}
-                  joystickDirection={joystickDirection}
-                  onPunch={punchPressed}
-                  onKick={kickPressed}
-                  onUpdate={handlePlayerUpdate}
-                  onAction={handlePlayerAction}
-                />
-                <OpponentController
-                  position={opponentPosition}
-                  rotation={opponentRotation}
-                  animation={opponentAnimation}
-                />
-              </>
+              <PlayerController
+                ref={playerControllerRef}
+                joystickDirection={joystickDirection}
+                onPunch={punchPressed}
+                onKick={kickPressed}
+              />
             )}
             <Arena />
             <RigidBody
@@ -298,7 +218,11 @@ const Experience = () => {
         </>
       )}
 
-      <Info showInfoPopup={showInfoPopup} setShowInfoPopup={setShowInfoPopup} />
+      <Info
+        showInfoPopup={showInfoPopup}
+        setShowInfoPopup={setShowInfoPopup}
+        onInfoClick={handleInfoClick}
+      />
     </>
   );
 };

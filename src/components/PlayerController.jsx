@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
 import { MathUtils, Vector3 } from "three";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -26,13 +27,7 @@ const lerpAngle = (start, end, t) => {
   return normalizeAngle(start + (end - start) * t);
 };
 
-const PlayerController = ({
-  joystickDirection,
-  onPunch,
-  onKick,
-  onUpdate,
-  onAction,
-}) => {
+const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
   const { camera } = useThree();
   const [animation, setAnimation] = useState("idle");
   const [isAttacking, setIsAttacking] = useState(false);
@@ -48,7 +43,6 @@ const PlayerController = ({
   const cameraPosition = useRef();
   const rb = useRef();
   const isMoving = useRef(false);
-  const prevAnimation = useRef("idle");
 
   // Camera refs
   const cameraWorldPosition = useRef(new Vector3());
@@ -197,21 +191,6 @@ const PlayerController = ({
       cameraTarget.current.getWorldPosition(cameraLookAtWorldPosition.current);
       cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
       camera.lookAt(cameraLookAt.current);
-    }
-
-    // Emit position updates
-    if (container.current && onUpdate) {
-      const position = container.current.position.toArray();
-      const rotation = container.current.rotation.y;
-      onUpdate(position, rotation);
-    }
-
-    // Emit action updates
-    if (animation !== prevAnimation.current) {
-      if (onAction) {
-        onAction(animation);
-      }
-      prevAnimation.current = animation;
     }
   });
 
