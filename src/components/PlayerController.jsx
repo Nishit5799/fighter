@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect } from "react";
-
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
 import { MathUtils, Vector3 } from "three";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -27,7 +26,13 @@ const lerpAngle = (start, end, t) => {
   return normalizeAngle(start + (end - start) * t);
 };
 
-const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
+const PlayerController = ({
+  joystickDirection,
+  onPunch,
+  onKick,
+  onUpdate,
+  onAction,
+}) => {
   const { camera } = useThree();
   const [animation, setAnimation] = useState("idle");
   const [isAttacking, setIsAttacking] = useState(false);
@@ -43,6 +48,7 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
   const cameraPosition = useRef();
   const rb = useRef();
   const isMoving = useRef(false);
+  const prevAnimation = useRef("idle");
 
   // Camera refs
   const cameraWorldPosition = useRef(new Vector3());
@@ -67,7 +73,7 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
       setTimeout(() => {
         setIsAttacking(false);
         setAnimation(isMoving.current ? "run" : "idle");
-      }, 600);
+      }, 800);
     }
   }, [onPunch, isAttacking]);
 
@@ -79,7 +85,7 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
       setTimeout(() => {
         setIsAttacking(false);
         setAnimation(isMoving.current ? "run" : "idle");
-      }, 600);
+      }, 800);
     }
   }, [onKick, isAttacking]);
 
@@ -152,14 +158,14 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
       setTimeout(() => {
         setIsAttacking(false);
         setAnimation(isMoving.current ? "run" : "idle");
-      }, 600);
+      }, 800);
     } else if (kick && !isAttacking) {
       setIsAttacking(true);
       setAnimation("kick");
       setTimeout(() => {
         setIsAttacking(false);
         setAnimation(isMoving.current ? "run" : "idle");
-      }, 600);
+      }, 800);
     }
 
     // Smooth character rotation
@@ -191,6 +197,21 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
       cameraTarget.current.getWorldPosition(cameraLookAtWorldPosition.current);
       cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
       camera.lookAt(cameraLookAt.current);
+    }
+
+    // Emit position updates
+    if (container.current && onUpdate) {
+      const position = container.current.position.toArray();
+      const rotation = container.current.rotation.y;
+      onUpdate(position, rotation);
+    }
+
+    // Emit action updates
+    if (animation !== prevAnimation.current) {
+      if (onAction) {
+        onAction(animation);
+      }
+      prevAnimation.current = animation;
     }
   });
 
