@@ -84,13 +84,13 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
   }, [onKick, isAttacking]);
 
   useFrame(() => {
-    if (!rb.current) return;
+    if (!rb.current || !container.current) return;
 
     const vel = rb.current.linvel();
     const movement = { x: 0, z: 0 };
     const { forward, backward, left, right, punch, kick } = get();
 
-    // Check if we have any movement input
+    // Calculate movement input
     const hasJoystickInput =
       joystickDirection &&
       (Math.abs(joystickDirection.x) > 0.1 ||
@@ -98,71 +98,79 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
     const hasKeyboardInput = forward || backward || left || right;
     const shouldMove = (hasJoystickInput || hasKeyboardInput) && !isAttacking;
 
-    // Immediately stop if no input or attacking
+    // Handle stopping
     if (!shouldMove && isMoving.current) {
       vel.x = 0;
       vel.z = 0;
       rb.current.setLinvel(vel, true);
       isMoving.current = false;
-      if (!isAttacking) {
-        setAnimation("idle");
+      if (!isAttacking) setAnimation("idle");
+
+      // Sync position when stopping
+      if (onMovement) {
+        const position = container.current.position;
+        onMovement(
+          { x: position.x, y: position.y, z: position.z },
+          characterRotationTarget.current
+        );
       }
       return;
     }
 
-    // Handle movement when not attacking
+    // Handle movement
     if (!isAttacking && shouldMove) {
       isMoving.current = true;
 
-      // Priority 1: Joystick input
+      // Process input sources
       if (hasJoystickInput) {
         movement.x = -joystickDirection.x;
         movement.z = -joystickDirection.y;
-      }
-      // Priority 2: Keyboard input
-      else {
+      } else {
         if (forward) movement.z = 1;
         if (backward) movement.z = -1;
         if (left) movement.x = 1;
         if (right) movement.x = -1;
       }
 
-      // Update rotation based on movement
+      // Normalize diagonal movement
+      const inputMagnitude = Math.sqrt(
+        movement.x * movement.x + movement.z * movement.z
+      );
+      if (inputMagnitude > 0) {
+        movement.x /= inputMagnitude;
+        movement.z /= inputMagnitude;
+      }
+
+      // Update rotation
       if (movement.x !== 0) {
         rotationTarget.current += ROTATION_SPEED * movement.x;
       }
 
-      // Update character state
+      // Update animation and target rotation
       setAnimation("run");
       characterRotationTarget.current = Math.atan2(movement.x, movement.z);
 
-      // Apply movement velocity
-      vel.x =
-        Math.sin(rotationTarget.current + characterRotationTarget.current) *
-        WALK_SPEED;
-      vel.z =
-        Math.cos(rotationTarget.current + characterRotationTarget.current) *
-        WALK_SPEED;
+      // Calculate velocity
+      const moveAngle =
+        rotationTarget.current + characterRotationTarget.current;
+      vel.x = Math.sin(moveAngle) * WALK_SPEED;
+      vel.z = Math.cos(moveAngle) * WALK_SPEED;
+
+      // Sync movement
+      if (onMovement) {
+        const position = container.current.position;
+        onMovement(position, characterRotationTarget.current);
+      }
     }
 
-    // Handle keyboard attack inputs
-    if (punch && !isAttacking) {
-      setIsAttacking(true);
-      setAnimation("punch");
-      setTimeout(() => {
-        setIsAttacking(false);
-        setAnimation(isMoving.current ? "run" : "idle");
-      }, 800);
-    } else if (kick && !isAttacking) {
-      setIsAttacking(true);
-      setAnimation("kick");
-      setTimeout(() => {
-        setIsAttacking(false);
-        setAnimation(isMoving.current ? "run" : "idle");
-      }, 800);
+    // Handle attacks
+    if ((punch || onPunch) && !isAttacking) {
+      handleAttack("punch");
+    } else if ((kick || onKick) && !isAttacking) {
+      handleAttack("kick");
     }
 
-    // Smooth character rotation
+    // Apply smooth character rotation
     if (character.current) {
       character.current.rotation.y = lerpAngle(
         character.current.rotation.y,
@@ -171,23 +179,46 @@ const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
       );
     }
 
+    // Apply physics
     rb.current.setLinvel(vel, true);
 
-    // Camera controls
-    if (container.current) {
+    // Update camera
+    updateCamera();
+
+    // Helper function for attacks
+    function handleAttack(type) {
+      setIsAttacking(true);
+      setAnimation(type);
+      if (onAttack) onAttack(type);
+
+      setTimeout(
+        () => {
+          setIsAttacking(false);
+          setAnimation(isMoving.current ? "run" : "idle");
+
+          // Sync state after attack
+          if (onMovement && container.current) {
+            const position = container.current.position;
+            onMovement(position, characterRotationTarget.current);
+          }
+        },
+        type === "punch" ? 800 : 900
+      );
+    }
+
+    // Helper function for camera updates
+    function updateCamera() {
+      if (!camera || !cameraPosition.current || !cameraTarget.current) return;
+
       container.current.rotation.y = MathUtils.lerp(
         container.current.rotation.y,
         rotationTarget.current,
         0.1
       );
-    }
 
-    if (cameraPosition.current && camera) {
       cameraPosition.current.getWorldPosition(cameraWorldPosition.current);
       camera.position.lerp(cameraWorldPosition.current, 0.1);
-    }
 
-    if (cameraTarget.current && camera) {
       cameraTarget.current.getWorldPosition(cameraLookAtWorldPosition.current);
       cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
       camera.lookAt(cameraLookAt.current);
