@@ -12,7 +12,8 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     const newSocket = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL 
+      process.env.NEXT_PUBLIC_SOCKET_URL ||
+        "https://web-production-7edc.up.railway.app/"
     );
     setSocket(newSocket);
 
