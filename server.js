@@ -1,194 +1,199 @@
-require("dotenv").config();
-const express = require("express");
-const { createServer } = require("http");
+const next = require("next");
+const http = require("http");
 const { Server } = require("socket.io");
-const Redis = require("ioredis");
+const { createClient } = require("redis");
+const { createAdapter } = require("@socket.io/redis-adapter");
 
-const app = express();
-const httpServer = createServer(app);
-const PORT = process.env.PORT || 3001;
+const dev = process.env.NODE_ENV !== "production";
+const app = next({ dev });
+const handle = app.getRequestHandler();
 
-// Redis setup
-const redisClient = new Redis(
-  process.env.REDIS_URL || "redis://localhost:6379"
-);
+const PORT = process.env.PORT || 3000;
 
-// Socket.io setup with Redis adapter
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-  adapter: require("socket.io-redis")({
-    pubClient: redisClient,
-    subClient: redisClient.duplicate(),
-  }),
+// Initialize Redis clients
+const pubClient = createClient({
+  url: process.env.REDIS_URL || "redis://localhost:6379",
 });
 
-// Game state management
-class RoomManager {
-  constructor() {
-    this.rooms = new Map();
-  }
+const subClient = pubClient.duplicate();
 
-  createRoom(roomId) {
-    this.rooms.set(roomId, {
-      players: new Map(),
-      readyPlayers: new Set(),
-      gameStarted: false,
-    });
-    return this.rooms.get(roomId);
-  }
+Promise.all([pubClient.connect(), subClient.connect()])
+  .then(() => {
+    app.prepare().then(() => {
+      const server = http.createServer((req, res) => {
+        handle(req, res);
+      });
 
-  getRoom(roomId) {
-    return this.rooms.get(roomId);
-  }
+      const io = new Server(server, {
+        cors: {
+          origin: "*",
+        },
+        // Enable connection state recovery
+        connectionStateRecovery: {
+          maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+          skipMiddlewares: true,
+        },
+      });
 
-  joinRoom(socket, roomId, username) {
-    let room = this.getRoom(roomId) || this.createRoom(roomId);
+      // Use Redis adapter
+      io.adapter(createAdapter(pubClient, subClient));
 
-    room.players.set(socket.id, {
-      username,
-      position: { x: 0, y: 0, z: 0 },
-      rotation: 0,
-      animation: "idle",
-    });
+      // Object to track room states (in-memory, Redis could be used for persistence if needed)
+      const roomStates = new Map();
 
-    return room;
-  }
+      // Generate unique room IDs
+      const generateRoomId = () => {
+        return `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      };
 
-  cleanupRoom(roomId) {
-    const room = this.getRoom(roomId);
-    if (room && room.players.size === 0) {
-      this.rooms.delete(roomId);
-    }
-  }
-}
-
-const roomManager = new RoomManager();
-
-io.on("connection", (socket) => {
-  console.log(`Player connected: ${socket.id}`);
-
-  // Room management
-  socket.on("joinRoom", async ({ username }) => {
-    try {
-      // Find or create a suitable room
-      let roomToJoin = null;
-      for (const [roomId, room] of roomManager.rooms) {
-        if (room.players.size < 2 && !room.gameStarted) {
-          roomToJoin = roomId;
-          break;
+      // Find or create available room
+      const findAvailableRoom = () => {
+        for (const [roomId, state] of roomStates) {
+          if (state.players.size < 2 && !state.gameStarted) {
+            return roomId;
+          }
         }
-      }
+        // Create new room if none available
+        const newRoomId = generateRoomId();
+        roomStates.set(newRoomId, {
+          players: new Map(),
+          gameStarted: false,
+          createdAt: Date.now(),
+        });
+        return newRoomId;
+      };
 
-      if (!roomToJoin) {
-        roomToJoin = `room_${Date.now()}`;
-      }
+      // Cleanup empty rooms periodically
+      setInterval(() => {
+        const now = Date.now();
+        for (const [roomId, state] of roomStates) {
+          if (state.players.size === 0 && now - state.createdAt > 3600000) {
+            // 1 hour
+            roomStates.delete(roomId);
+            console.log(`Cleaned up empty room: ${roomId}`);
+          }
+        }
+      }, 60000); // Run every minute
 
-      const room = roomManager.joinRoom(socket, roomToJoin, username);
-      await socket.join(roomToJoin);
+      io.on("connection", (socket) => {
+        console.log(`New connection: ${socket.id}`);
 
-      // Prepare player list response
-      const players = Array.from(room.players.entries()).map(
-        ([id, player]) => ({
-          id,
-          username: player.username,
-          isReady: room.readyPlayers.has(id),
-        })
-      );
+        // Assign to room
+        const roomId = findAvailableRoom();
+        socket.join(roomId);
+        const roomState = roomStates.get(roomId);
 
-      // Notify the joining player
-      socket.emit("roomJoined", {
-        roomId: roomToJoin,
-        players,
-        isGameMaster: room.players.size === 1,
+        // Send current room state to new player
+        socket.emit("roomState", {
+          players: Array.from(roomState.players.values()),
+          gameStarted: roomState.gameStarted,
+        });
+
+        // Handle player joining
+        socket.on("joinRoom", (playerName) => {
+          if (roomState.players.has(socket.id)) {
+            return; // Already joined
+          }
+
+          // Check if name is taken in this room
+          for (const player of roomState.players.values()) {
+            if (player.name === playerName) {
+              socket.emit("usernameTaken");
+              return;
+            }
+          }
+
+          // Add player to room
+          roomState.players.set(socket.id, {
+            id: socket.id,
+            name: playerName,
+            isReady: false,
+          });
+
+          // Broadcast updated player list
+          io.to(roomId).emit(
+            "updatePlayers",
+            Array.from(roomState.players.values())
+          );
+        });
+
+        // Handle player ready status
+        socket.on("playerReady", () => {
+          const player = roomState.players.get(socket.id);
+          if (player) {
+            player.isReady = true;
+            io.to(roomId).emit(
+              "updatePlayers",
+              Array.from(roomState.players.values())
+            );
+
+            // Start game if all ready
+            if (
+              roomState.players.size === 2 &&
+              Array.from(roomState.players.values()).every((p) => p.isReady)
+            ) {
+              roomState.gameStarted = true;
+              io.to(roomId).emit("startGame");
+            }
+          }
+        });
+
+        // Handle game movements
+        socket.on("carMove", (data) => {
+          socket.to(roomId).emit("carMove", data);
+        });
+
+        // Handle game restarts
+        socket.on("restartGame", () => {
+          roomState.players.clear();
+          roomState.gameStarted = false;
+          io.to(roomId).emit("restartGame");
+        });
+
+        socket.on("playerRestart", (data) => {
+          console.log(
+            `Player ${data.playerName} (${data.playerId}) restarted their game`
+          );
+        });
+        // Handle disconnections
+        socket.on("disconnect", () => {
+          console.log(`Disconnected: ${socket.id}`);
+          if (roomState.players.delete(socket.id)) {
+            io.to(roomId).emit(
+              "updatePlayers",
+              Array.from(roomState.players.values())
+            );
+
+            // Notify if game was in progress
+            if (roomState.gameStarted) {
+              io.to(roomId).emit("playerDisconnected", socket.id);
+            }
+          }
+        });
+
+        // Error handling
+        socket.on("error", (err) => {
+          console.error(`Socket error (${socket.id}):`, err);
+        });
       });
 
-      // Notify other players in the room
-      socket.to(roomToJoin).emit("playerJoined", {
-        playerId: socket.id,
-        username,
+      // Handle Redis client errors
+      pubClient.on("error", (err) => {
+        console.error("Redis pub client error:", err);
       });
-    } catch (error) {
-      console.error("Room join error:", error);
-      socket.emit("error", { message: "Failed to join room" });
-    }
-  });
 
-  // Game readiness
-  socket.on("playerReady", ({ roomId }) => {
-    const room = roomManager.getRoom(roomId);
-    if (!room) return;
+      subClient.on("error", (err) => {
+        console.error("Redis sub client error:", err);
+      });
 
-    room.readyPlayers.add(socket.id);
-    socket.to(roomId).emit("playerReady", { playerId: socket.id });
-
-    // Start game if all players are ready
-    if (room.readyPlayers.size === 2) {
-      room.gameStarted = true;
-      io.to(roomId).emit("startGame");
-      console.log(`Game started in room ${roomId}`);
-    }
-  });
-
-  // Gameplay events
-  socket.on("playerMovement", ({ roomId, position, rotation }) => {
-    const room = roomManager.getRoom(roomId);
-    if (!room || !room.gameStarted) return;
-
-    // Update player state
-    if (room.players.has(socket.id)) {
-      room.players.get(socket.id).position = position;
-      room.players.get(socket.id).rotation = rotation;
-    }
-
-    // Broadcast to other players
-    socket.to(roomId).emit("playerMovement", {
-      playerId: socket.id,
-      position,
-      rotation,
+      server.listen(PORT, (err) => {
+        if (err) throw err;
+        console.log(`> Ready on http://localhost:${PORT}`);
+        console.log(`> Using Redis: ${pubClient.options.url}`);
+      });
     });
+  })
+  .catch((err) => {
+    console.error("Redis connection failed:", err);
+    process.exit(1);
   });
-
-  socket.on("playerAttack", ({ roomId, attackType }) => {
-    const room = roomManager.getRoom(roomId);
-    if (!room || !room.gameStarted) return;
-
-    // Update player state
-    if (room.players.has(socket.id)) {
-      room.players.get(socket.id).animation = attackType;
-    }
-
-    // Broadcast to other players
-    socket.to(roomId).emit("playerAttack", {
-      playerId: socket.id,
-      attackType,
-    });
-  });
-
-  // Disconnection handling
-  socket.on("disconnect", () => {
-    console.log(`Player disconnected: ${socket.id}`);
-
-    // Find and clean up rooms
-    for (const [roomId, room] of roomManager.rooms) {
-      if (room.players.has(socket.id)) {
-        room.players.delete(socket.id);
-        room.readyPlayers.delete(socket.id);
-
-        // Notify remaining player
-        socket.to(roomId).emit("playerLeft");
-
-        // Clean up empty rooms
-        roomManager.cleanupRoom(roomId);
-        break;
-      }
-    }
-  });
-});
-
-httpServer.listen(PORT, () => {
-  console.log(`Fight Arena server running on port ${PORT}`);
-});

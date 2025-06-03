@@ -1,248 +1,224 @@
-import React, { useRef, useState, useEffect } from "react";
+// src/components/CarController.jsx
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
-import { MathUtils, Vector3 } from "three";
-import { useFrame, useThree } from "@react-three/fiber";
+import { Vector3 } from "three";
+import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
+import { MathUtils } from "three/src/math/MathUtils";
+import { useSocket } from "../context/SocketContext";
 import Fighter from "./Fighter";
 
-const normalizeAngle = (angle) => {
-  while (angle > Math.PI) angle -= 2 * Math.PI;
-  while (angle < -Math.PI) angle += 2 * Math.PI;
-  return angle;
-};
+const PlayerController = forwardRef(
+  ({ joystickInput, onRaceEnd, position, isPlayer1, color }, ref) => {
+    const socket = useSocket();
+    const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
+    const [isBraking, setIsBraking] = useState(false);
+    const [isReversing, setIsReversing] = useState(false);
 
-const lerpAngle = (start, end, t) => {
-  start = normalizeAngle(start);
-  end = normalizeAngle(end);
 
-  if (Math.abs(end - start) > Math.PI) {
-    if (end > start) {
-      start += 2 * Math.PI;
-    } else {
-      end += 2 * Math.PI;
-    }
-  }
+    useEffect(() => {
+      const handleResize = () => {
+        setIsSmallScreen(window.innerWidth < 640);
+      };
 
-  return normalizeAngle(start + (end - start) * t);
-};
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
-const PlayerController = ({ joystickDirection, onPunch, onKick }) => {
-  const { camera } = useThree();
-  const [animation, setAnimation] = useState("idle");
-  const [isAttacking, setIsAttacking] = useState(false);
-  const WALK_SPEED = 3;
-  const ROTATION_SPEED = 0.02;
+    const WALK_SPEED = isSmallScreen ? 90 : 100;
+    const RUN_SPEED = 100;
+    const ROTATION_SPEED = isSmallScreen ? 0.03 : 0.02;
+    const ACCELERATION = 0.5;
+    const DECELERATION = 1;
 
-  // Refs
-  const container = useRef();
-  const character = useRef();
-  const cameraTarget = useRef();
-  const rotationTarget = useRef(0);
-  const characterRotationTarget = useRef(0);
-  const cameraPosition = useRef();
-  const rb = useRef();
-  const isMoving = useRef(false);
+    const rb = useRef();
+    const container = useRef();
+    const character = useRef();
+    const rotationTarget = useRef(0);
+    const cameraTarget = useRef();
+    const cameraPosition = useRef();
+    const cameraworldPosition = useRef(new Vector3());
+    const cameraLookAtWorldPosition = useRef(new Vector3());
+    const cameraLookAt = useRef(new Vector3());
+    const [, get] = useKeyboardControls();
 
-  // Camera refs
-  const cameraWorldPosition = useRef(new Vector3());
-  const cameraLookAtWorldPosition = useRef(new Vector3());
-  const cameraLookAt = useRef(new Vector3());
+    const currentSpeed = useRef(0);
 
-  const [, get] = useKeyboardControls();
+    useFrame(({ camera, mouse }) => {
+      if (rb.current && isPlayer1) {
+        const vel = rb.current.linvel();
+        const movement = {
+          x: 0,
+          z: 0,
+        };
 
-  // Initialize rigidbody properties
-  useEffect(() => {
-    if (rb.current) {
-      rb.current.setLinearDamping(5);
-      rb.current.setAngularDamping(5);
-    }
-  }, []);
+        let targetSpeed = 0;
 
-  // Handle punch from mobile buttons
-  useEffect(() => {
-    if (onPunch && !isAttacking) {
-      setIsAttacking(true);
-      setAnimation("punch");
-      setTimeout(() => {
-        setIsAttacking(false);
-        setAnimation(isMoving.current ? "run" : "idle");
-      }, 800);
-    }
-  }, [onPunch, isAttacking]);
+        const { forward, backward, left, right, run } = get();
+        if (forward) {
+          targetSpeed = run ? RUN_SPEED : WALK_SPEED;
 
-  // Handle kick from mobile buttons
-  useEffect(() => {
-    if (onKick && !isAttacking) {
-      setIsAttacking(true);
-      setAnimation("kick");
-      setTimeout(() => {
-        setIsAttacking(false);
-        setAnimation(isMoving.current ? "run" : "idle");
-      }, 800);
-    }
-  }, [onKick, isAttacking]);
-
-  useFrame(() => {
-    if (!rb.current || !container.current) return;
-
-    const vel = rb.current.linvel();
-    const movement = { x: 0, z: 0 };
-    const { forward, backward, left, right, punch, kick } = get();
-
-    // Calculate movement input
-    const hasJoystickInput =
-      joystickDirection &&
-      (Math.abs(joystickDirection.x) > 0.1 ||
-        Math.abs(joystickDirection.y) > 0.1);
-    const hasKeyboardInput = forward || backward || left || right;
-    const shouldMove = (hasJoystickInput || hasKeyboardInput) && !isAttacking;
-
-    // Handle stopping
-    if (!shouldMove && isMoving.current) {
-      vel.x = 0;
-      vel.z = 0;
-      rb.current.setLinvel(vel, true);
-      isMoving.current = false;
-      if (!isAttacking) setAnimation("idle");
-
-      // Sync position when stopping
-      if (onMovement) {
-        const position = container.current.position;
-        onMovement(
-          { x: position.x, y: position.y, z: position.z },
-          characterRotationTarget.current
-        );
-      }
-      return;
-    }
-
-    // Handle movement
-    if (!isAttacking && shouldMove) {
-      isMoving.current = true;
-
-      // Process input sources
-      if (hasJoystickInput) {
-        movement.x = -joystickDirection.x;
-        movement.z = -joystickDirection.y;
-      } else {
-        if (forward) movement.z = 1;
-        if (backward) movement.z = -1;
-        if (left) movement.x = 1;
-        if (right) movement.x = -1;
-      }
-
-      // Normalize diagonal movement
-      const inputMagnitude = Math.sqrt(
-        movement.x * movement.x + movement.z * movement.z
-      );
-      if (inputMagnitude > 0) {
-        movement.x /= inputMagnitude;
-        movement.z /= inputMagnitude;
-      }
-
-      // Update rotation
-      if (movement.x !== 0) {
-        rotationTarget.current += ROTATION_SPEED * movement.x;
-      }
-
-      // Update animation and target rotation
-      setAnimation("run");
-      characterRotationTarget.current = Math.atan2(movement.x, movement.z);
-
-      // Calculate velocity
-      const moveAngle =
-        rotationTarget.current + characterRotationTarget.current;
-      vel.x = Math.sin(moveAngle) * WALK_SPEED;
-      vel.z = Math.cos(moveAngle) * WALK_SPEED;
-
-      // Sync movement
-      if (onMovement) {
-        const position = container.current.position;
-        onMovement(position, characterRotationTarget.current);
-      }
-    }
-
-    // Handle attacks
-    if ((punch || onPunch) && !isAttacking) {
-      handleAttack("punch");
-    } else if ((kick || onKick) && !isAttacking) {
-      handleAttack("kick");
-    }
-
-    // Apply smooth character rotation
-    if (character.current) {
-      character.current.rotation.y = lerpAngle(
-        character.current.rotation.y,
-        characterRotationTarget.current,
-        0.1
-      );
-    }
-
-    // Apply physics
-    rb.current.setLinvel(vel, true);
-
-    // Update camera
-    updateCamera();
-
-    // Helper function for attacks
-    function handleAttack(type) {
-      setIsAttacking(true);
-      setAnimation(type);
-      if (onAttack) onAttack(type);
-
-      setTimeout(
-        () => {
-          setIsAttacking(false);
-          setAnimation(isMoving.current ? "run" : "idle");
-
-          // Sync state after attack
-          if (onMovement && container.current) {
-            const position = container.current.position;
-            onMovement(position, characterRotationTarget.current);
+          setIsBraking(false);
+          setIsReversing(false);
+          setIsMovingForward(true);
+        } else if (backward) {
+          if (currentSpeed.current > 0) {
+            targetSpeed = 0;
+          } else {
+            targetSpeed = 0;
           }
-        },
-        type === "punch" ? 800 : 900
-      );
-    }
+          setIsReversing(true);
+          setIsMovingForward(false);
+        } else {
+          setIsReversing(false);
+          setIsBraking(false);
+          setIsMovingForward(false);
+        }
 
-    // Helper function for camera updates
-    function updateCamera() {
-      if (!camera || !cameraPosition.current || !cameraTarget.current) return;
+        if (joystickInput) {
+          if (joystickInput.y < 0) {
+            targetSpeed = WALK_SPEED;
+            setIsBraking(false);
+            setIsReversing(false);
+            setIsMovingForward(true);
+          } else if (joystickInput.y > 0) {
+            if (currentSpeed.current > 0) {
+              targetSpeed = 0;
+            } else {
+              targetSpeed = 0;
+            }
+            setIsReversing(true);
+            setIsMovingForward(false);
+          }
+          rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+        }
 
-      container.current.rotation.y = MathUtils.lerp(
-        container.current.rotation.y,
-        rotationTarget.current,
-        0.1
-      );
+        if (currentSpeed.current < targetSpeed) {
+          currentSpeed.current += ACCELERATION;
+        } else if (currentSpeed.current > targetSpeed) {
+          currentSpeed.current -= DECELERATION;
+        }
 
-      cameraPosition.current.getWorldPosition(cameraWorldPosition.current);
-      camera.position.lerp(cameraWorldPosition.current, 0.1);
+        if (currentSpeed.current !== 0) {
+          movement.z = currentSpeed.current > 0 ? -1 : 1;
+        }
 
-      cameraTarget.current.getWorldPosition(cameraLookAtWorldPosition.current);
-      cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
-      camera.lookAt(cameraLookAt.current);
-    }
-  });
+        setIsBraking(currentSpeed.current < 0);
 
-  return (
-    <RigidBody
-      colliders={false}
-      lockRotations
-      ref={rb}
-      linearDamping={5}
-      angularDamping={5}
-    >
-      <group ref={container}>
-        <group ref={cameraTarget} position={[0, 0, 1.5]} />
-        <group ref={cameraPosition} position={[0, 4, -4]} />
-        <group ref={character}>
-          <Fighter animation={animation} position={[0, 0.6, 0]} />
+        if (left) {
+          movement.x = 1;
+        }
+        if (right) {
+          movement.x = -1;
+        }
+
+        if (movement.x !== 0) {
+          rotationTarget.current += ROTATION_SPEED * movement.x;
+        }
+
+        if (movement.x !== 0 || movement.z !== 0) {
+          vel.x =
+            Math.sin(rotationTarget.current) *
+            Math.abs(currentSpeed.current) *
+            movement.z;
+          vel.z =
+            Math.cos(rotationTarget.current) *
+            Math.abs(currentSpeed.current) *
+            movement.z;
+        }
+
+        rb.current.setLinvel(vel, true);
+
+        if (socket) {
+          socket.emit("carMove", {
+            position: rb.current.translation(),
+            rotation: container.current.rotation.y,
+            isPlayer1,
+          });
+        }
+      }
+
+      if (isPlayer1) {
+        container.current.rotation.y = MathUtils.lerp(
+          container.current.rotation.y,
+          rotationTarget.current,
+          0.1
+        );
+        cameraPosition.current.getWorldPosition(cameraworldPosition.current);
+        camera.position.lerp(cameraworldPosition.current, 0.1);
+        if (cameraTarget.current) {
+          cameraTarget.current.getWorldPosition(
+            cameraLookAtWorldPosition.current
+          );
+          cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
+          camera.lookAt(cameraLookAt.current);
+        }
+      }
+    });
+
+    useEffect(() => {
+      if (socket) {
+        socket.on("carMove", (data) => {
+          if (data.isPlayer1 !== isPlayer1) {
+            rb.current.setTranslation(data.position);
+            container.current.rotation.y = data.rotation;
+          }
+        });
+      }
+    }, [socket, isPlayer1]);
+
+    const respawn = () => {
+      rb.current.setTranslation({ x: 0, y: -10, z: -10 });
+      rb.current.setLinvel({ x: 0, y: 0, z: 0 });
+      rb.current.setAngvel({ x: 0, y: 0, z: 0 });
+      rotationTarget.current = 0;
+      container.current.rotation.y = 0;
+    };
+
+    useImperativeHandle(ref, () => ({
+      respawn,
+      playVictorySound,
+      playLostSound,
+    }));
+
+    return (
+      <RigidBody
+        colliders={false}
+        lockRotations
+        ref={rb}
+        gravityScale={9}
+        onIntersectionEnter={({ other }) => {
+          if (other.rigidBodyObject.name === "raceEnd") {
+            onRaceEnd(isPlayer1); // Pass isPlayer1 to onRaceEnd
+          } else if (other.rigidBodyObject.name === "space") {
+            respawn();
+          }
+        }}
+      >
+        <group ref={container} position={position}>
+          <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
+          <group ref={cameraPosition} position-y={10} position-z={18} />
+          <group ref={character} rotation-y={Math.PI}>
+            <Fighter
+              scale={isSmallScreen ? 2.7 : 3.18}
+              position-y={-0.25}
+              isBraking={isBraking}
+              isReversing={isReversing}
+              color={color}
+            />
+            <CapsuleCollider args={[0.5, 3.5]} position={[0, 3, 0]} />
+          </group>
         </group>
-      </group>
-      <CapsuleCollider args={[0.45, 0.45]} position={[0, 1.5, 0]} />
-    </RigidBody>
-  );
-};
+      </RigidBody>
+    );
+  }
+);
 
 export default PlayerController;
