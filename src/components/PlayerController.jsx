@@ -194,13 +194,7 @@ const PlayerController = forwardRef(
         lockRotations
         ref={rb}
         gravityScale={9}
-        onIntersectionEnter={({ other }) => {
-          if (other.rigidBodyObject.name === "raceEnd") {
-            onRaceEnd(isPlayer1); // Pass isPlayer1 to onRaceEnd
-          } else if (other.rigidBodyObject.name === "space") {
-            respawn();
-          }
-        }}
+     
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
