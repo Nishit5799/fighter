@@ -77,7 +77,7 @@ const Joystick = ({ onMove, onStart = () => {}, disabled }) => {
   return (
     <div
       ref={joystickRef}
-      className="fixed bottom-5 left-5 w-32 h-32 rounded-full bg-white bg-opacity-50 touch-none flex items-center justify-center sm:block md:hidden select-none user-select-none"
+      className="fixed bottom-5 left-5 w-32 h-32 rounded-full bg-white bg-opacity-50 touch-none flex items-center justify-center  sm:hidden select-none user-select-none"
     >
       <div
         ref={thumbstickRef}

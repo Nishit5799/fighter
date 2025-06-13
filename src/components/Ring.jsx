@@ -1,0 +1,40 @@
+import React from "react";
+import { useGLTF } from "@react-three/drei";
+import { RigidBody } from "@react-three/rapier";
+
+export default function Ring(props) {
+  const { nodes, materials } = useGLTF("/ring.glb");
+  return (
+    <group {...props} dispose={null}>
+      <RigidBody type="fixed" colliders="trimesh">
+        <group scale={0.01}>
+          <group
+            rotation={[-Math.PI / 2, 0, 0]}
+            scale={[882.048, 1043.17, 135.761]}
+          >
+            <mesh
+              geometry={nodes.Cube_ring_0.geometry}
+              // material={materials.ring}
+            >
+              <meshBasicMaterial color="#777777" />
+            </mesh>
+            <mesh
+              geometry={nodes.Cube_Material001_0.geometry}
+              material={materials["Material.001"]}
+            />
+            <mesh
+              geometry={nodes.Cube_amod_0.geometry}
+              material={materials.amod}
+            />
+            <mesh
+              geometry={nodes.Cube_black_0.geometry}
+              material={materials.black}
+            />
+          </group>
+        </group>
+      </RigidBody>
+    </group>
+  );
+}
+
+useGLTF.preload("/ring.glb");

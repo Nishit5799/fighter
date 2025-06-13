@@ -143,6 +143,12 @@ Promise.all([pubClient.connect(), subClient.connect()])
           socket.to(roomId).emit("carMove", data);
         });
 
+        socket.on("playerHit", (data) => {
+          socket.to(roomId).emit("playerHit", data);
+        });
+        socket.on("playerDefeated", (data) => {
+          io.to(roomId).emit("playerDefeated", data);
+        });
         // Handle game restarts
         socket.on("restartGame", () => {
           roomState.players.clear();
