@@ -19,7 +19,7 @@ export default function Ring(props) {
               <meshStandardMaterial
                 color="#777777"
                 metalness={0.7}
-                roughness={0.4}
+                roughness={0.5}
               />
             </mesh>
             <mesh

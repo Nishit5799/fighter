@@ -10,7 +10,6 @@ import { Canvas } from "@react-three/fiber";
 import {
   Environment,
   KeyboardControls,
-  OrbitControls,
   OrthographicCamera,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
@@ -22,7 +21,7 @@ import gsap from "gsap";
 import { useSocket } from "../context/SocketContext";
 
 import Info from "./Info";
-import Arena from "./Arena";
+
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 
@@ -145,45 +144,6 @@ const Experience = () => {
       );
     }
   }, [showWelcomeScreen]);
-
-  const handleRaceEnd = useCallback(
-    (isPlayer1) => {
-      if (!players || players.length < 2) return;
-
-      const winnerPlayer = isPlayer1 ? players[0] : players[1];
-      const loserPlayer = isPlayer1 ? players[1] : players[0];
-
-      setWinner(winnerPlayer);
-      setLoser(loserPlayer);
-
-      console.log(
-        `Winner: ${winnerPlayer.name} (ID: ${winnerPlayer.id}), Is Player 1: ${isPlayer1}`
-      );
-      console.log(
-        `Loser: ${loserPlayer.name} (ID: ${
-          loserPlayer.id
-        }), Is Player 1: ${!isPlayer1}`
-      );
-
-      if (isPlayer1) {
-        setPopupMessage(`You won, ${winnerPlayer.name}! Well played!`);
-        carControllerRef1.current?.playVictorySound();
-      } else {
-        setPopupMessage(
-          `You lost, ${winnerPlayer.name}. ${loserPlayer.name} won the race. Let's try again!`
-        );
-        carControllerRef1.current?.playLostSound();
-      }
-
-      setShowPopup(true);
-      hasStarted.current = false;
-
-      if (socket) {
-        socket.emit("raceEnd", isPlayer1);
-      }
-    },
-    [players, socket]
-  );
 
   const handleReset = useCallback(() => {
     setRestartCountdown(2);
@@ -366,7 +326,7 @@ const Experience = () => {
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <Environment preset="sunset" />
-          {/* <OrbitControls /> */}
+         
           <directionalLight
             intensity={0.5}
             castShadow
@@ -394,7 +354,6 @@ const Experience = () => {
           </directionalLight>
 
           <Physics>
-            {/* <Arena /> */}
             <Ring />
 
             {isGameStarted && (
@@ -405,7 +364,6 @@ const Experience = () => {
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
                   }
-                  onRaceEnd={handleRaceEnd}
                   disabled={!isGameStarted}
                   position={[1.6, 0, 0]}
                   isPlayer1={players[0]?.id === socket?.id}
@@ -421,7 +379,6 @@ const Experience = () => {
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
                   }
-                  onRaceEnd={handleRaceEnd}
                   disabled={!isGameStarted}
                   position={[-1.6, 0, 0]}
                   isPlayer1={players[1]?.id === socket?.id}

@@ -37,7 +37,8 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
-    const colliderArgs = isSmallScreen ? [0.2, 0.4] : [0.2, 0.4];
+    const colliderArgs = isSmallScreen ? [0.4, 0.25] : [0.2, 0.4];
+    const sensorArgs = isSmallScreen ? [0.4, 0.35] : [0.3, 0.6];
     const attackDamage = 10;
     const [health, setHealth] = useState(100);
     const opponentRef = useRef();
@@ -53,11 +54,9 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = 2;
+    const WALK_SPEED = isSmallScreen ? 2.1 : 2;
     const RUN_SPEED = 4;
-    const ROTATION_SPEED = isSmallScreen ? 0.03 : 0.04;
-    const ACCELERATION = 0.5;
-    const DECELERATION = 1;
+    const ROTATION_SPEED = isSmallScreen ? 0.055 : 0.04;
 
     const rb = useRef();
     const container = useRef();
@@ -70,7 +69,6 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
 
-    const currentSpeed = useRef(0);
     const movementEnabled = useRef(true);
 
     const setOpponentRef = (ref) => {
@@ -163,10 +161,10 @@ const PlayerController = forwardRef(
       }
 
       const otherUserData = event.other.rigidBody?.userData;
-      console.log("Collision enter with:", otherUserData?.id);
+      // console.log("Collision enter with:", otherUserData?.id);
 
       if (otherUserData?.id === opponentRef.current?.id) {
-        console.log("Valid collision with opponent detected");
+        // console.log("Valid collision with opponent detected");
         setIsInContact(true);
 
         if (contactTimeout.current) {
@@ -179,11 +177,11 @@ const PlayerController = forwardRef(
       if (!opponentRef.current || !rb.current) return;
 
       const otherUserData = event.other.rigidBody?.userData;
-      console.log("Collision exit with:", otherUserData?.id);
+      // console.log("Collision exit with:", otherUserData?.id);
 
       if (otherUserData?.id === opponentRef.current?.id) {
         contactTimeout.current = setTimeout(() => {
-          console.log("No longer colliding with opponent");
+          // console.log("No longer colliding with opponent");
           setIsInContact(false);
         }, 100);
       }
@@ -229,21 +227,22 @@ const PlayerController = forwardRef(
 
       const vel = rb.current.linvel();
       const movement = { x: 0, z: 0 };
-      let targetSpeed = 0;
 
       const { forward, backward, left, right, run, punch, kick } = get();
 
+      // Handle attacks
       if (punch && !isAttacking && !isHit) startAttack("punch");
       if (kick && !isAttacking && !isHit) startAttack("kick");
 
       if (movementEnabled.current && !isHit) {
+        // Movement handling - simplified to use WALK_SPEED directly
         if (forward) {
-          targetSpeed = run ? RUN_SPEED : WALK_SPEED;
+          movement.z = -WALK_SPEED; // Move forward at constant WALK_SPEED
           setIsBraking(false);
           setIsReversing(false);
           if (!isAttacking) setCurrentAnimation("run");
         } else if (backward) {
-          targetSpeed = 0;
+          movement.z = 0;
           setIsReversing(true);
           if (!isAttacking) setCurrentAnimation("idle");
         } else {
@@ -252,60 +251,45 @@ const PlayerController = forwardRef(
           if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
+        // Joystick input handling
         if (joystickInput) {
           if (joystickInput.y < 0) {
-            targetSpeed = WALK_SPEED;
+            movement.z = -WALK_SPEED;
             setIsBraking(false);
             setIsReversing(false);
             if (!isAttacking) setCurrentAnimation("run");
           } else if (joystickInput.y > 0) {
-            targetSpeed = 0;
+            movement.z = 0;
             setIsReversing(true);
             if (!isAttacking) setCurrentAnimation("idle");
           }
           rotationTarget.current += ROTATION_SPEED * joystickInput.x;
         }
 
+        // Rotation handling
         if (left) movement.x = 1;
         if (right) movement.x = -1;
-      } else {
-        targetSpeed = 0;
-        currentSpeed.current = 0;
       }
 
-      if (currentSpeed.current < targetSpeed) {
-        currentSpeed.current += ACCELERATION;
-      } else if (currentSpeed.current > targetSpeed) {
-        currentSpeed.current -= DECELERATION;
-      }
-
-      if (currentSpeed.current !== 0 && movementEnabled.current && !isHit) {
-        movement.z = currentSpeed.current > 0 ? -1 : 1;
-      }
-
-      setIsBraking(currentSpeed.current < 0);
-
+      // Apply rotation
       if (movement.x !== 0 && movementEnabled.current && !isHit) {
         rotationTarget.current += ROTATION_SPEED * movement.x;
       }
 
+      // Apply movement
       if (
         (movement.x !== 0 || movement.z !== 0) &&
         movementEnabled.current &&
         !isHit
       ) {
-        vel.x =
-          Math.sin(rotationTarget.current) *
-          Math.abs(currentSpeed.current) *
-          movement.z;
-        vel.z =
-          Math.cos(rotationTarget.current) *
-          Math.abs(currentSpeed.current) *
-          movement.z;
+        vel.x = Math.sin(rotationTarget.current) * movement.z;
+        vel.z = Math.cos(rotationTarget.current) * movement.z;
       }
 
+      // Update rigid body velocity
       rb.current.setLinvel(vel, true);
 
+      // Sync with server
       if (socket) {
         socket.emit("carMove", {
           position: rb.current.translation(),
@@ -318,6 +302,7 @@ const PlayerController = forwardRef(
         });
       }
 
+      // Camera follow for player 1
       if (isPlayer1) {
         container.current.rotation.y = MathUtils.lerp(
           container.current.rotation.y,
@@ -433,7 +418,7 @@ const PlayerController = forwardRef(
             )}
             <CapsuleCollider args={colliderArgs} position={[0, 3, 0]} />
             <CapsuleCollider
-              args={[0.3, 0.6]}
+              args={sensorArgs}
               position={[0, 3, 0]}
               sensor
               onCollisionEnter={handleCollisionEnter}
