@@ -53,7 +53,7 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = isSmallScreen ? 2.1 : 2;
+    const WALK_SPEED = isSmallScreen ? 2.8 : 2;
     const RUN_SPEED = 4;
     const ROTATION_SPEED = isSmallScreen ? 0.08 : 0.04;
 
@@ -225,7 +225,9 @@ const PlayerController = forwardRef(
 
       const vel = rb.current.linvel();
       const movement = { x: 0, z: 0 };
-
+      const isUsingJoystick =
+        joystickInput &&
+        (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
       const { forward, backward, left, right, run, punch, kick } = get();
 
       // Handle attacks
@@ -233,7 +235,7 @@ const PlayerController = forwardRef(
       if (kick && !isAttacking && !isHit) startAttack("kick");
 
       if (movementEnabled.current && !isHit) {
-        // Movement handling
+        // Keyboard movement handling
         if (forward) {
           movement.z = -WALK_SPEED;
           setIsBraking(false);
@@ -249,28 +251,30 @@ const PlayerController = forwardRef(
           if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
-        // Joystick input handling - improved for mobile
+        // Joystick input handling - optimized version
         if (joystickInput) {
-          // Forward/backward movement
-          if (joystickInput.y < 0) {
-            movement.z = -WALK_SPEED;
-            setIsBraking(false);
-            setIsReversing(false);
-            if (!isAttacking) setCurrentAnimation("run");
-          } else if (joystickInput.y > 0) {
-            movement.z = 0;
-            setIsReversing(true);
-            if (!isAttacking) setCurrentAnimation("idle");
-          }
+          const joystickMagnitude = Math.sqrt(
+            joystickInput.x * joystickInput.x +
+              joystickInput.y * joystickInput.y
+          );
 
-          // Rotation with deadzone and maintained forward speed
-          if (Math.abs(joystickInput.x) > 0.1) {
-            // Deadzone to prevent micro-rotations
-            rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+          // Only process if joystick is being actively used (deadzone)
+          if (joystickMagnitude > 0.1) {
+            // Rotation
+            if (Math.abs(joystickInput.x) > 0.1) {
+              rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+            }
 
-            // Maintain forward speed during rotation if moving forward
+            // Movement - maintain full speed in movement direction
             if (joystickInput.y < 0) {
-              movement.z = -WALK_SPEED * (isSmallScreen ? 1.2 : 1); // Slight boost on mobile
+              movement.z = -WALK_SPEED;
+              setIsBraking(false);
+              setIsReversing(false);
+              if (!isAttacking) setCurrentAnimation("run");
+            } else if (joystickInput.y > 0) {
+              movement.z = 0;
+              setIsReversing(true);
+              if (!isAttacking) setCurrentAnimation("idle");
             }
           }
         }
@@ -285,14 +289,23 @@ const PlayerController = forwardRef(
         rotationTarget.current += ROTATION_SPEED * movement.x;
       }
 
-      // Apply movement
-      if (
-        (movement.x !== 0 || movement.z !== 0) &&
-        movementEnabled.current &&
-        !isHit
-      ) {
-        vel.x = Math.sin(rotationTarget.current) * movement.z;
-        vel.z = Math.cos(rotationTarget.current) * movement.z;
+      // Apply movement - special handling for joystick
+      if (movementEnabled.current && !isHit) {
+        if (isUsingJoystick && joystickInput.y < 0) {
+          // For joystick: maintain constant speed in movement direction
+          const moveDirection = new Vector3(
+            Math.sin(rotationTarget.current),
+            0,
+            Math.cos(rotationTarget.current)
+          ).normalize();
+
+          vel.x = moveDirection.x * -WALK_SPEED;
+          vel.z = moveDirection.z * -WALK_SPEED;
+        } else if (movement.x !== 0 || movement.z !== 0) {
+          // Default movement for keyboard
+          vel.x = Math.sin(rotationTarget.current) * movement.z;
+          vel.z = Math.cos(rotationTarget.current) * movement.z;
+        }
       }
 
       // Update rigid body velocity
