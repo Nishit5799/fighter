@@ -53,9 +53,9 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = isSmallScreen ? 2 : 2;
+    const WALK_SPEED = isSmallScreen ? 2.1 : 2;
     const RUN_SPEED = 4;
-    const ROTATION_SPEED = isSmallScreen ? 0.05 : 0.04;
+    const ROTATION_SPEED = isSmallScreen ? 0.08 : 0.04;
 
     const rb = useRef();
     const container = useRef();
@@ -220,7 +220,6 @@ const PlayerController = forwardRef(
         socket.off("playerDefeated", onPlayerDefeated);
       };
     }, [socket]);
-
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1) return;
 
@@ -234,9 +233,9 @@ const PlayerController = forwardRef(
       if (kick && !isAttacking && !isHit) startAttack("kick");
 
       if (movementEnabled.current && !isHit) {
-        // Movement handling - simplified to use WALK_SPEED directly
+        // Movement handling
         if (forward) {
-          movement.z = -WALK_SPEED; // Move forward at constant WALK_SPEED
+          movement.z = -WALK_SPEED;
           setIsBraking(false);
           setIsReversing(false);
           if (!isAttacking) setCurrentAnimation("run");
@@ -250,8 +249,9 @@ const PlayerController = forwardRef(
           if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
-        // Joystick input handling
+        // Joystick input handling - improved for mobile
         if (joystickInput) {
+          // Forward/backward movement
           if (joystickInput.y < 0) {
             movement.z = -WALK_SPEED;
             setIsBraking(false);
@@ -262,10 +262,20 @@ const PlayerController = forwardRef(
             setIsReversing(true);
             if (!isAttacking) setCurrentAnimation("idle");
           }
-          rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+
+          // Rotation with deadzone and maintained forward speed
+          if (Math.abs(joystickInput.x) > 0.1) {
+            // Deadzone to prevent micro-rotations
+            rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+
+            // Maintain forward speed during rotation if moving forward
+            if (joystickInput.y < 0) {
+              movement.z = -WALK_SPEED * (isSmallScreen ? 1.2 : 1); // Slight boost on mobile
+            }
+          }
         }
 
-        // Rotation handling
+        // Keyboard rotation handling
         if (left) movement.x = 1;
         if (right) movement.x = -1;
       }
