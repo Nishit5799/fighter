@@ -7,7 +7,7 @@ export default function Ring(props) {
   return (
     <group {...props} dispose={null}>
       <RigidBody type="fixed" colliders="trimesh">
-        <group scale={0.0024} position={[0, 1.3, 0]}>
+        <group scale={0.0024}>
           <group
             rotation={[-Math.PI / 2, 0, 0]}
             scale={[882.048, 1043.17, 135.761]}
