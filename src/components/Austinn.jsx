@@ -37,7 +37,7 @@ export default function Austinn({
   }, [animation, actions]);
   return (
     <group ref={group} {...props} dispose={null}>
-      <group name="Scene" scale={0.23} position={[0, position, 0]}>
+      <group name="Scene" scale={0.07} position={[0, position, 0]}>
         <group
           name="node_fa4db8f5_24ac_4ab4_bbf6_653508ff73e5"
           rotation={[Math.PI / 2, 0, 0]}

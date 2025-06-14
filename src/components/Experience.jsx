@@ -24,6 +24,7 @@ import { useSocket } from "../context/SocketContext";
 import Info from "./Info";
 import Arena from "./Arena";
 import PlayerController from "./PlayerController";
+import Ring from "./Ring";
 
 const keyboardMap = [
   {
@@ -365,7 +366,7 @@ const Experience = () => {
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <Environment preset="sunset" />
-          <OrbitControls />
+          {/* <OrbitControls /> */}
           <directionalLight
             intensity={0.5}
             castShadow
@@ -392,8 +393,9 @@ const Experience = () => {
             />
           </directionalLight>
 
-          <Physics debug>
-            <Arena />
+          <Physics>
+            {/* <Arena /> */}
+            <Ring />
 
             {isGameStarted && (
               <>
@@ -405,7 +407,7 @@ const Experience = () => {
                   }
                   onRaceEnd={handleRaceEnd}
                   disabled={!isGameStarted}
-                  position={[5, 0, 0]}
+                  position={[1.6, 0, 0]}
                   isPlayer1={players[0]?.id === socket?.id}
                   color={0x90902d}
                   isPunching={
@@ -421,7 +423,7 @@ const Experience = () => {
                   }
                   onRaceEnd={handleRaceEnd}
                   disabled={!isGameStarted}
-                  position={[-5, 0, 0]}
+                  position={[-1.6, 0, 0]}
                   isPlayer1={players[1]?.id === socket?.id}
                   color={0x2b2ba1}
                   isPunching={

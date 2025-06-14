@@ -410,7 +410,7 @@ const PlayerController = forwardRef(
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
-          <group ref={cameraPosition} position-y={4} position-z={2} />
+          <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI}>
             {characterType === "austin" ? (
               <Austinn
@@ -439,7 +439,6 @@ const PlayerController = forwardRef(
               onCollisionEnter={handleCollisionEnter}
               onCollisionExit={handleCollisionExit}
             />
-           
           </group>
         </group>
       </RigidBody>
