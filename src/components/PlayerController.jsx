@@ -440,7 +440,7 @@ const PlayerController = forwardRef(
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.4, 0.35]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter} // More precise than onCollisionEnter
