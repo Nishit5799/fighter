@@ -44,6 +44,8 @@ const PlayerController = forwardRef(
     const [isInContact, setIsInContact] = useState(false);
     const [showDebugCollider] = useState(true);
     const contactTimeout = useRef(null);
+    const lastJoystickMagnitude = useRef(0);
+    const joystickChangeThreshold = 0.05; // Only log if magnitude changes by this amount
 
     useEffect(() => {
       const handleResize = () => {
@@ -257,6 +259,14 @@ const PlayerController = forwardRef(
             joystickInput.x * joystickInput.x +
               joystickInput.y * joystickInput.y
           );
+
+          if (
+            Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
+            joystickChangeThreshold
+          ) {
+            console.log(joystickMagnitude);
+            lastJoystickMagnitude.current = joystickMagnitude;
+          }
 
           // Only process if joystick is being actively used (deadzone)
           if (joystickMagnitude > 0.1) {
