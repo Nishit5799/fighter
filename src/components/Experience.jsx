@@ -353,7 +353,14 @@ const Experience = () => {
             />
           </directionalLight>
 
-          <Physics debug>
+          <Physics
+            debug
+            contactPairPersistentThreshold={0.08} // Fast hit detection response
+            sleepAfterStillness={0.2} // Balanced sleep delay
+            substeps={2} // Smooth fast movements
+            solverIterations={8} // Good balance for combat physics
+            timeStep="vary" // Handle frame rate drops gracefully
+          >
             <Ring />
 
             {isGameStarted && (

@@ -95,7 +95,7 @@ const PlayerController = forwardRef(
         });
       }
 
-      const duration = type === "punch" ? 800 : 1000;
+      const duration = type === "punch" ? 700 : 700;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = true;
@@ -127,7 +127,7 @@ const PlayerController = forwardRef(
         }
       }
 
-      const duration = 1000;
+      const duration = 700;
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
         if (!isAttacking) {
@@ -399,8 +399,16 @@ const PlayerController = forwardRef(
         gravityScale={9}
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
-        userData={{ id: socket?.id }}
-        solverIterations={10}
+        userData={{
+          id: socket?.id,
+          isPlayer: true, // For easy filtering
+        }}
+        solverIterations={10} // Slightly higher than world setting
+        ccd={true} // Prevent fast attack tunneling
+        linearDamping={0.5} // Reduce unwanted sliding
+        angularDamping={1.0} // Prevent excessive rotation
+        sleepAfterStillness={0.2} // Match physics world setting
+        canSleep={true}
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
@@ -425,13 +433,18 @@ const PlayerController = forwardRef(
                 animation={isHit ? "hit" : currentAnimation}
               />
             )}
-            <CapsuleCollider args={[0.4, 0.25]} position={[0, 3, 0]} />
+            <CapsuleCollider
+              args={[0.4, 0.25]}
+              position={[0, 3, 0]}
+              restitution={0.1}
+              friction={0.5}
+            />
             <CapsuleCollider
               args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
-              onCollisionEnter={handleCollisionEnter}
-              onCollisionExit={handleCollisionExit}
+              onIntersectionEnter={handleCollisionEnter} // More precise than onCollisionEnter
+              onIntersectionExit={handleCollisionExit}
             />
           </group>
         </group>
