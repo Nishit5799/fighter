@@ -37,12 +37,13 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
-    const colliderArgs = isSmallScreen ? [0.2, 0.4] : [0.2, 0.4];
+    const colliderArgs = isSmallScreen ? [0.4, 0.25] : [0.2, 0.4];
+    const sensorArgs = isSmallScreen ? [0.6, 0.3] : [0.3, 0.6];
     const attackDamage = 10;
     const [health, setHealth] = useState(100);
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
-    const [showDebugCollider] = useState(true);
+
     const contactTimeout = useRef(null);
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05; // Only log if magnitude changes by this amount
@@ -55,7 +56,7 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = isSmallScreen ? 2.8 : 2;
+    const WALK_SPEED = isSmallScreen ? 2.4 : 2;
     const RUN_SPEED = 4;
     const ROTATION_SPEED = isSmallScreen ? 0.08 : 0.04;
 
@@ -74,7 +75,6 @@ const PlayerController = forwardRef(
 
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
-      console.log("Opponent reference set:", ref?.id);
     };
 
     const startAttack = (type) => {
@@ -88,23 +88,12 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      console.log(
-        `Starting ${type} attack. In contact: ${isInContact}, Opponent: ${
-          opponentRef.current ? "exists" : "null"
-        }`
-      );
-
       if (isInContact && socket && opponentRef.current) {
-        console.log(`${type} landed on opponent!`);
         socket.emit("playerHit", {
           attackerId: socket.id,
           damage: attackDamage,
           attackType: type,
         });
-      } else {
-        console.log(
-          `${type} missed - contact:${isInContact}, opponent:${!!opponentRef.current}`
-        );
       }
 
       const duration = type === "punch" ? 800 : 1000;
@@ -126,18 +115,11 @@ const PlayerController = forwardRef(
       setCurrentAnimation("hit");
       setHealth((prev) => Math.max(0, prev - attackDamage));
 
-      console.log(
-        `Player took ${attackType} hit! Current health: ${
-          health - attackDamage
-        }`
-      );
-
       if (character.current?.playHitSound) {
         character.current.playHitSound();
       }
 
       if (health - attackDamage <= 0) {
-        console.log("Player defeated!");
         if (socket) {
           socket.emit("playerDefeated", {
             winnerId: socket.id,
@@ -157,15 +139,12 @@ const PlayerController = forwardRef(
 
     const handleCollisionEnter = (event) => {
       if (!opponentRef.current || !rb.current) {
-        console.log("No opponent or rigid body reference");
         return;
       }
 
       const otherUserData = event.other.rigidBody?.userData;
-      // console.log("Collision enter with:", otherUserData?.id);
 
       if (otherUserData?.id === opponentRef.current?.id) {
-        // console.log("Valid collision with opponent detected");
         setIsInContact(true);
 
         if (contactTimeout.current) {
@@ -178,11 +157,9 @@ const PlayerController = forwardRef(
       if (!opponentRef.current || !rb.current) return;
 
       const otherUserData = event.other.rigidBody?.userData;
-      // console.log("Collision exit with:", otherUserData?.id);
 
       if (otherUserData?.id === opponentRef.current?.id) {
         contactTimeout.current = setTimeout(() => {
-          // console.log("No longer colliding with opponent");
           setIsInContact(false);
         }, 100);
       }
@@ -264,7 +241,6 @@ const PlayerController = forwardRef(
             Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
             joystickChangeThreshold
           ) {
-            console.log(joystickMagnitude);
             lastJoystickMagnitude.current = joystickMagnitude;
           }
 
@@ -450,7 +426,7 @@ const PlayerController = forwardRef(
             )}
             <CapsuleCollider args={colliderArgs} position={[0, 3, 0]} />
             <CapsuleCollider
-              args={[0.3, 0.6]}
+              args={sensorArgs}
               position={[0, 3, 0]}
               sensor
               onCollisionEnter={handleCollisionEnter}

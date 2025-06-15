@@ -24,7 +24,6 @@ import Info from "./Info";
 
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
-import Arena from "./Arena";
 
 const keyboardMap = [
   {
@@ -355,8 +354,7 @@ const Experience = () => {
           </directionalLight>
 
           <Physics>
-            {/* <Ring /> */}
-            <Arena />
+            <Ring />
 
             {isGameStarted && (
               <>
@@ -419,7 +417,7 @@ const Experience = () => {
               ref={welcomeTextRef}
               className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
             >
-              {"Welcome to NishGear".split("").map((letter, index) => (
+              {"Welcome to Fight Arena".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
                   {letter === " " ? "\u00A0" : letter}
                 </span>
