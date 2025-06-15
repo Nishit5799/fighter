@@ -112,6 +112,7 @@ const PlayerController = forwardRef(
 
       setIsHit(true);
       setCurrentAnimation("hit");
+      setHealth((prev) => Math.max(0, prev - attackDamage));
 
       if (character.current?.playHitSound) {
         character.current.playHitSound();
@@ -126,13 +127,13 @@ const PlayerController = forwardRef(
         }
       }
 
-      const durationn = 1000;
+      const duration = 1000;
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
         if (!isAttacking) {
           setCurrentAnimation("idle");
         }
-      }, durationn);
+      }, duration);
     };
 
     const handleCollisionEnter = (event) => {
@@ -161,7 +162,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.id === opponentRef.current?.id) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 10);
+        }, 100);
       }
     };
     useEffect(() => {
