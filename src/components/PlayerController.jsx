@@ -425,9 +425,9 @@ const PlayerController = forwardRef(
                 animation={isHit ? "hit" : currentAnimation}
               />
             )}
-            <CapsuleCollider args={[0.4, 0.3]} position={[0, 3, 0]} />
+            <CapsuleCollider args={[0.4, 0.25]} position={[0, 3, 0]} />
             <CapsuleCollider
-              args={[0.3, 0.5]}
+              args={[0.4, 0.35]}
               position={[0, 3, 0]}
               sensor
               onCollisionEnter={handleCollisionEnter}
