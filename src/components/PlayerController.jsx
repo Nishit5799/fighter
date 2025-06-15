@@ -427,7 +427,7 @@ const PlayerController = forwardRef(
             )}
             <CapsuleCollider args={[0.4, 0.25]} position={[0, 3, 0]} />
             <CapsuleCollider
-              args={[0.4, 0.35]}
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
               onCollisionEnter={handleCollisionEnter}
