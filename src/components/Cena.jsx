@@ -18,7 +18,7 @@ export default function Cena({
 
   // Debug: Log available animations
   useEffect(() => {
-    console.log("Available animations:", Object.keys(animations || {}));
+   
   }, [animations]);
 
   useEffect(() => {

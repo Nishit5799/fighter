@@ -55,7 +55,7 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = isSmallScreen ? 3 : 2;
+    const WALK_SPEED = isSmallScreen ? 2.5 : 2;
     const RUN_SPEED = 4;
     const ROTATION_SPEED = isSmallScreen ? 0.08 : 0.04;
 
@@ -143,6 +143,7 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
 
+      // Only proceed if the collision is with the opponent's collider (has userData.id)
       if (otherUserData?.id === opponentRef.current?.id) {
         setIsInContact(true);
 
@@ -157,13 +158,13 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
 
+      // Only proceed if the collision exit is with the opponent's collider
       if (otherUserData?.id === opponentRef.current?.id) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
         }, 100);
       }
     };
-
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
@@ -399,6 +400,7 @@ const PlayerController = forwardRef(
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{ id: socket?.id }}
+        solverIterations={10}
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />

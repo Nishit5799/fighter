@@ -208,7 +208,7 @@ const Experience = () => {
             console.log(
               `Player ${socket.id} is in position ${
                 currentPlayerIndex + 1
-              }, reloading...`
+              } reloading`
             );
             setShouldReload(true);
             return;
@@ -353,7 +353,7 @@ const Experience = () => {
             />
           </directionalLight>
 
-          <Physics >
+          <Physics debug>
             <Ring />
 
             {isGameStarted && (
