@@ -328,9 +328,9 @@ const Experience = () => {
           <Environment preset="sunset" />
 
           <directionalLight
-            intensity={0.5}
+            intensity={1}
             castShadow
-            position={[-15, 20, 0]}
+            position={[0, 10, 0]}
             shadow-mapSize-width={4096}
             shadow-mapSize-height={4096}
             shadow-bias={-0.0005}
@@ -353,7 +353,7 @@ const Experience = () => {
             />
           </directionalLight>
 
-          <Physics>
+          <Physics >
             <Ring />
 
             {isGameStarted && (
@@ -365,7 +365,7 @@ const Experience = () => {
                     players[0]?.id === socket?.id ? joystickInput : null
                   }
                   disabled={!isGameStarted}
-                  position={[1.6, 0, 0]}
+                  position={[1.2, 0, 0]}
                   isPlayer1={players[0]?.id === socket?.id}
                   color={0x90902d}
                   isPunching={
@@ -380,7 +380,7 @@ const Experience = () => {
                     players[1]?.id === socket?.id ? joystickInput : null
                   }
                   disabled={!isGameStarted}
-                  position={[-1.6, 0, 0]}
+                  position={[-1.2, 0, 0]}
                   isPlayer1={players[1]?.id === socket?.id}
                   color={0x2b2ba1}
                   isPunching={
@@ -417,7 +417,7 @@ const Experience = () => {
               ref={welcomeTextRef}
               className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
             >
-              {"Welcome to Fight Arena".split("").map((letter, index) => (
+              {"Welcome to NishGear".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
                   {letter === " " ? "\u00A0" : letter}
                 </span>

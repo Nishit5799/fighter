@@ -37,8 +37,7 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
-    const colliderArgs = isSmallScreen ? [0.4, 0.25] : [0.2, 0.4];
-    const sensorArgs = isSmallScreen ? [0.6, 0.3] : [0.3, 0.6];
+
     const attackDamage = 10;
     const [health, setHealth] = useState(100);
     const opponentRef = useRef();
@@ -56,7 +55,7 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = isSmallScreen ? 2.4 : 2;
+    const WALK_SPEED = isSmallScreen ? 3 : 2;
     const RUN_SPEED = 4;
     const ROTATION_SPEED = isSmallScreen ? 0.08 : 0.04;
 
@@ -424,9 +423,9 @@ const PlayerController = forwardRef(
                 animation={isHit ? "hit" : currentAnimation}
               />
             )}
-            <CapsuleCollider args={colliderArgs} position={[0, 3, 0]} />
+            <CapsuleCollider args={[0.4, 0.3]} position={[0, 3, 0]} />
             <CapsuleCollider
-              args={sensorArgs}
+              args={[0.3, 0.5]}
               position={[0, 3, 0]}
               sensor
               onCollisionEnter={handleCollisionEnter}
