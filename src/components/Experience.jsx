@@ -354,7 +354,6 @@ const Experience = () => {
           </directionalLight>
 
           <Physics
-            debug
             contactPairPersistentThreshold={0.08} // Fast hit detection response
             sleepAfterStillness={0.2} // Balanced sleep delay
             substeps={2} // Smooth fast movements
@@ -515,7 +514,14 @@ const Experience = () => {
       )}
 
       <Joystick
-        onMove={setJoystickInput}
+        onMove={(data) => {
+          // Pass isRunning to the joystickInput
+          setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
+        }}
+        onToggleRun={(isRunning) => {
+          // Update the run state when the button is toggled
+          setJoystickInput((prev) => ({ ...prev, isRunning }));
+        }}
         onStart={() => {}}
         disabled={!isGameStarted || players.length !== 2}
       />

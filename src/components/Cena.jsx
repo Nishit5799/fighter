@@ -16,11 +16,6 @@ export default function Cena({
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
   const position = isSmallScreen ? 1.0 : 0.83;
 
-  // Debug: Log available animations
-  useEffect(() => {
-   
-  }, [animations]);
-
   useEffect(() => {
     const handleResize = () => {
       setIsSmallScreen(window.innerWidth < 640);

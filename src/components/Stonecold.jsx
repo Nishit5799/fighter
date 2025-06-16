@@ -14,12 +14,7 @@ export default function Stonecold({
   const { nodes, materials } = useGraph(clone);
   const { actions } = useAnimations(animations, group);
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
-  const position = isSmallScreen ? 1 : 1;
-
-  // Debug: Log available animations
-  useEffect(() => {
-    console.log("Available animations:", Object.keys(animations || {}));
-  }, [animations]);
+  const position = isSmallScreen ? 1.0 : 0.83;
 
   useEffect(() => {
     const handleResize = () => {
@@ -37,7 +32,7 @@ export default function Stonecold({
   }, [animation, actions]);
   return (
     <group ref={group} {...props} dispose={null}>
-      <group name="Scene" scale={0.23} position={[0, position, 0]}>
+      <group name="Scene" scale={0.07} position={[0, position, 0]}>
         <group
           name="node_fa4db8f5_24ac_4ab4_bbf6_653508ff73e5"
           rotation={[Math.PI / 2, 0, 0]}

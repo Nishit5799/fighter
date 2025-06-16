@@ -14,11 +14,7 @@ export default function John({
   const { nodes, materials } = useGraph(clone);
   const { actions } = useAnimations(animations, group);
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
-  const position = isSmallScreen ? 1 : 1;
-
-  useEffect(() => {
-    console.log("Available animations:", Object.keys(animations || {}));
-  }, [animations]);
+  const position = isSmallScreen ? 1.0 : 0.83;
 
   useEffect(() => {
     const handleResize = () => {
@@ -36,7 +32,7 @@ export default function John({
   }, [animation, actions]);
   return (
     <group ref={group} {...props} dispose={null}>
-      <group name="Scene" scale={0.14} position={[0, position, 0]}>
+      <group name="Scene" scale={0.04} position={[0, position, 0]}>
         <group
           name="node_6818f641_3858_4c92_aa22_cc0bb306df4e"
           rotation={[Math.PI / 2, 0, 0]}

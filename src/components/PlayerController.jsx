@@ -11,8 +11,9 @@ import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
-import Cena from "./Cena";
-import Austinn from "./Austinn";
+
+import Stonecold from "./Stonecold";
+import John from "./John";
 
 const PlayerController = forwardRef(
   (
@@ -55,9 +56,9 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = isSmallScreen ? 2.5 : 2;
-    const RUN_SPEED = 4;
-    const ROTATION_SPEED = isSmallScreen ? 0.08 : 0.04;
+    const WALK_SPEED = isSmallScreen ? 1.5 : 1.5;
+    const RUN_SPEED = 2.5;
+    const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     const rb = useRef();
     const container = useRef();
@@ -216,10 +217,10 @@ const PlayerController = forwardRef(
       if (movementEnabled.current && !isHit) {
         // Keyboard movement handling
         if (forward) {
-          movement.z = -WALK_SPEED;
+          movement.z = run ? -RUN_SPEED : -WALK_SPEED; // Use RUN_SPEED if shift is pressed
           setIsBraking(false);
           setIsReversing(false);
-          if (!isAttacking) setCurrentAnimation("run");
+          if (!isAttacking) setCurrentAnimation(run ? "run" : "walk"); // Set animation based on run key
         } else if (backward) {
           movement.z = 0;
           setIsReversing(true);
@@ -253,10 +254,11 @@ const PlayerController = forwardRef(
 
             // Movement - maintain full speed in movement direction
             if (joystickInput.y < 0) {
-              movement.z = -WALK_SPEED;
+              movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
               setIsBraking(false);
               setIsReversing(false);
-              if (!isAttacking) setCurrentAnimation("run");
+              if (!isAttacking)
+                setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
             } else if (joystickInput.y > 0) {
               movement.z = 0;
               setIsReversing(true);
@@ -285,8 +287,12 @@ const PlayerController = forwardRef(
             Math.cos(rotationTarget.current)
           ).normalize();
 
-          vel.x = moveDirection.x * -WALK_SPEED;
-          vel.z = moveDirection.z * -WALK_SPEED;
+          vel.x =
+            moveDirection.x *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+          vel.z =
+            moveDirection.z *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
         } else if (movement.x !== 0 || movement.z !== 0) {
           // Default movement for keyboard
           vel.x = Math.sin(rotationTarget.current) * movement.z;
@@ -415,7 +421,7 @@ const PlayerController = forwardRef(
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI}>
             {characterType === "austin" ? (
-              <Austinn
+              <Stonecold
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 isBraking={isBraking}
@@ -424,7 +430,7 @@ const PlayerController = forwardRef(
                 animation={isHit ? "hit" : currentAnimation}
               />
             ) : (
-              <Cena
+              <John
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 isBraking={isBraking}
@@ -434,13 +440,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.25]}
+              args={[0.4, 0.3]}
               position={[0, 3, 0]}
               restitution={0.1}
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.35]}
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter} // More precise than onCollisionEnter
