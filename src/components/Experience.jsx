@@ -24,6 +24,7 @@ import Info from "./Info";
 
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
+import Background from "./Background";
 
 const keyboardMap = [
   {
@@ -326,6 +327,8 @@ const Experience = () => {
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <Environment preset="sunset" />
+
+          <Background />
 
           <directionalLight
             intensity={1}
