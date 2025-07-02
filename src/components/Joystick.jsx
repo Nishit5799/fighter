@@ -6,8 +6,12 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
   const runButtonRef = useRef(null);
   const touchIdRef = useRef(null);
   const centerRef = useRef({ x: 0, y: 0 });
+
   const [thumbstickPosition, setThumbstickPosition] = useState({ x: 0, y: 0 });
+
   const [isRunning, setIsRunning] = useState(false);
+  const [runState, setRunState] = useState("ready"); // 'ready' | 'running' | 'cooldown'
+  const [runCountdown, setRunCountdown] = useState(null); // 5 → 4 → ... → 1
 
   const handleTouchStart = (e) => {
     e.preventDefault();
@@ -46,7 +50,7 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
         onMove({
           x: isBackward ? -Math.cos(angle) * force : -Math.cos(angle) * force,
           y: Math.sin(angle) * force,
-          isRunning, // Pass the running state to the onMove callback
+          isRunning,
         });
 
         if (deltaY < 0) {
@@ -62,13 +66,33 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
     onMove({ x: 0, y: 0, isRunning });
   };
 
-  const toggleRun = (e) => {
-    e.preventDefault();
-    const newRunState = !isRunning;
-    setIsRunning(newRunState);
-    if (onToggleRun) {
-      onToggleRun(newRunState);
-    }
+  const triggerRun = () => {
+    if (runState !== "ready") return;
+
+    setRunState("running");
+    setIsRunning(true);
+    if (onToggleRun) onToggleRun(true);
+
+    let count = 5;
+    setRunCountdown(count);
+
+    const countdownInterval = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setRunCountdown(count);
+      } else {
+        clearInterval(countdownInterval);
+        setRunCountdown(null);
+        setIsRunning(false);
+        if (onToggleRun) onToggleRun(false);
+        setRunState("cooldown");
+
+        // Begin cooldown for 5s
+        setTimeout(() => {
+          setRunState("ready");
+        }, 5000);
+      }
+    }, 1000);
   };
 
   useEffect(() => {
@@ -79,15 +103,23 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
     joystickElement.addEventListener("touchstart", handleTouchStart, options);
     joystickElement.addEventListener("touchmove", handleTouchMove, options);
     joystickElement.addEventListener("touchend", handleTouchEnd, options);
-    runButtonElement.addEventListener("touchstart", toggleRun, options);
+    runButtonElement.addEventListener("touchstart", triggerRun, options);
 
     return () => {
       joystickElement.removeEventListener("touchstart", handleTouchStart);
       joystickElement.removeEventListener("touchmove", handleTouchMove);
       joystickElement.removeEventListener("touchend", handleTouchEnd);
-      runButtonElement.removeEventListener("touchstart", toggleRun);
+      runButtonElement.removeEventListener("touchstart", triggerRun);
     };
-  }, [isRunning]);
+  }, [runState]);
+
+  const isButtonDisabled = runState !== "ready";
+
+  const renderRunLabel = () => {
+    if (runCountdown !== null) return runCountdown;
+    if (runState === "cooldown") return "COOLING";
+    return "RUN";
+  };
 
   return (
     <>
@@ -105,17 +137,58 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
           ></div>
         </div>
       </div>
+
       <div className="fixed bottom-[27%] right-5 flex flex-col items-center gap-4">
-        <button
-          ref={runButtonRef}
-          className={`w-16 h-16 rounded-full ${
-            isRunning ? "bg-green-500" : "bg-gray-500"
-          } bg-opacity-70 flex items-center justify-center active:bg-opacity-100 transition-all select-none user-select-none sm:hidden`}
-          onClick={toggleRun}
-        >
-          <span className="text-3xl">RUN</span>
-        </button>
+        <div className="relative w-16 h-16">
+          {/* Red cooldown circle only during cooldown */}
+          {runState === "cooldown" && (
+            <svg
+              className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
+              viewBox="0 0 36 36"
+            >
+              <circle
+                stroke="red"
+                strokeWidth="3"
+                fill="transparent"
+                r="16"
+                cx="18"
+                cy="18"
+                style={{
+                  strokeDasharray: 100,
+                  strokeDashoffset: 100,
+                  transform: "rotate(-90deg)",
+                  transformOrigin: "center",
+                  animation: "run-cooldown 5s linear forwards",
+                }}
+              />
+            </svg>
+          )}
+
+          <button
+            ref={runButtonRef}
+            disabled={isButtonDisabled}
+            className={`w-16 h-16 rounded-full ${
+              runState === "running" ? "bg-green-600" : "bg-gray-600"
+            } bg-opacity-80 flex items-center justify-center text-white 
+              ${runState !== "ready" ? "opacity-100 cursor-not-allowed" : ""}
+              active:bg-opacity-100 transition-all select-none user-select-none sm:hidden`}
+            onClick={triggerRun}
+          >
+            <span className="text-2xl font-bold">{renderRunLabel()}</span>
+          </button>
+        </div>
       </div>
+
+      <style jsx>{`
+        @keyframes run-cooldown {
+          from {
+            stroke-dashoffset: 100;
+          }
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+      `}</style>
     </>
   );
 };

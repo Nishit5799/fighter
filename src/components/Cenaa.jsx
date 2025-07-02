@@ -2,14 +2,15 @@ import React, { useEffect, useState } from "react";
 import { useGraph } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
+import { LoopOnce } from "three";
 
-export default function Stonecold({
+export default function Cenaa({
   animation = "idle",
 
   ...props
 }) {
   const group = React.useRef();
-  const { scene, animations } = useGLTF("/stonecold.glb");
+  const { scene, animations } = useGLTF("/cenaa.glb");
   const clone = React.useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const { nodes, materials } = useGraph(clone);
   const { actions } = useAnimations(animations, group);
@@ -24,6 +25,11 @@ export default function Stonecold({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  if (actions["fall"]) {
+    actions["fall"].loop = LoopOnce;
+    actions["fall"].clampWhenFinished = true;
+  }
   useEffect(() => {
     // Reset and fade in the selected animation, default to "idle" if no animation is provided
     actions[animation]?.reset().fadeIn(0.24).play();
@@ -32,20 +38,20 @@ export default function Stonecold({
   }, [animation, actions]);
   return (
     <group ref={group} {...props} dispose={null}>
-      <group name="Scene" scale={0.07} position={[0, position, 0]}>
+      <group name="Scene" scale={0.04} position={[0, position, 0]}>
         <group
-          name="node_fa4db8f5_24ac_4ab4_bbf6_653508ff73e5"
+          name="node_6818f641_3858_4c92_aa22_cc0bb306df4e"
           rotation={[Math.PI / 2, 0, 0]}
         >
-          <group name="node_d018ab6b_5e8c_4f11_8f1d_5551820581e7">
+          <group name="node_bb51f080_2262_476c_b628_06b4d007736d">
             <group
-              name="node_89f9dc3a_d302_4be8_a8cb_010214047686"
+              name="node_1d6eb569_b739_4b98_929b_1b47a39f9a2e"
               rotation={[-Math.PI / 2, 0, 0]}
             >
-              <group name="node_dcba5340_a2e3_420b_9689_9d0480730df6">
-                <group name="node_1ba5b01f_53fe_4b3c_aeec_e0fe77cc998e" />
-                <group name="node_22ba7ed6_d22d_40ac_9cb7_7be0612f6294" />
-                <group name="node_6145c307_6cba_4858_a9ad_0eeafb7ad657" />
+              <group name="node_33c7da44_8ca9_48e2_843f_1e4512a1387d">
+                <group name="node_1fbb39fe_a579_4d1c_980b_b5eae92e1a2b" />
+                <group name="node_a5875d48_41bc_4ea4_a827_a6ce655d9841" />
+                <group name="node_c213c0a3_3da9_482f_bc22_c14b06810fe1" />
               </group>
             </group>
           </group>
@@ -62,33 +68,33 @@ export default function Stonecold({
           <primitive object={nodes.Ctrl_Foot_IK_Right} />
           <primitive object={nodes.Ctrl_LegPole_IK_Right} />
           <skinnedMesh
-            name="node_1ba5b01f_53fe_4b3c_aeec_e0fe77cc998e_mesh0"
+            name="node_1fbb39fe_a579_4d1c_980b_b5eae92e1a2b_mesh0"
             geometry={
-              nodes.node_1ba5b01f_53fe_4b3c_aeec_e0fe77cc998e_mesh0.geometry
+              nodes.node_1fbb39fe_a579_4d1c_980b_b5eae92e1a2b_mesh0.geometry
             }
             material={materials.mat_1}
             skeleton={
-              nodes.node_1ba5b01f_53fe_4b3c_aeec_e0fe77cc998e_mesh0.skeleton
+              nodes.node_1fbb39fe_a579_4d1c_980b_b5eae92e1a2b_mesh0.skeleton
             }
           />
           <skinnedMesh
-            name="node_22ba7ed6_d22d_40ac_9cb7_7be0612f6294_mesh0"
+            name="node_a5875d48_41bc_4ea4_a827_a6ce655d9841_mesh0"
             geometry={
-              nodes.node_22ba7ed6_d22d_40ac_9cb7_7be0612f6294_mesh0.geometry
+              nodes.node_a5875d48_41bc_4ea4_a827_a6ce655d9841_mesh0.geometry
             }
             material={materials.mat_2}
             skeleton={
-              nodes.node_22ba7ed6_d22d_40ac_9cb7_7be0612f6294_mesh0.skeleton
+              nodes.node_a5875d48_41bc_4ea4_a827_a6ce655d9841_mesh0.skeleton
             }
           />
           <skinnedMesh
-            name="node_6145c307_6cba_4858_a9ad_0eeafb7ad657_mesh0"
+            name="node_c213c0a3_3da9_482f_bc22_c14b06810fe1_mesh0"
             geometry={
-              nodes.node_6145c307_6cba_4858_a9ad_0eeafb7ad657_mesh0.geometry
+              nodes.node_c213c0a3_3da9_482f_bc22_c14b06810fe1_mesh0.geometry
             }
             material={materials.mat_0}
             skeleton={
-              nodes.node_6145c307_6cba_4858_a9ad_0eeafb7ad657_mesh0.skeleton
+              nodes.node_c213c0a3_3da9_482f_bc22_c14b06810fe1_mesh0.skeleton
             }
           />
         </group>
@@ -97,4 +103,4 @@ export default function Stonecold({
   );
 }
 
-useGLTF.preload("/stonecold.glb");
+useGLTF.preload("/cenaa.glb");

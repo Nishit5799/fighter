@@ -13,48 +13,24 @@ import {
   OrthographicCamera,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-
 import Joystick from "./Joystick";
 import AttackButtons from "./AttackButtons";
-
 import gsap from "gsap";
 import { useSocket } from "../context/SocketContext";
-
 import Info from "./Info";
-
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
+import { preloadSounds } from "@/utils/sounds";
 
 const keyboardMap = [
-  {
-    name: "forward",
-    keys: ["ArrowUp", "KeyW"],
-  },
-  {
-    name: "backward",
-    keys: ["ArrowDown", "KeyS"],
-  },
-  {
-    name: "left",
-    keys: ["ArrowLeft", "KeyA"],
-  },
-  {
-    name: "right",
-    keys: ["ArrowRight", "KeyD"],
-  },
-  {
-    name: "run",
-    keys: ["Shift"],
-  },
-  {
-    name: "punch",
-    keys: ["KeyP"],
-  },
-  {
-    name: "kick",
-    keys: ["KeyK"],
-  },
+  { name: "forward", keys: ["ArrowUp", "KeyW"] },
+  { name: "backward", keys: ["ArrowDown", "KeyS"] },
+  { name: "left", keys: ["ArrowLeft", "KeyA"] },
+  { name: "right", keys: ["ArrowRight", "KeyD"] },
+  { name: "run", keys: ["Shift"] },
+  { name: "punch", keys: ["KeyP"] },
+  { name: "kick", keys: ["KeyK"] },
 ];
 
 const Experience = () => {
@@ -63,7 +39,6 @@ const Experience = () => {
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
   const [isPunching, setIsPunching] = useState(false);
   const [isKicking, setIsKicking] = useState(false);
-
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState("");
   const [showInfoPopup, setShowInfoPopup] = useState(false);
@@ -77,7 +52,6 @@ const Experience = () => {
   const [shouldReload, setShouldReload] = useState(false);
   const [health1, setHealth1] = useState(100);
   const [health2, setHealth2] = useState(100);
-
   const [winner, setWinner] = useState(null);
   const [loser, setLoser] = useState(null);
   const [playerLeft, setPlayerLeft] = useState(false);
@@ -89,6 +63,32 @@ const Experience = () => {
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
+
+  // Handle mobile audio autoplay policy
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      const dummy = new Audio();
+      dummy.volume = 0;
+      dummy.play().then(() => dummy.remove());
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
+    };
+
+    document.addEventListener("click", handleFirstInteraction);
+    document.addEventListener("touchstart", handleFirstInteraction);
+
+    return () => {
+      document.removeEventListener("click", handleFirstInteraction);
+      document.removeEventListener("touchstart", handleFirstInteraction);
+    };
+  }, []);
+
+  // Preload sounds when game starts
+  useEffect(() => {
+    if (isGameStarted) {
+      preloadSounds();
+    }
+  }, [isGameStarted]);
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -148,30 +148,21 @@ const Experience = () => {
 
   const handleReset = useCallback(() => {
     setRestartCountdown(2);
-
     setTimeout(() => {
       setShowPopup(false);
       setWinner(null);
       setLoser(null);
       setPlayerLeft(false);
       hasStarted.current = false;
-      if (carControllerRef1.current) {
-        carControllerRef1.current.respawn();
-      }
-      if (carControllerRef2.current) {
-        carControllerRef2.current.respawn();
-      }
-      if (blockRef.current) {
-        blockRef.current.setEnabled(true);
-      }
+      if (carControllerRef1.current) carControllerRef1.current.respawn();
+      if (carControllerRef2.current) carControllerRef2.current.respawn();
+      if (blockRef.current) blockRef.current.setEnabled(true);
       setShowWelcomeScreen(true);
       setPlayers([]);
       setIsReady(false);
       setHasJoinedRoom(false);
       setPlayerName("");
-      if (socket) {
-        socket.emit("restartGame");
-      }
+      if (socket) socket.emit("restartGame");
       window.location.reload();
     }, 2000);
   }, [socket]);
@@ -196,26 +187,105 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
+  const onPlayerHit = useCallback(
+    (data) => {
+      if (winner || loser) return;
+
+      if (players[0]?.id === data.attackerId) {
+        setHealth2((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          console.log(`Player 2 health: ${prev} -> ${newHealth}`);
+
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[0].id,
+                loserId: players[1]?.id,
+                winnerHealth: health1,
+                loserHealth: newHealth,
+              });
+            }, 50);
+          }
+          return newHealth;
+        });
+      } else if (players[1]?.id === data.attackerId) {
+        setHealth1((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          console.log(`Player 1 health: ${prev} -> ${newHealth}`);
+
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[1].id,
+                loserId: players[0]?.id,
+                winnerHealth: health2,
+                loserHealth: newHealth,
+              });
+            }, 50);
+          }
+          return newHealth;
+        });
+      }
+    },
+    [socket, players, winner, loser, health1, health2]
+  );
+
+  const onPlayerDefeated = useCallback(
+    (data) => {
+      console.log(
+        `[FINAL HEALTH] Winner: ${data.winnerHealth}% | Loser: ${data.loserHealth}%`
+      );
+
+      if (players[0]?.id === data.winnerId) {
+        setHealth1(data.winnerHealth);
+        setHealth2(data.loserHealth);
+        setWinner(players[0]);
+        setLoser(players[1]);
+      } else if (players[1]?.id === data.winnerId) {
+        setHealth1(data.loserHealth);
+        setHealth2(data.winnerHealth);
+        setWinner(players[1]);
+        setLoser(players[0]);
+      }
+
+      if (carControllerRef1.current && carControllerRef2.current) {
+        if (players[0]?.id === data.winnerId) {
+          carControllerRef1.current.setVictory();
+          carControllerRef2.current.setDefeat();
+        } else {
+          carControllerRef1.current.setDefeat();
+          carControllerRef2.current.setVictory();
+        }
+      }
+
+      setTimeout(() => {
+        if (players[0]?.id === data.winnerId) {
+          setPopupMessage(
+            players[0]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
+          );
+        } else {
+          setPopupMessage(
+            players[1]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
+          );
+        }
+        setShowPopup(true);
+      }, 2000);
+    },
+    [players, socket?.id]
+  );
+
   useEffect(() => {
     if (socket) {
       const updatePlayersHandler = (players) => {
-        console.log("Received updatePlayers event:", players);
-
         if (players.length > 2) {
           const currentPlayerIndex = players.findIndex(
             (p) => p.id === socket.id
           );
           if (currentPlayerIndex >= 2) {
-            console.log(
-              `Player ${socket.id} is in position ${
-                currentPlayerIndex + 1
-              } reloading`
-            );
             setShouldReload(true);
             return;
           }
         }
-
         setPlayers(players);
 
         if (isGameStarted && players.length === 1) {
@@ -252,15 +322,23 @@ const Experience = () => {
       socket.on("startGame", startGameHandler);
       socket.on("restartGame", restartGameHandler);
       socket.on("usernameTaken", usernameTakenHandler);
+      socket.on("playerHit", onPlayerHit);
+      socket.on("playerDefeated", onPlayerDefeated);
 
       return () => {
         socket.off("updatePlayers", updatePlayersHandler);
         socket.off("startGame", startGameHandler);
         socket.off("restartGame", restartGameHandler);
         socket.off("usernameTaken", usernameTakenHandler);
+        socket.off("playerHit", onPlayerHit);
+        socket.off("playerDefeated", onPlayerDefeated);
       };
     }
-  }, [socket, isGameStarted, players, handleReset, shouldReload]);
+  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
+
+  useEffect(() => {
+    console.log("Current health state:", { health1, health2 });
+  }, [health1, health2]);
 
   useEffect(() => {
     if (
@@ -278,39 +356,6 @@ const Experience = () => {
     }
   }, [isGameStarted, players, socket?.id]);
 
-  useEffect(() => {
-    if (!socket) return;
-
-    const onPlayerHit = (data) => {
-      if (players[0]?.id === data.attackerId) {
-        setHealth2((prev) => Math.max(0, prev - data.damage));
-      } else if (players[1]?.id === data.attackerId) {
-        setHealth1((prev) => Math.max(0, prev - data.damage));
-      }
-    };
-
-    const onPlayerDefeated = (data) => {
-      if (players[0]?.id === data.winnerId) {
-        setPopupMessage(`${players[0].name} won the match!`);
-        setWinner(players[0]);
-        setLoser(players[1]);
-      } else if (players[1]?.id === data.winnerId) {
-        setPopupMessage(`${players[1].name} won the match!`);
-        setWinner(players[1]);
-        setLoser(players[0]);
-      }
-      setShowPopup(true);
-    };
-
-    socket.on("playerHit", onPlayerHit);
-    socket.on("playerDefeated", onPlayerDefeated);
-
-    return () => {
-      socket.off("playerHit", onPlayerHit);
-      socket.off("playerDefeated", onPlayerDefeated);
-    };
-  }, [socket, players]);
-
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
 
   useEffect(() => {
@@ -322,14 +367,19 @@ const Experience = () => {
     }
   }, [restartCountdown]);
 
+  useEffect(() => {
+    console.log("Health State Updated:", {
+      player1: { health: health1, name: players[0]?.name },
+      player2: { health: health2, name: players[1]?.name },
+    });
+  }, [health1, health2, players]);
+
   return (
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <Environment preset="sunset" />
-
           <Background />
-
           <directionalLight
             intensity={1}
             castShadow
@@ -357,14 +407,13 @@ const Experience = () => {
           </directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.08} // Fast hit detection response
-            sleepAfterStillness={0.2} // Balanced sleep delay
-            substeps={2} // Smooth fast movements
-            solverIterations={8} // Good balance for combat physics
-            timeStep="vary" // Handle frame rate drops gracefully
+            contactPairPersistentThreshold={0.08}
+            sleepAfterStillness={0.2}
+            substeps={2}
+            solverIterations={8}
+            timeStep="vary"
           >
             <Ring />
-
             {isGameStarted && (
               <>
                 <PlayerController
@@ -381,6 +430,11 @@ const Experience = () => {
                     players[0]?.id === socket?.id ? isPunching : false
                   }
                   isKicking={players[0]?.id === socket?.id ? isKicking : false}
+                  health={health1}
+                  opponentHealth={health2}
+                  isLocalPlayer={players[0]?.id === socket?.id}
+                  playerName={players[0]?.name || "Player 1"}
+                  opponentName={players[1]?.name || "Player 2"}
                 />
                 <PlayerController
                   ref={carControllerRef2}
@@ -396,6 +450,11 @@ const Experience = () => {
                     players[1]?.id === socket?.id ? isPunching : false
                   }
                   isKicking={players[1]?.id === socket?.id ? isKicking : false}
+                  health={health2}
+                  opponentHealth={health1}
+                  isLocalPlayer={players[1]?.id === socket?.id}
+                  playerName={players[1]?.name || "Player 2"}
+                  opponentName={players[0]?.name || "Player 1"}
                 />
               </>
             )}
@@ -497,11 +556,50 @@ const Experience = () => {
         </div>
       )}
 
+      {isGameStarted && (
+        <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          <div className="flex flex-col items-start">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{
+                  width: `${
+                    players[0]?.id === socket?.id ? health1 : health2
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.id === socket?.id
+                ? players[0]?.name
+                : players[1]?.name}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{
+                  width: `${
+                    players[0]?.id === socket?.id ? health2 : health1
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.id === socket?.id
+                ? players[1]?.name
+                : players[0]?.name}
+            </div>
+          </div>
+        </div>
+      )}
       {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-[103]">
+        <div className="fixed inset-0 flex items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
-            <h2 className="text-2xl font-bold mb-4">Race Over!</h2>
-            <p className="mb-4">{popupMessage}</p>
+            <h2 className="text-2xl font-bold mb-4 text-black">Fight Over!</h2>
+            <p className="mb-4 text-xl text-black">{popupMessage}</p>
             {restartCountdown !== null ? (
               <p className="text-black">RESTARTING IN {restartCountdown}...</p>
             ) : (
@@ -518,11 +616,9 @@ const Experience = () => {
 
       <Joystick
         onMove={(data) => {
-          // Pass isRunning to the joystickInput
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
         onToggleRun={(isRunning) => {
-          // Update the run state when the button is toggled
           setJoystickInput((prev) => ({ ...prev, isRunning }));
         }}
         onStart={() => {}}

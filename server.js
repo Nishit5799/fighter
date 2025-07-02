@@ -144,7 +144,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerHit", (data) => {
-          socket.to(roomId).emit("playerHit", data);
+          io.to(roomId).emit("playerHit", data); // Broadcast to everyone in the room
         });
         socket.on("playerDefeated", (data) => {
           io.to(roomId).emit("playerDefeated", data);

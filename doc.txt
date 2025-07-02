@@ -1,3 +1,683 @@
+//experience.jsx  
+
+"use client";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import { Canvas } from "@react-three/fiber";
+import {
+  Environment,
+  KeyboardControls,
+  OrthographicCamera,
+} from "@react-three/drei";
+import { Physics } from "@react-three/rapier";
+
+import Joystick from "./Joystick";
+import AttackButtons from "./AttackButtons";
+
+import gsap from "gsap";
+import { useSocket } from "../context/SocketContext";
+
+import Info from "./Info";
+
+import PlayerController from "./PlayerController";
+import Ring from "./Ring";
+import Background from "./Background";
+
+const keyboardMap = [
+  {
+    name: "forward",
+    keys: ["ArrowUp", "KeyW"],
+  },
+  {
+    name: "backward",
+    keys: ["ArrowDown", "KeyS"],
+  },
+  {
+    name: "left",
+    keys: ["ArrowLeft", "KeyA"],
+  },
+  {
+    name: "right",
+    keys: ["ArrowRight", "KeyD"],
+  },
+  {
+    name: "run",
+    keys: ["Shift"],
+  },
+  {
+    name: "punch",
+    keys: ["KeyP"],
+  },
+  {
+    name: "kick",
+    keys: ["KeyK"],
+  },
+];
+
+const Experience = () => {
+  const socket = useSocket();
+  const shadowCameraRef = useRef();
+  const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
+  const [isPunching, setIsPunching] = useState(false);
+  const [isKicking, setIsKicking] = useState(false);
+
+  // Commented out popup states
+  // const [showPopup, setShowPopup] = useState(false);
+  // const [popupMessage, setPopupMessage] = useState("");
+  const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(true);
+  const [isGameStarted, setIsGameStarted] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+  const [players, setPlayers] = useState([]);
+  const [isReady, setIsReady] = useState(false);
+  const [countdown, setCountdown] = useState(null);
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
+  const [shouldReload, setShouldReload] = useState(false);
+  const [health1, setHealth1] = useState(100);
+  const [health2, setHealth2] = useState(100);
+
+  const [winner, setWinner] = useState(null);
+  const [loser, setLoser] = useState(null);
+  const [playerLeft, setPlayerLeft] = useState(false);
+  const [isUsernameValid, setIsUsernameValid] = useState(true);
+  const [restartCountdown, setRestartCountdown] = useState(null);
+
+  const carControllerRef1 = useRef();
+  const carControllerRef2 = useRef();
+  const blockRef = useRef();
+  const hasStarted = useRef(false);
+  const welcomeTextRef = useRef();
+
+  const isUsernameUnique = (name) => {
+    return !players.some((player) => player.name === name);
+  };
+
+  const handleJoinRoom = () => {
+    if (!socket) {
+      console.error("Socket is not available");
+      // setPopupMessage("Connection error. Please refresh the page.");
+      // setShowPopup(true);
+      return;
+    }
+
+    const trimmedName = playerName.trim();
+    if (trimmedName !== "" && !hasJoinedRoom) {
+      if (players.length >= 2) {
+        // setPopupMessage("Room is already full. Please try again later.");
+        // setShowPopup(true);
+        setTimeout(() => window.location.reload(), 1000);
+        return;
+      }
+
+      if (isUsernameUnique(trimmedName)) {
+        socket.emit("joinRoom", trimmedName);
+        setHasJoinedRoom(true);
+        setIsUsernameValid(true);
+      } else {
+        setIsUsernameValid(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (playerName.trim() !== "") {
+      setIsUsernameValid(isUsernameUnique(playerName.trim()));
+    }
+  }, [playerName, players]);
+
+  useEffect(() => {
+    if (showWelcomeScreen) {
+      const letters = Array.from(welcomeTextRef.current.children);
+      gsap.fromTo(
+        letters,
+        { y: -10 },
+        {
+          y: 0,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "ease.in",
+          repeat: -1,
+          repeatDelay: 0.5,
+          yoyo: true,
+        }
+      );
+    }
+  }, [showWelcomeScreen]);
+
+  const handleReset = useCallback(() => {
+    setRestartCountdown(2);
+
+    setTimeout(() => {
+      // setShowPopup(false);
+      setWinner(null);
+      setLoser(null);
+      setPlayerLeft(false);
+      hasStarted.current = false;
+      if (carControllerRef1.current) {
+        carControllerRef1.current.respawn();
+      }
+      if (carControllerRef2.current) {
+        carControllerRef2.current.respawn();
+      }
+      if (blockRef.current) {
+        blockRef.current.setEnabled(true);
+      }
+      setShowWelcomeScreen(true);
+      setPlayers([]);
+      setIsReady(false);
+      setHasJoinedRoom(false);
+      setPlayerName("");
+      if (socket) {
+        socket.emit("restartGame");
+      }
+      window.location.reload();
+    }, 2000);
+  }, [socket]);
+
+  const handleInfoClick = useCallback(() => {
+    setShowInfoPopup(true);
+  }, []);
+
+  const handleReady = () => {
+    if (socket) {
+      socket.emit("playerReady", playerName);
+      setIsReady(true);
+    }
+  };
+
+  useEffect(() => {
+    if (shouldReload) {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldReload]);
+
+  useEffect(() => {
+    if (socket) {
+      const updatePlayersHandler = (players) => {
+        console.log("Received updatePlayers event:", players);
+
+        if (players.length > 2) {
+          const currentPlayerIndex = players.findIndex(
+            (p) => p.id === socket.id
+          );
+          if (currentPlayerIndex >= 2) {
+            console.log(
+              `Player ${socket.id} is in position ${
+                currentPlayerIndex + 1
+              } reloading`
+            );
+            setShouldReload(true);
+            return;
+          }
+        }
+
+        setPlayers(players);
+
+        if (isGameStarted && players.length === 1) {
+          setPlayerLeft(true);
+          // setPopupMessage("The other player has left the game.");
+          // setShowPopup(true);
+          handleReset();
+        }
+      };
+
+      const startGameHandler = () => {
+        let count = 3;
+        setCountdown(count);
+        const interval = setInterval(() => {
+          count -= 1;
+          setCountdown(count);
+          if (count === 0) {
+            clearInterval(interval);
+            setShowWelcomeScreen(false);
+            setIsGameStarted(true);
+          }
+        }, 1000);
+      };
+
+      const restartGameHandler = () => {
+        window.location.reload();
+      };
+
+      const usernameTakenHandler = () => {
+        setIsUsernameValid(false);
+      };
+
+      socket.on("updatePlayers", updatePlayersHandler);
+      socket.on("startGame", startGameHandler);
+      socket.on("restartGame", restartGameHandler);
+      socket.on("usernameTaken", usernameTakenHandler);
+
+      return () => {
+        socket.off("updatePlayers", updatePlayersHandler);
+        socket.off("startGame", startGameHandler);
+        socket.off("restartGame", restartGameHandler);
+        socket.off("usernameTaken", usernameTakenHandler);
+      };
+    }
+  }, [socket, isGameStarted, players, handleReset, shouldReload]);
+
+  useEffect(() => {
+    if (
+      isGameStarted &&
+      carControllerRef1.current &&
+      carControllerRef2.current
+    ) {
+      if (players[0]?.id === socket?.id) {
+        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+      } else if (players[1]?.id === socket?.id) {
+        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+      }
+    }
+  }, [isGameStarted, players, socket?.id]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const onPlayerHit = (data) => {
+      const attackerIndex = players.findIndex(
+        (player) => player.id === data.attackerId
+      );
+      const opponentIndex = attackerIndex === 0 ? 1 : 0;
+      const opponentId = players[opponentIndex]?.id || "unknown";
+
+      console.log(
+        `Hit received - attacker: ${data.attackerId} (${
+          players[attackerIndex]?.name || "unknown"
+        }), ` +
+          `opponent: ${opponentId} (${
+            players[opponentIndex]?.name || "unknown"
+          }), ` +
+          `damage: ${data.damage}`
+      );
+
+      if (players[0]?.id === data.attackerId) {
+        setHealth2((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          console.log(
+            `Updating Player 2 (${players[1]?.id}) health from ${prev} to ${newHealth}`
+          );
+          return newHealth;
+        });
+      } else if (players[1]?.id === data.attackerId) {
+        setHealth1((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          console.log(
+            `Updating Player 1 (${players[0]?.id}) health from ${prev} to ${newHealth}`
+          );
+          return newHealth;
+        });
+      }
+    };
+
+    // In the onPlayerDefeated handler in Experience.jsx
+    const onPlayerDefeated = (data) => {
+      const currentPlayerId = socket.id;
+      const isCurrentPlayerWinner = currentPlayerId === data.winnerId;
+
+      if (players[0]?.id === data.winnerId) {
+        setWinner(players[0]);
+        setLoser(players[1]);
+        // Force both controllers to correct animations
+        if (carControllerRef1.current) {
+          carControllerRef1.current.setCurrentAnimation(
+            isCurrentPlayerWinner ? "fall" : "fall"
+          );
+          carControllerRef1.current.setIsDefeated(!isCurrentPlayerWinner);
+        }
+        if (carControllerRef2.current) {
+          carControllerRef2.current.setCurrentAnimation(
+            isCurrentPlayerWinner ? "fall" : "fall"
+          );
+          carControllerRef2.current.setIsDefeated(isCurrentPlayerWinner);
+        }
+      } else if (players[1]?.id === data.winnerId) {
+        setWinner(players[1]);
+        setLoser(players[0]);
+        // Force both controllers to correct animations
+        if (carControllerRef1.current) {
+          carControllerRef1.current.setCurrentAnimation(
+            isCurrentPlayerWinner ? "fall" : "fall"
+          );
+          carControllerRef1.current.setIsDefeated(isCurrentPlayerWinner);
+        }
+        if (carControllerRef2.current) {
+          carControllerRef2.current.setCurrentAnimation(
+            isCurrentPlayerWinner ? "fall" : "fall"
+          );
+          carControllerRef2.current.setIsDefeated(!isCurrentPlayerWinner);
+        }
+      }
+
+      hasStarted.current = false;
+    };
+
+    socket.on("playerHit", onPlayerHit);
+    socket.on("playerDefeated", onPlayerDefeated);
+
+    return () => {
+      socket.off("playerHit", onPlayerHit);
+      socket.off("playerDefeated", onPlayerDefeated);
+    };
+  }, [socket, players]);
+
+  const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+
+  useEffect(() => {
+    if (restartCountdown !== null && restartCountdown > 0) {
+      const interval = setInterval(() => {
+        setRestartCountdown((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [restartCountdown]);
+
+  return (
+    <>
+      <KeyboardControls map={memoizedKeyboardMap}>
+        <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
+          <Environment preset="sunset" />
+
+          <Background />
+
+          <directionalLight
+            intensity={1}
+            castShadow
+            position={[0, 10, 0]}
+            shadow-mapSize-width={4096}
+            shadow-mapSize-height={4096}
+            shadow-bias={-0.0005}
+            shadow-camera-left={-500}
+            shadow-camera-right={500}
+            shadow-camera-top={500}
+            shadow-camera-bottom={-500}
+            shadow-camera-near={1}
+            shadow-camera-far={2000}
+          >
+            <OrthographicCamera
+              left={-500}
+              right={500}
+              top={500}
+              bottom={-500}
+              near={1}
+              far={2000}
+              ref={shadowCameraRef}
+              attach={"shadow-camera"}
+            />
+          </directionalLight>
+
+          <Physics
+            contactPairPersistentThreshold={0.08}
+            sleepAfterStillness={0.2}
+            substeps={2}
+            solverIterations={8}
+            timeStep="vary"
+          >
+            <Ring />
+
+            {isGameStarted && (
+              <>
+                <PlayerController
+                  ref={carControllerRef1}
+                  characterType="cena"
+                  joystickInput={
+                    players[0]?.id === socket?.id ? joystickInput : null
+                  }
+                  disabled={!isGameStarted}
+                  position={[1.2, 0, 0]}
+                  isPlayer1={players[0]?.id === socket?.id}
+                  color={0x90902d}
+                  isPunching={
+                    players[0]?.id === socket?.id ? isPunching : false
+                  }
+                  isKicking={players[0]?.id === socket?.id ? isKicking : false}
+                  health={health1}
+                  opponentHealth={health2}
+                  isLocalPlayer={players[0]?.id === socket?.id}
+                  playerName={players[0]?.name || "Player 1"}
+                  opponentName={players[1]?.name || "Player 2"}
+                />
+
+                <PlayerController
+                  ref={carControllerRef2}
+                  characterType="austin"
+                  joystickInput={
+                    players[1]?.id === socket?.id ? joystickInput : null
+                  }
+                  disabled={!isGameStarted}
+                  position={[-1.2, 0, 0]}
+                  isPlayer1={players[1]?.id === socket?.id}
+                  color={0x2b2ba1}
+                  isPunching={
+                    players[1]?.id === socket?.id ? isPunching : false
+                  }
+                  isKicking={players[1]?.id === socket?.id ? isKicking : false}
+                  health={health2}
+                  opponentHealth={health1}
+                  isLocalPlayer={players[1]?.id === socket?.id}
+                  playerName={players[1]?.name || "Player 2"}
+                  opponentName={players[0]?.name || "Player 1"}
+                />
+              </>
+            )}
+          </Physics>
+        </Canvas>
+      </KeyboardControls>
+
+      {showWelcomeScreen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 start">
+          <div className="text-center">
+            {hasJoinedRoom && (
+              <button
+                onClick={() => {
+                  if (socket) {
+                    socket.emit("playerRestart", {
+                      playerId: socket.id,
+                      playerName,
+                    });
+                  }
+                  window.location.reload();
+                }}
+                className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
+              >
+                Exit
+              </button>
+            )}
+            <div
+              ref={welcomeTextRef}
+              className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
+            >
+              {"Welcome to NishGear".split("").map((letter, index) => (
+                <span key={index} className="inline-block">
+                  {letter === " " ? "\u00A0" : letter}
+                </span>
+              ))}
+            </div>
+            <div>
+              <input
+                type="text"
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="px-4 py-2 mb-4 rounded-lg"
+              />
+            </div>
+            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
+              <button
+                onClick={handleJoinRoom}
+                disabled={
+                  hasJoinedRoom ||
+                  !isUsernameValid ||
+                  playerName.trim().length === 0
+                }
+                className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                  hasJoinedRoom ||
+                  !isUsernameValid ||
+                  playerName.trim().length === 0
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-orange-600"
+                } transition-colors`}
+              >
+                JOIN ROOM
+              </button>
+            </div>
+            <div
+              onClick={handleInfoClick}
+              className="mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+            >
+              HOW TO PLAY?
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasJoinedRoom && !isGameStarted && (
+        <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
+          <h3>Lobby</h3>
+          {players.map((player, index) => (
+            <div key={index}>
+              {player.name} {player.isReady ? "✅" : "❌"}
+            </div>
+          ))}
+          {players.length === 2 && !isReady && (
+            <button
+              onClick={handleReady}
+              className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg"
+            >
+              READY
+            </button>
+          )}
+        </div>
+      )}
+
+      {countdown !== null && !isGameStarted && (
+        <div className="fixed inset-0 flex items-center justify-center z-[101]">
+          <div className="w-[80vw] h-[80vw] rounded-full bg-black text-white text-9xl flex items-center justify-center">
+            {countdown}
+          </div>
+        </div>
+      )}
+
+      {isGameStarted && (
+        <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          <div className="flex flex-col items-start">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{
+                  width: `${
+                    players[0]?.id === socket?.id ? health1 : health2
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.id === socket?.id
+                ? players[0]?.name
+                : players[1]?.name}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{
+                  width: `${
+                    players[0]?.id === socket?.id ? health2 : health1
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.id === socket?.id
+                ? players[1]?.name
+                : players[0]?.name}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Commented out popup UI */}
+      {/* {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-[103]">
+          <div className="bg-white p-8 rounded-lg text-center max-w-md w-full">
+            <h2 className="text-3xl font-bold mb-4 text-black">
+              {winner?.id === socket?.id ? "VICTORY!" : "DEFEAT"}
+            </h2>
+            <div className="mb-6">
+              <p className="text-xl text-black">{popupMessage}</p>
+              {winner && (
+                <p className="mt-2 text-lg text-green-600">
+                  Winner: {winner.name}
+                </p>
+              )}
+              {loser && (
+                <p className="mt-1 text-lg text-red-600">Loser: {loser.name}</p>
+              )}
+            </div>
+            {restartCountdown !== null ? (
+              <p className="text-black text-xl">
+                RESTARTING IN {restartCountdown}...
+              </p>
+            ) : (
+              <button
+                onClick={handleReset}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg text-lg hover:bg-blue-700 transition-colors"
+              >
+                {winner?.id === socket?.id ? "Play Again" : "Try Again"}
+              </button>
+            )}
+          </div>
+        </div>
+      )} */}
+
+      <Joystick
+        onMove={(data) => {
+          setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
+        }}
+        onToggleRun={(isRunning) => {
+          setJoystickInput((prev) => ({ ...prev, isRunning }));
+        }}
+        onStart={() => {}}
+        disabled={!isGameStarted || players.length !== 2}
+      />
+
+      {isGameStarted && (
+        <AttackButtons
+          onPunch={(punching) => setIsPunching(punching)}
+          onKick={(kicking) => setIsKicking(kicking)}
+        />
+      )}
+
+      <Info
+        onReset={handleReset}
+        // showPopup={showPopup}
+        // popupMessage={popupMessage}
+        showInfoPopup={showInfoPopup}
+        setShowInfoPopup={setShowInfoPopup}
+        onInfoClick={handleInfoClick}
+      />
+    </>
+  );
+};
+
+export default Experience;
+
+
+
+//playercontroller.jsx
+
 import React, {
   useEffect,
   useRef,
@@ -11,8 +691,9 @@ import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
-import Cena from "./Cena";
-import Austinn from "./Austinn";
+
+import Stone from "./Stone";
+import Cenaa from "./Cenaa";
 
 const PlayerController = forwardRef(
   (
@@ -25,6 +706,11 @@ const PlayerController = forwardRef(
       isPunching,
       isKicking,
       characterType,
+      health, // Add this
+      opponentHealth,
+      playerName, // Add this
+      opponentName, // Add this
+      isLocalPlayer,
     },
     ref
   ) => {
@@ -37,13 +723,15 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
-    const colliderArgs = isSmallScreen ? [0.2, 0.4] : [0.2, 0.4];
+
     const attackDamage = 10;
-    const [health, setHealth] = useState(100);
+
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
-    const [showDebugCollider] = useState(true);
+
     const contactTimeout = useRef(null);
+    const lastJoystickMagnitude = useRef(0);
+    const joystickChangeThreshold = 0.05; // Only log if magnitude changes by this amount
 
     useEffect(() => {
       const handleResize = () => {
@@ -53,11 +741,9 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    const WALK_SPEED = 2;
-    const RUN_SPEED = 4;
-    const ROTATION_SPEED = isSmallScreen ? 0.03 : 0.04;
-    const ACCELERATION = 0.5;
-    const DECELERATION = 1;
+    const WALK_SPEED = isSmallScreen ? 1.5 : 1.5;
+    const RUN_SPEED = 2.5;
+    const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     const rb = useRef();
     const container = useRef();
@@ -70,17 +756,17 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
 
-    const currentSpeed = useRef(0);
     const movementEnabled = useRef(true);
 
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
-      console.log("Opponent reference set:", ref?.id);
     };
 
     const startAttack = (type) => {
       if (isAttacking) return;
-
+      console.log(
+        `[ATTACK] ${socket.id} (${playerName}) attacking with ${type}`
+      );
       if (attackTimer.current) {
         clearTimeout(attackTimer.current);
       }
@@ -89,26 +775,15 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      console.log(
-        `Starting ${type} attack. In contact: ${isInContact}, Opponent: ${
-          opponentRef.current ? "exists" : "null"
-        }`
-      );
-
       if (isInContact && socket && opponentRef.current) {
-        console.log(`${type} landed on opponent!`);
         socket.emit("playerHit", {
           attackerId: socket.id,
           damage: attackDamage,
           attackType: type,
         });
-      } else {
-        console.log(
-          `${type} missed - contact:${isInContact}, opponent:${!!opponentRef.current}`
-        );
       }
 
-      const duration = type === "punch" ? 800 : 1000;
+      const duration = type === "punch" ? 700 : 700;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = true;
@@ -125,20 +800,12 @@ const PlayerController = forwardRef(
 
       setIsHit(true);
       setCurrentAnimation("hit");
-      setHealth((prev) => Math.max(0, prev - attackDamage));
-
-      console.log(
-        `Player took ${attackType} hit! Current health: ${
-          health - attackDamage
-        }`
-      );
 
       if (character.current?.playHitSound) {
         character.current.playHitSound();
       }
 
       if (health - attackDamage <= 0) {
-        console.log("Player defeated!");
         if (socket) {
           socket.emit("playerDefeated", {
             winnerId: socket.id,
@@ -147,7 +814,7 @@ const PlayerController = forwardRef(
         }
       }
 
-      const duration = 1000;
+      const duration = 700;
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
         if (!isAttacking) {
@@ -158,15 +825,13 @@ const PlayerController = forwardRef(
 
     const handleCollisionEnter = (event) => {
       if (!opponentRef.current || !rb.current) {
-        console.log("No opponent or rigid body reference");
         return;
       }
 
       const otherUserData = event.other.rigidBody?.userData;
-      console.log("Collision enter with:", otherUserData?.id);
 
+      // Only proceed if the collision is with the opponent's collider (has userData.id)
       if (otherUserData?.id === opponentRef.current?.id) {
-        console.log("Valid collision with opponent detected");
         setIsInContact(true);
 
         if (contactTimeout.current) {
@@ -179,20 +844,32 @@ const PlayerController = forwardRef(
       if (!opponentRef.current || !rb.current) return;
 
       const otherUserData = event.other.rigidBody?.userData;
-      console.log("Collision exit with:", otherUserData?.id);
 
+      // Only proceed if the collision exit is with the opponent's collider
       if (otherUserData?.id === opponentRef.current?.id) {
         contactTimeout.current = setTimeout(() => {
-          console.log("No longer colliding with opponent");
           setIsInContact(false);
         }, 100);
       }
     };
-
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
     }, [isPunching, isKicking]);
+
+    useEffect(() => {
+      if (isLocalPlayer) {
+        console.groupCollapsed(`Health Update (${playerName}'s perspective)`);
+        console.log(`Your Health (${playerName}): ${health}%`);
+        console.log(`Opponent Health (${opponentName}): ${opponentHealth}%`);
+        console.groupEnd();
+      }
+
+      // Debug log showing raw health values
+      console.log(
+        `[DEBUG] ${playerName} - self: ${health}%, opponent: ${opponentHealth}%`
+      );
+    }, [health, opponentHealth, playerName, opponentName, isLocalPlayer]);
 
     useEffect(() => {
       if (!socket) return;
@@ -205,11 +882,11 @@ const PlayerController = forwardRef(
 
       const onPlayerDefeated = (data) => {
         if (data.loserId === socket.id) {
-          setCurrentAnimation("defeated");
+          setCurrentAnimation("fall");
           setPopupMessage("You were defeated! Better luck next time!");
           setShowPopup(true);
         } else if (data.winnerId === socket.id) {
-          setCurrentAnimation("victory");
+          setCurrentAnimation("idle");
           setPopupMessage("You won the match! Congratulations!");
           setShowPopup(true);
         }
@@ -223,27 +900,29 @@ const PlayerController = forwardRef(
         socket.off("playerDefeated", onPlayerDefeated);
       };
     }, [socket]);
-
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1) return;
 
       const vel = rb.current.linvel();
       const movement = { x: 0, z: 0 };
-      let targetSpeed = 0;
-
+      const isUsingJoystick =
+        joystickInput &&
+        (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
       const { forward, backward, left, right, run, punch, kick } = get();
 
+      // Handle attacks
       if (punch && !isAttacking && !isHit) startAttack("punch");
       if (kick && !isAttacking && !isHit) startAttack("kick");
 
       if (movementEnabled.current && !isHit) {
+        // Keyboard movement handling
         if (forward) {
-          targetSpeed = run ? RUN_SPEED : WALK_SPEED;
+          movement.z = run ? -RUN_SPEED : -WALK_SPEED; // Use RUN_SPEED if shift is pressed
           setIsBraking(false);
           setIsReversing(false);
-          if (!isAttacking) setCurrentAnimation("run");
+          if (!isAttacking) setCurrentAnimation(run ? "run" : "walk"); // Set animation based on run key
         } else if (backward) {
-          targetSpeed = 0;
+          movement.z = 0;
           setIsReversing(true);
           if (!isAttacking) setCurrentAnimation("idle");
         } else {
@@ -252,60 +931,79 @@ const PlayerController = forwardRef(
           if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
+        // Joystick input handling - optimized version
         if (joystickInput) {
-          if (joystickInput.y < 0) {
-            targetSpeed = WALK_SPEED;
-            setIsBraking(false);
-            setIsReversing(false);
-            if (!isAttacking) setCurrentAnimation("run");
-          } else if (joystickInput.y > 0) {
-            targetSpeed = 0;
-            setIsReversing(true);
-            if (!isAttacking) setCurrentAnimation("idle");
+          const joystickMagnitude = Math.sqrt(
+            joystickInput.x * joystickInput.x +
+              joystickInput.y * joystickInput.y
+          );
+
+          if (
+            Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
+            joystickChangeThreshold
+          ) {
+            lastJoystickMagnitude.current = joystickMagnitude;
           }
-          rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+
+          // Only process if joystick is being actively used (deadzone)
+          if (joystickMagnitude > 0.1) {
+            // Rotation
+            if (Math.abs(joystickInput.x) > 0.1) {
+              rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+            }
+
+            // Movement - maintain full speed in movement direction
+            if (joystickInput.y < 0) {
+              movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
+              setIsBraking(false);
+              setIsReversing(false);
+              if (!isAttacking)
+                setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
+            } else if (joystickInput.y > 0) {
+              movement.z = 0;
+              setIsReversing(true);
+              if (!isAttacking) setCurrentAnimation("idle");
+            }
+          }
         }
 
+        // Keyboard rotation handling
         if (left) movement.x = 1;
         if (right) movement.x = -1;
-      } else {
-        targetSpeed = 0;
-        currentSpeed.current = 0;
       }
 
-      if (currentSpeed.current < targetSpeed) {
-        currentSpeed.current += ACCELERATION;
-      } else if (currentSpeed.current > targetSpeed) {
-        currentSpeed.current -= DECELERATION;
-      }
-
-      if (currentSpeed.current !== 0 && movementEnabled.current && !isHit) {
-        movement.z = currentSpeed.current > 0 ? -1 : 1;
-      }
-
-      setIsBraking(currentSpeed.current < 0);
-
+      // Apply rotation
       if (movement.x !== 0 && movementEnabled.current && !isHit) {
         rotationTarget.current += ROTATION_SPEED * movement.x;
       }
 
-      if (
-        (movement.x !== 0 || movement.z !== 0) &&
-        movementEnabled.current &&
-        !isHit
-      ) {
-        vel.x =
-          Math.sin(rotationTarget.current) *
-          Math.abs(currentSpeed.current) *
-          movement.z;
-        vel.z =
-          Math.cos(rotationTarget.current) *
-          Math.abs(currentSpeed.current) *
-          movement.z;
+      // Apply movement - special handling for joystick
+      if (movementEnabled.current && !isHit) {
+        if (isUsingJoystick && joystickInput.y < 0) {
+          // For joystick: maintain constant speed in movement direction
+          const moveDirection = new Vector3(
+            Math.sin(rotationTarget.current),
+            0,
+            Math.cos(rotationTarget.current)
+          ).normalize();
+
+          vel.x =
+            moveDirection.x *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+          vel.z =
+            moveDirection.z *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+        } else if (movement.x !== 0 || movement.z !== 0) {
+          // Default movement for keyboard
+          vel.x = Math.sin(rotationTarget.current) * movement.z;
+          vel.z = Math.cos(rotationTarget.current) * movement.z;
+        }
       }
 
+      // Update rigid body velocity
       rb.current.setLinvel(vel, true);
 
+      // Sync with server
       if (socket) {
         socket.emit("carMove", {
           position: rb.current.translation(),
@@ -318,6 +1016,7 @@ const PlayerController = forwardRef(
         });
       }
 
+      // Camera follow for player 1
       if (isPlayer1) {
         container.current.rotation.y = MathUtils.lerp(
           container.current.rotation.y,
@@ -371,7 +1070,7 @@ const PlayerController = forwardRef(
       setCurrentAnimation("idle");
       setIsAttacking(false);
       setIsHit(false);
-      setHealth(100);
+
       movementEnabled.current = true;
       setIsInContact(false);
     };
@@ -406,14 +1105,23 @@ const PlayerController = forwardRef(
         gravityScale={9}
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
-        userData={{ id: socket?.id }}
+        userData={{
+          id: socket?.id,
+          isPlayer: true, // For easy filtering
+        }}
+        solverIterations={10} // Slightly higher than world setting
+        ccd={true} // Prevent fast attack tunneling
+        linearDamping={0.5} // Reduce unwanted sliding
+        angularDamping={1.0} // Prevent excessive rotation
+        sleepAfterStillness={0.2} // Match physics world setting
+        canSleep={true}
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
-          <group ref={cameraPosition} position-y={4} position-z={2} />
+          <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI}>
             {characterType === "austin" ? (
-              <Austinn
+              <Stone
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 isBraking={isBraking}
@@ -422,7 +1130,7 @@ const PlayerController = forwardRef(
                 animation={isHit ? "hit" : currentAnimation}
               />
             ) : (
-              <Cena
+              <Cenaa
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 isBraking={isBraking}
@@ -431,25 +1139,19 @@ const PlayerController = forwardRef(
                 animation={isHit ? "hit" : currentAnimation}
               />
             )}
-            <CapsuleCollider args={colliderArgs} position={[0, 3, 0]} />
             <CapsuleCollider
-              args={[0.3, 0.5]}
+              args={[0.4, 0.3]}
+              position={[0, 3, 0]}
+              restitution={0.1}
+              friction={0.5}
+            />
+            <CapsuleCollider
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
-              onCollisionEnter={handleCollisionEnter}
-              onCollisionExit={handleCollisionExit}
+              onIntersectionEnter={handleCollisionEnter} // More precise than onCollisionEnter
+              onIntersectionExit={handleCollisionExit}
             />
-            {/* {showDebugCollider && (
-              <mesh position={[0, 3, 0.5]}>
-                <capsuleGeometry args={[0.3, 0.6]} />
-                <meshBasicMaterial
-                  color="red"
-                  wireframe
-                  transparent
-                  opacity={0.5}
-                />
-              </mesh>
-            )} */}
           </group>
         </group>
       </RigidBody>
@@ -460,6 +1162,1077 @@ const PlayerController = forwardRef(
 export default PlayerController;
 
 
+imp part2 experience.jsx//
+
+"use client";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import { Canvas } from "@react-three/fiber";
+import {
+  Environment,
+  KeyboardControls,
+  OrthographicCamera,
+} from "@react-three/drei";
+import { Physics } from "@react-three/rapier";
+
+import Joystick from "./Joystick";
+import AttackButtons from "./AttackButtons";
+import gsap from "gsap";
+import { useSocket } from "../context/SocketContext";
+import Info from "./Info";
+import PlayerController from "./PlayerController";
+import Ring from "./Ring";
+import Background from "./Background";
+
+const keyboardMap = [
+  { name: "forward", keys: ["ArrowUp", "KeyW"] },
+  { name: "backward", keys: ["ArrowDown", "KeyS"] },
+  { name: "left", keys: ["ArrowLeft", "KeyA"] },
+  { name: "right", keys: ["ArrowRight", "KeyD"] },
+  { name: "run", keys: ["Shift"] },
+  { name: "punch", keys: ["KeyP"] },
+  { name: "kick", keys: ["KeyK"] },
+];
+
+const Experience = () => {
+  const socket = useSocket();
+  const shadowCameraRef = useRef();
+  const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
+  const [isPunching, setIsPunching] = useState(false);
+  const [isKicking, setIsKicking] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState("");
+  const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(true);
+  const [isGameStarted, setIsGameStarted] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+  const [players, setPlayers] = useState([]);
+  const [isReady, setIsReady] = useState(false);
+  const [countdown, setCountdown] = useState(null);
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
+  const [shouldReload, setShouldReload] = useState(false);
+  const [health1, setHealth1] = useState(100);
+  const [health2, setHealth2] = useState(100);
+  const [winner, setWinner] = useState(null);
+  const [loser, setLoser] = useState(null);
+  const [playerLeft, setPlayerLeft] = useState(false);
+  const [isUsernameValid, setIsUsernameValid] = useState(true);
+  const [restartCountdown, setRestartCountdown] = useState(null);
+
+  const carControllerRef1 = useRef();
+  const carControllerRef2 = useRef();
+  const blockRef = useRef();
+  const hasStarted = useRef(false);
+  const welcomeTextRef = useRef();
+
+  const isUsernameUnique = (name) => {
+    return !players.some((player) => player.name === name);
+  };
+
+  const handleJoinRoom = () => {
+    if (!socket) {
+      console.error("Socket is not available");
+      setPopupMessage("Connection error. Please refresh the page.");
+      setShowPopup(true);
+      return;
+    }
+
+    const trimmedName = playerName.trim();
+    if (trimmedName !== "" && !hasJoinedRoom) {
+      if (players.length >= 2) {
+        setPopupMessage("Room is already full. Please try again later.");
+        setShowPopup(true);
+        setTimeout(() => window.location.reload(), 1000);
+        return;
+      }
+
+      if (isUsernameUnique(trimmedName)) {
+        socket.emit("joinRoom", trimmedName);
+        setHasJoinedRoom(true);
+        setIsUsernameValid(true);
+      } else {
+        setIsUsernameValid(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (playerName.trim() !== "") {
+      setIsUsernameValid(isUsernameUnique(playerName.trim()));
+    }
+  }, [playerName, players]);
+
+  useEffect(() => {
+    if (showWelcomeScreen) {
+      const letters = Array.from(welcomeTextRef.current.children);
+      gsap.fromTo(
+        letters,
+        { y: -10 },
+        {
+          y: 0,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "ease.in",
+          repeat: -1,
+          repeatDelay: 0.5,
+          yoyo: true,
+        }
+      );
+    }
+  }, [showWelcomeScreen]);
+
+  const handleReset = useCallback(() => {
+    setRestartCountdown(2);
+    setTimeout(() => {
+      setShowPopup(false);
+      setWinner(null);
+      setLoser(null);
+      setPlayerLeft(false);
+      hasStarted.current = false;
+      if (carControllerRef1.current) carControllerRef1.current.respawn();
+      if (carControllerRef2.current) carControllerRef2.current.respawn();
+      if (blockRef.current) blockRef.current.setEnabled(true);
+      setShowWelcomeScreen(true);
+      setPlayers([]);
+      setIsReady(false);
+      setHasJoinedRoom(false);
+      setPlayerName("");
+      if (socket) socket.emit("restartGame");
+      window.location.reload();
+    }, 2000);
+  }, [socket]);
+
+  const handleInfoClick = useCallback(() => {
+    setShowInfoPopup(true);
+  }, []);
+
+  const handleReady = () => {
+    if (socket) {
+      socket.emit("playerReady", playerName);
+      setIsReady(true);
+    }
+  };
+
+  useEffect(() => {
+    if (shouldReload) {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldReload]);
+
+  const onPlayerHit = useCallback(
+    (data) => {
+      if (winner || loser) return;
+
+      // Use functional updates to ensure we get latest state
+      if (players[0]?.id === data.attackerId) {
+        setHealth2((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          console.log(`Player 2 health: ${prev} -> ${newHealth}`);
+
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[0].id,
+                loserId: players[1]?.id,
+                winnerHealth: health1,
+                loserHealth: newHealth,
+              });
+            }, 50);
+          }
+          return newHealth;
+        });
+      } else if (players[1]?.id === data.attackerId) {
+        setHealth1((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          console.log(`Player 1 health: ${prev} -> ${newHealth}`);
+
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[1].id,
+                loserId: players[0]?.id,
+                winnerHealth: health2,
+                loserHealth: newHealth,
+              });
+            }, 50);
+          }
+          return newHealth;
+        });
+      }
+    },
+    [socket, players, winner, loser, health1, health2]
+  );
+
+  const onPlayerDefeated = useCallback(
+    (data) => {
+      console.log(
+        `[FINAL HEALTH] Winner: ${data.winnerHealth}% | Loser: ${data.loserHealth}%`
+      );
+
+      // Set health first
+      if (players[0]?.id === data.winnerId) {
+        setHealth1(data.winnerHealth);
+        setHealth2(data.loserHealth);
+        setWinner(players[0]);
+        setLoser(players[1]);
+      } else if (players[1]?.id === data.winnerId) {
+        setHealth1(data.loserHealth);
+        setHealth2(data.winnerHealth);
+        setWinner(players[1]);
+        setLoser(players[0]);
+      }
+
+      // Force animation update through car controllers
+      if (carControllerRef1.current && carControllerRef2.current) {
+        if (players[0]?.id === data.winnerId) {
+          carControllerRef1.current.setVictory();
+          carControllerRef2.current.setDefeat();
+        } else {
+          carControllerRef1.current.setDefeat();
+          carControllerRef2.current.setVictory();
+        }
+      }
+    },
+    [players]
+  );
+
+  useEffect(() => {
+    if (socket) {
+      const updatePlayersHandler = (players) => {
+        if (players.length > 2) {
+          const currentPlayerIndex = players.findIndex(
+            (p) => p.id === socket.id
+          );
+          if (currentPlayerIndex >= 2) {
+            setShouldReload(true);
+            return;
+          }
+        }
+        setPlayers(players);
+
+        if (isGameStarted && players.length === 1) {
+          setPlayerLeft(true);
+          setPopupMessage("The other player has left the game.");
+          setShowPopup(true);
+          handleReset();
+        }
+      };
+
+      const startGameHandler = () => {
+        let count = 3;
+        setCountdown(count);
+        const interval = setInterval(() => {
+          count -= 1;
+          setCountdown(count);
+          if (count === 0) {
+            clearInterval(interval);
+            setShowWelcomeScreen(false);
+            setIsGameStarted(true);
+          }
+        }, 1000);
+      };
+
+      const restartGameHandler = () => {
+        window.location.reload();
+      };
+
+      const usernameTakenHandler = () => {
+        setIsUsernameValid(false);
+      };
+
+      socket.on("updatePlayers", updatePlayersHandler);
+      socket.on("startGame", startGameHandler);
+      socket.on("restartGame", restartGameHandler);
+      socket.on("usernameTaken", usernameTakenHandler);
+      socket.on("playerHit", onPlayerHit);
+      socket.on("playerDefeated", onPlayerDefeated);
+
+      return () => {
+        socket.off("updatePlayers", updatePlayersHandler);
+        socket.off("startGame", startGameHandler);
+        socket.off("restartGame", restartGameHandler);
+        socket.off("usernameTaken", usernameTakenHandler);
+        socket.off("playerHit", onPlayerHit);
+        socket.off("playerDefeated", onPlayerDefeated);
+      };
+    }
+  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
+
+  useEffect(() => {
+    console.log("Current health state:", { health1, health2 });
+  }, [health1, health2]);
+
+  useEffect(() => {
+    if (
+      isGameStarted &&
+      carControllerRef1.current &&
+      carControllerRef2.current
+    ) {
+      if (players[0]?.id === socket?.id) {
+        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+      } else if (players[1]?.id === socket?.id) {
+        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+      }
+    }
+  }, [isGameStarted, players, socket?.id]);
+
+  const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+
+  useEffect(() => {
+    if (restartCountdown !== null && restartCountdown > 0) {
+      const interval = setInterval(() => {
+        setRestartCountdown((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [restartCountdown]);
+
+  useEffect(() => {
+    console.log("Health State Updated:", {
+      player1: { health: health1, name: players[0]?.name },
+      player2: { health: health2, name: players[1]?.name },
+    });
+  }, [health1, health2, players]);
+
+  return (
+    <>
+      <KeyboardControls map={memoizedKeyboardMap}>
+        <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
+          <Environment preset="sunset" />
+          <Background />
+          <directionalLight
+            intensity={1}
+            castShadow
+            position={[0, 10, 0]}
+            shadow-mapSize-width={4096}
+            shadow-mapSize-height={4096}
+            shadow-bias={-0.0005}
+            shadow-camera-left={-500}
+            shadow-camera-right={500}
+            shadow-camera-top={500}
+            shadow-camera-bottom={-500}
+            shadow-camera-near={1}
+            shadow-camera-far={2000}
+          >
+            <OrthographicCamera
+              left={-500}
+              right={500}
+              top={500}
+              bottom={-500}
+              near={1}
+              far={2000}
+              ref={shadowCameraRef}
+              attach={"shadow-camera"}
+            />
+          </directionalLight>
+
+          <Physics
+            contactPairPersistentThreshold={0.08}
+            sleepAfterStillness={0.2}
+            substeps={2}
+            solverIterations={8}
+            timeStep="vary"
+          >
+            <Ring />
+            {isGameStarted && (
+              <>
+                <PlayerController
+                  ref={carControllerRef1}
+                  characterType="cena"
+                  joystickInput={
+                    players[0]?.id === socket?.id ? joystickInput : null
+                  }
+                  disabled={!isGameStarted}
+                  position={[1.2, 0, 0]}
+                  isPlayer1={players[0]?.id === socket?.id}
+                  color={0x90902d}
+                  isPunching={
+                    players[0]?.id === socket?.id ? isPunching : false
+                  }
+                  isKicking={players[0]?.id === socket?.id ? isKicking : false}
+                  health={health1}
+                  opponentHealth={health2}
+                  isLocalPlayer={players[0]?.id === socket?.id}
+                  playerName={players[0]?.name || "Player 1"}
+                  opponentName={players[1]?.name || "Player 2"}
+                />
+                <PlayerController
+                  ref={carControllerRef2}
+                  characterType="austin"
+                  joystickInput={
+                    players[1]?.id === socket?.id ? joystickInput : null
+                  }
+                  disabled={!isGameStarted}
+                  position={[-1.2, 0, 0]}
+                  isPlayer1={players[1]?.id === socket?.id}
+                  color={0x2b2ba1}
+                  isPunching={
+                    players[1]?.id === socket?.id ? isPunching : false
+                  }
+                  isKicking={players[1]?.id === socket?.id ? isKicking : false}
+                  health={health2}
+                  opponentHealth={health1}
+                  isLocalPlayer={players[1]?.id === socket?.id}
+                  playerName={players[1]?.name || "Player 2"}
+                  opponentName={players[0]?.name || "Player 1"}
+                />
+              </>
+            )}
+          </Physics>
+        </Canvas>
+      </KeyboardControls>
+
+      {showWelcomeScreen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 start">
+          <div className="text-center">
+            {hasJoinedRoom && (
+              <button
+                onClick={() => {
+                  if (socket) {
+                    socket.emit("playerRestart", {
+                      playerId: socket.id,
+                      playerName,
+                    });
+                  }
+                  window.location.reload();
+                }}
+                className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
+              >
+                Exit
+              </button>
+            )}
+            <div
+              ref={welcomeTextRef}
+              className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
+            >
+              {"Welcome to NishGear".split("").map((letter, index) => (
+                <span key={index} className="inline-block">
+                  {letter === " " ? "\u00A0" : letter}
+                </span>
+              ))}
+            </div>
+            <div>
+              <input
+                type="text"
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="px-4 py-2 mb-4 rounded-lg"
+              />
+            </div>
+            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
+              <button
+                onClick={handleJoinRoom}
+                disabled={
+                  hasJoinedRoom ||
+                  !isUsernameValid ||
+                  playerName.trim().length === 0
+                }
+                className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                  hasJoinedRoom ||
+                  !isUsernameValid ||
+                  playerName.trim().length === 0
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-orange-600"
+                } transition-colors`}
+              >
+                JOIN ROOM
+              </button>
+            </div>
+            <div
+              onClick={handleInfoClick}
+              className="mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+            >
+              HOW TO PLAY?
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasJoinedRoom && !isGameStarted && (
+        <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
+          <h3>Lobby</h3>
+          {players.map((player, index) => (
+            <div key={index}>
+              {player.name} {player.isReady ? "✅" : "❌"}
+            </div>
+          ))}
+          {players.length === 2 && !isReady && (
+            <button
+              onClick={handleReady}
+              className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg"
+            >
+              READY
+            </button>
+          )}
+        </div>
+      )}
+
+      {countdown !== null && !isGameStarted && (
+        <div className="fixed inset-0 flex items-center justify-center z-[101]">
+          <div className="w-[80vw] h-[80vw] rounded-full bg-black text-white text-9xl flex items-center justify-center">
+            {countdown}
+          </div>
+        </div>
+      )}
+
+      {isGameStarted && (
+        <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {/* Player Health (always on left) */}
+          <div className="flex flex-col items-start">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{
+                  width: `${
+                    players[0]?.id === socket?.id ? health1 : health2
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.id === socket?.id
+                ? players[0]?.name
+                : players[1]?.name}
+            </div>
+          </div>
+
+          {/* Opponent Health (always on right) */}
+          <div className="flex flex-col items-end">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{
+                  width: `${
+                    players[0]?.id === socket?.id ? health2 : health1
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.id === socket?.id
+                ? players[1]?.name
+                : players[0]?.name}
+            </div>
+          </div>
+        </div>
+      )}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-[103]">
+          <div className="bg-white p-8 rounded-lg text-center">
+            <h2 className="text-2xl font-bold mb-4">Race Over!</h2>
+            <p className="mb-4">{popupMessage}</p>
+            {restartCountdown !== null ? (
+              <p className="text-black">RESTARTING IN {restartCountdown}...</p>
+            ) : (
+              <button
+                onClick={handleReset}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+              >
+                Restart
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Joystick
+        onMove={(data) => {
+          // Pass isRunning to the joystickInput
+          setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
+        }}
+        onToggleRun={(isRunning) => {
+          // Update the run state when the button is toggled
+          setJoystickInput((prev) => ({ ...prev, isRunning }));
+        }}
+        onStart={() => {}}
+        disabled={!isGameStarted || players.length !== 2}
+      />
+
+      {isGameStarted && (
+        <AttackButtons
+          onPunch={(punching) => setIsPunching(punching)}
+          onKick={(kicking) => setIsKicking(kicking)}
+        />
+      )}
+
+      <Info
+        onReset={handleReset}
+        showPopup={showPopup}
+        popupMessage={popupMessage}
+        showInfoPopup={showInfoPopup}
+        setShowInfoPopup={setShowInfoPopup}
+        onInfoClick={handleInfoClick}
+      />
+    </>
+  );
+};
+
+export default Experience;
 
 
- userData={{ id: socket?.id }}
+ imp part2 playercontroller.jsx//
+
+ import React, {
+  useEffect,
+  useRef,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { CapsuleCollider, RigidBody } from "@react-three/rapier";
+import { Vector3 } from "three";
+import { useFrame } from "@react-three/fiber";
+import { useKeyboardControls } from "@react-three/drei";
+import { MathUtils } from "three/src/math/MathUtils";
+import { useSocket } from "../context/SocketContext";
+import Stone from "./Stone";
+import Cenaa from "./Cenaa";
+
+const PlayerController = forwardRef(
+  (
+    {
+      joystickInput,
+      position,
+      isPlayer1,
+      color,
+      isPunching,
+      isKicking,
+      characterType,
+      health,
+      opponentHealth,
+      playerName,
+      opponentName,
+      isLocalPlayer,
+    },
+    ref
+  ) => {
+    const socket = useSocket();
+    const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
+    const [currentAnimation, setCurrentAnimation] = useState("idle");
+    const [isAttacking, setIsAttacking] = useState(false);
+    const [isHit, setIsHit] = useState(false);
+    const [isDefeated, setIsDefeated] = useState(false);
+    const [matchResult, setMatchResult] = useState(null);
+    const attackTimer = useRef(null);
+    const hitTimer = useRef(null);
+    const attackDamage = 10;
+    const opponentRef = useRef();
+    const [isInContact, setIsInContact] = useState(false);
+    const contactTimeout = useRef(null);
+    const lastJoystickMagnitude = useRef(0);
+    const joystickChangeThreshold = 0.05;
+
+    const WALK_SPEED = 1.5;
+    const RUN_SPEED = 2.5;
+    const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
+
+    const rb = useRef();
+    const container = useRef();
+    const character = useRef();
+    const rotationTarget = useRef(0);
+    const cameraTarget = useRef();
+    const cameraPosition = useRef();
+    const cameraworldPosition = useRef(new Vector3());
+    const cameraLookAtWorldPosition = useRef(new Vector3());
+    const cameraLookAt = useRef(new Vector3());
+    const [, get] = useKeyboardControls();
+    const movementEnabled = useRef(true);
+
+    useEffect(() => {
+      const handleResize = () => {
+        setIsSmallScreen(window.innerWidth < 640);
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const setOpponentRef = (ref) => {
+      opponentRef.current = ref;
+    };
+
+    const startAttack = (type) => {
+      if (isAttacking || isDefeated) return;
+
+      // Standardize damage to 10
+      const damage = 10;
+
+      if (attackTimer.current) {
+        clearTimeout(attackTimer.current);
+      }
+
+      setIsAttacking(true);
+      movementEnabled.current = false;
+      setCurrentAnimation(type);
+
+      if (
+        isInContact &&
+        socket &&
+        opponentRef.current &&
+        !opponentRef.current.isDefeated
+      ) {
+        socket.emit("playerHit", {
+          attackerId: socket.id,
+          damage: damage, // Always send 10 damage
+          attackType: type,
+        });
+      }
+
+      const duration = 700;
+      attackTimer.current = setTimeout(() => {
+        setIsAttacking(false);
+        movementEnabled.current = !isDefeated;
+        setCurrentAnimation(isDefeated ? "fall" : "idle");
+      }, duration);
+    };
+
+    const takeHit = (attackType) => {
+      if (isHit || isDefeated) return;
+
+      if (hitTimer.current) {
+        clearTimeout(hitTimer.current);
+      }
+
+      setIsHit(true);
+      setCurrentAnimation("hit");
+
+      if (character.current?.playHitSound) {
+        character.current.playHitSound();
+      }
+
+      const duration = 700;
+      hitTimer.current = setTimeout(() => {
+        setIsHit(false);
+        if (!isAttacking) {
+          setCurrentAnimation(isDefeated ? "fall" : "idle");
+        }
+      }, duration);
+    };
+
+    const handleCollisionEnter = (event) => {
+      if (!opponentRef.current || !rb.current) return;
+      const otherUserData = event.other.rigidBody?.userData;
+      if (otherUserData?.id === opponentRef.current?.id) {
+        setIsInContact(true);
+        if (contactTimeout.current) {
+          clearTimeout(contactTimeout.current);
+        }
+      }
+    };
+
+    const handleCollisionExit = (event) => {
+      if (!opponentRef.current || !rb.current) return;
+      const otherUserData = event.other.rigidBody?.userData;
+      if (otherUserData?.id === opponentRef.current?.id) {
+        contactTimeout.current = setTimeout(() => {
+          setIsInContact(false);
+        }, 100);
+      }
+    };
+
+    useEffect(() => {
+      if (isPunching && !isHit) startAttack("punch");
+      if (isKicking && !isHit) startAttack("kick");
+    }, [isPunching, isKicking]);
+
+    useEffect(() => {
+      if (health <= 0 && !isDefeated && socket) {
+        setIsDefeated(true);
+        setCurrentAnimation("fall");
+        movementEnabled.current = false;
+        socket.emit("playerDefeated", {
+          winnerId: opponentRef.current?.id,
+          loserId: socket.id,
+          winnerHealth: opponentHealth,
+          loserHealth: health,
+        });
+      }
+    }, [health, isDefeated, opponentHealth, socket]);
+
+    useEffect(() => {
+      if (!socket) return;
+
+      const onPlayerHit = (data) => {
+        if (data.attackerId !== socket.id) {
+          takeHit(data.attackType);
+        }
+      };
+
+      socket.on("playerHit", onPlayerHit);
+
+      return () => {
+        socket.off("playerHit", onPlayerHit);
+      };
+    }, [socket]);
+    useFrame(({ camera }) => {
+      if (!rb.current || !isPlayer1 || isDefeated) return;
+
+      const vel = rb.current.linvel();
+      const movement = { x: 0, z: 0 };
+      const isUsingJoystick =
+        joystickInput &&
+        (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
+      const { forward, backward, left, right, run, punch, kick } = get();
+
+      if (punch && !isAttacking && !isHit) startAttack("punch");
+      if (kick && !isAttacking && !isHit) startAttack("kick");
+
+      if (movementEnabled.current && !isHit) {
+        if (forward) {
+          movement.z = run ? -RUN_SPEED : -WALK_SPEED;
+          if (!isAttacking) setCurrentAnimation(run ? "run" : "walk");
+        } else if (backward) {
+          movement.z = 0;
+          if (!isAttacking) setCurrentAnimation("idle");
+        } else {
+          if (!isAttacking && !isHit) setCurrentAnimation("idle");
+        }
+
+        if (joystickInput) {
+          const joystickMagnitude = Math.sqrt(
+            joystickInput.x * joystickInput.x +
+              joystickInput.y * joystickInput.y
+          );
+
+          if (
+            Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
+            joystickChangeThreshold
+          ) {
+            lastJoystickMagnitude.current = joystickMagnitude;
+          }
+
+          if (joystickMagnitude > 0.1) {
+            if (Math.abs(joystickInput.x) > 0.1) {
+              rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+            }
+
+            if (joystickInput.y < 0) {
+              movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
+              if (!isAttacking)
+                setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
+            } else if (joystickInput.y > 0) {
+              movement.z = 0;
+              if (!isAttacking) setCurrentAnimation("idle");
+            }
+          }
+        }
+
+        if (left) movement.x = 1;
+        if (right) movement.x = -1;
+      }
+
+      if (movement.x !== 0 && movementEnabled.current && !isHit) {
+        rotationTarget.current += ROTATION_SPEED * movement.x;
+      }
+
+      if (movementEnabled.current && !isHit) {
+        if (isUsingJoystick && joystickInput.y < 0) {
+          const moveDirection = new Vector3(
+            Math.sin(rotationTarget.current),
+            0,
+            Math.cos(rotationTarget.current)
+          ).normalize();
+          vel.x =
+            moveDirection.x *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+          vel.z =
+            moveDirection.z *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+        } else if (movement.x !== 0 || movement.z !== 0) {
+          vel.x = Math.sin(rotationTarget.current) * movement.z;
+          vel.z = Math.cos(rotationTarget.current) * movement.z;
+        }
+      }
+
+      rb.current.setLinvel(vel, true);
+
+      if (socket && !isDefeated) {
+        socket.emit("carMove", {
+          position: rb.current.translation(),
+          rotation: container.current.rotation.y,
+          isPlayer1,
+          animation: currentAnimation,
+          isAttacking,
+          isHit,
+          health,
+        });
+      }
+
+      if (isPlayer1) {
+        container.current.rotation.y = MathUtils.lerp(
+          container.current.rotation.y,
+          rotationTarget.current,
+          0.1
+        );
+        cameraPosition.current.getWorldPosition(cameraworldPosition.current);
+        camera.position.lerp(cameraworldPosition.current, 0.1);
+        if (cameraTarget.current) {
+          cameraTarget.current.getWorldPosition(
+            cameraLookAtWorldPosition.current
+          );
+          cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
+          camera.lookAt(cameraLookAt.current);
+        }
+      }
+    });
+
+    useEffect(() => {
+      if (!socket) return;
+
+      const onCarMove = (data) => {
+        if (data.isPlayer1 !== isPlayer1) {
+          rb.current.setTranslation(data.position);
+          container.current.rotation.y = data.rotation;
+          setCurrentAnimation(data.animation || "idle");
+          setIsAttacking(data.isAttacking || false);
+          setIsHit(data.isHit || false);
+        }
+      };
+
+      socket.on("carMove", onCarMove);
+      return () => socket.off("carMove", onCarMove);
+    }, [socket, isPlayer1]);
+
+    const respawn = () => {
+      if (attackTimer.current) clearTimeout(attackTimer.current);
+      if (hitTimer.current) clearTimeout(hitTimer.current);
+      if (contactTimeout.current) clearTimeout(contactTimeout.current);
+      rb.current.setTranslation({ x: 0, y: -10, z: -10 });
+      rb.current.setLinvel({ x: 0, y: 0, z: 0 });
+      rb.current.setAngvel({ x: 0, y: 0, z: 0 });
+      rotationTarget.current = 0;
+      container.current.rotation.y = 0;
+      setCurrentAnimation("idle");
+      setIsAttacking(false);
+      setIsHit(false);
+      setIsDefeated(false);
+      setMatchResult(null);
+      movementEnabled.current = true;
+      setIsInContact(false);
+    };
+
+    useImperativeHandle(ref, () => ({
+      respawn,
+      setOpponentRef,
+
+      setVictory: () => {
+        setMatchResult("won");
+        setCurrentAnimation("victory");
+        movementEnabled.current = false;
+      },
+      setDefeat: () => {
+        setMatchResult("lost");
+        setCurrentAnimation("fall");
+        movementEnabled.current = false;
+      },
+      translation: () => rb.current?.translation(),
+      id: socket?.id,
+      rigidBody: rb.current,
+      isDefeated,
+    }));
+
+    useEffect(() => {
+      return () => {
+        if (attackTimer.current) clearTimeout(attackTimer.current);
+        if (hitTimer.current) clearTimeout(hitTimer.current);
+        if (contactTimeout.current) clearTimeout(contactTimeout.current);
+      };
+    }, []);
+
+    useEffect(() => {
+      console.log(
+        `[${playerName}] Health: ${health}% | State: ${
+          matchResult === "won"
+            ? "VICTORY"
+            : matchResult === "lost"
+            ? "DEFEAT"
+            : "PLAYING"
+        }`
+      );
+    }, [health, matchResult, playerName]);
+
+    return (
+      <RigidBody
+        colliders={false}
+        lockRotations
+        ref={rb}
+        gravityScale={9}
+        onCollisionEnter={handleCollisionEnter}
+        onCollisionExit={handleCollisionExit}
+        userData={{
+          id: socket?.id,
+          isPlayer: true,
+        }}
+        solverIterations={10}
+        ccd={true}
+        linearDamping={0.5}
+        angularDamping={1.0}
+        sleepAfterStillness={0.2}
+        canSleep={true}
+      >
+        <group ref={container} position={position}>
+          <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
+          <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
+          <group ref={character} rotation-y={Math.PI}>
+            {characterType === "austin" ? (
+              <Stone
+                scale={isSmallScreen ? 2.7 : 3.18}
+                position-y={-0.25}
+                color={color}
+                animation={
+                  matchResult === "won"
+                    ? "victory"
+                    : matchResult === "lost"
+                    ? "fall"
+                    : isHit
+                    ? "hit"
+                    : currentAnimation
+                }
+              />
+            ) : (
+              <Cenaa
+                scale={isSmallScreen ? 2.7 : 3.18}
+                position-y={-0.25}
+                color={color}
+                animation={
+                  matchResult === "won"
+                    ? "victory"
+                    : matchResult === "lost"
+                    ? "fall"
+                    : isHit
+                    ? "hit"
+                    : currentAnimation
+                }
+              />
+            )}
+            <CapsuleCollider
+              args={[0.4, 0.3]}
+              position={[0, 3, 0]}
+              restitution={0.1}
+              friction={0.5}
+            />
+            <CapsuleCollider
+              args={[0.4, 0.4]}
+              position={[0, 3, 0]}
+              sensor
+              onIntersectionEnter={handleCollisionEnter}
+              onIntersectionExit={handleCollisionExit}
+            />
+          </group>
+        </group>
+      </RigidBody>
+    );
+  }
+);
+
+export default PlayerController;
