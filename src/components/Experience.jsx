@@ -13,6 +13,7 @@ import {
   OrthographicCamera,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
+
 import Joystick from "./Joystick";
 import AttackButtons from "./AttackButtons";
 import gsap from "gsap";
@@ -21,7 +22,6 @@ import Info from "./Info";
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
-import { preloadSounds } from "@/utils/sounds";
 
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -63,32 +63,6 @@ const Experience = () => {
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
-
-  // Handle mobile audio autoplay policy
-  useEffect(() => {
-    const handleFirstInteraction = () => {
-      const dummy = new Audio();
-      dummy.volume = 0;
-      dummy.play().then(() => dummy.remove());
-      document.removeEventListener("click", handleFirstInteraction);
-      document.removeEventListener("touchstart", handleFirstInteraction);
-    };
-
-    document.addEventListener("click", handleFirstInteraction);
-    document.addEventListener("touchstart", handleFirstInteraction);
-
-    return () => {
-      document.removeEventListener("click", handleFirstInteraction);
-      document.removeEventListener("touchstart", handleFirstInteraction);
-    };
-  }, []);
-
-  // Preload sounds when game starts
-  useEffect(() => {
-    if (isGameStarted) {
-      preloadSounds();
-    }
-  }, [isGameStarted]);
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -191,6 +165,7 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
+      // Use functional updates to ensure we get latest state
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
@@ -230,12 +205,15 @@ const Experience = () => {
     [socket, players, winner, loser, health1, health2]
   );
 
+  // In Experience.jsx, inside the onPlayerDefeated callback function
+  // In Experience.jsx, update the onPlayerDefeated callback
   const onPlayerDefeated = useCallback(
     (data) => {
       console.log(
         `[FINAL HEALTH] Winner: ${data.winnerHealth}% | Loser: ${data.loserHealth}%`
       );
 
+      // Set health first
       if (players[0]?.id === data.winnerId) {
         setHealth1(data.winnerHealth);
         setHealth2(data.loserHealth);
@@ -248,6 +226,7 @@ const Experience = () => {
         setLoser(players[0]);
       }
 
+      // Force animation update through car controllers
       if (carControllerRef1.current && carControllerRef2.current) {
         if (players[0]?.id === data.winnerId) {
           carControllerRef1.current.setVictory();
@@ -258,6 +237,7 @@ const Experience = () => {
         }
       }
 
+      // Show popup after 2 seconds
       setTimeout(() => {
         if (players[0]?.id === data.winnerId) {
           setPopupMessage(
@@ -273,7 +253,6 @@ const Experience = () => {
     },
     [players, socket?.id]
   );
-
   useEffect(() => {
     if (socket) {
       const updatePlayersHandler = (players) => {
@@ -558,6 +537,7 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {/* Player Health (always on left) */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -576,6 +556,7 @@ const Experience = () => {
             </div>
           </div>
 
+          {/* Opponent Health (always on right) */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -596,7 +577,7 @@ const Experience = () => {
         </div>
       )}
       {showPopup && (
-        <div className="fixed inset-0 flex items-start justify-center bg-opacity-80 z-[103]">
+        <div className="fixed inset-0 flex items-start justify-center  bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
             <h2 className="text-2xl font-bold mb-4 text-black">Fight Over!</h2>
             <p className="mb-4 text-xl text-black">{popupMessage}</p>
@@ -616,9 +597,11 @@ const Experience = () => {
 
       <Joystick
         onMove={(data) => {
+          // Pass isRunning to the joystickInput
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
         onToggleRun={(isRunning) => {
+          // Update the run state when the button is toggled
           setJoystickInput((prev) => ({ ...prev, isRunning }));
         }}
         onStart={() => {}}

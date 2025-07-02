@@ -13,7 +13,6 @@ import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
-import { sounds } from "@/utils/sounds";
 
 const PlayerController = forwardRef(
   (
@@ -80,14 +79,6 @@ const PlayerController = forwardRef(
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
-      // Play attack sound
-      if (isLocalPlayer) {
-        // Only play sound for local player
-        const sound = type === "punch" ? sounds.punch : sounds.kick;
-        sound.currentTime = 0; // Rewind to start
-        sound.play().catch((e) => console.log("Sound play failed:", e));
-      }
-
       // Standardize damage to 10
       const damage = 10;
 
@@ -122,8 +113,6 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType) => {
       if (isHit || isDefeated) return;
-      sounds.hit.currentTime = 0;
-      sounds.hit.play().catch((e) => console.log("Hit sound play failed:", e));
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
@@ -347,7 +336,6 @@ const PlayerController = forwardRef(
       setIsInContact(false);
     };
 
-    // In the useImperativeHandle section of PlayerController.jsx
     useImperativeHandle(ref, () => ({
       respawn,
       setOpponentRef,
@@ -356,25 +344,11 @@ const PlayerController = forwardRef(
         setMatchResult("won");
         setCurrentAnimation("victory");
         movementEnabled.current = false;
-        // Play victory sound for local player
-        if (isLocalPlayer) {
-          sounds.victory.currentTime = 0;
-          sounds.victory
-            .play()
-            .catch((e) => console.log("Victory sound play failed:", e));
-        }
       },
       setDefeat: () => {
         setMatchResult("lost");
         setCurrentAnimation("fall");
         movementEnabled.current = false;
-        // Play fall sound for local player
-        if (isLocalPlayer) {
-          sounds.fall.currentTime = 0;
-          sounds.fall
-            .play()
-            .catch((e) => console.log("Fall sound play failed:", e));
-        }
       },
       translation: () => rb.current?.translation(),
       id: socket?.id,
