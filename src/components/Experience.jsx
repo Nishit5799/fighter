@@ -128,16 +128,17 @@ const Experience = () => {
       setLoser(null);
       setPlayerLeft(false);
       hasStarted.current = false;
-      if (carControllerRef1.current) carControllerRef1.current.respawn();
-      if (carControllerRef2.current) carControllerRef2.current.respawn();
+
       if (blockRef.current) blockRef.current.setEnabled(true);
       setShowWelcomeScreen(true);
       setPlayers([]);
       setIsReady(false);
       setHasJoinedRoom(false);
       setPlayerName("");
+      setHealth1(100);
+      setHealth2(100);
       if (socket) socket.emit("restartGame");
-      window.location.reload();
+      // Don't reload the page, just reset the state
     }, 2000);
   }, [socket]);
 
@@ -169,7 +170,6 @@ const Experience = () => {
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
-          console.log(`Player 2 health: ${prev} -> ${newHealth}`);
 
           if (newHealth <= 0) {
             setTimeout(() => {
@@ -186,7 +186,6 @@ const Experience = () => {
       } else if (players[1]?.id === data.attackerId) {
         setHealth1((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
-          console.log(`Player 1 health: ${prev} -> ${newHealth}`);
 
           if (newHealth <= 0) {
             setTimeout(() => {
@@ -209,10 +208,6 @@ const Experience = () => {
   // In Experience.jsx, update the onPlayerDefeated callback
   const onPlayerDefeated = useCallback(
     (data) => {
-      console.log(
-        `[FINAL HEALTH] Winner: ${data.winnerHealth}% | Loser: ${data.loserHealth}%`
-      );
-
       // Set health first
       if (players[0]?.id === data.winnerId) {
         setHealth1(data.winnerHealth);
@@ -249,6 +244,8 @@ const Experience = () => {
           );
         }
         setShowPopup(true);
+        // Start the automatic reset countdown
+        setRestartCountdown(5); // 5 seconds countdown
       }, 2000);
     },
     [players, socket?.id]
@@ -316,10 +313,6 @@ const Experience = () => {
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
   useEffect(() => {
-    console.log("Current health state:", { health1, health2 });
-  }, [health1, health2]);
-
-  useEffect(() => {
     if (
       isGameStarted &&
       carControllerRef1.current &&
@@ -343,15 +336,10 @@ const Experience = () => {
         setRestartCountdown((prev) => prev - 1);
       }, 1000);
       return () => clearInterval(interval);
+    } else if (restartCountdown === 0) {
+      handleReset(); // Automatically call reset when countdown reaches 0
     }
-  }, [restartCountdown]);
-
-  useEffect(() => {
-    console.log("Health State Updated:", {
-      player1: { health: health1, name: players[0]?.name },
-      player2: { health: health2, name: players[1]?.name },
-    });
-  }, [health1, health2, players]);
+  }, [restartCountdown, handleReset]);
 
   return (
     <>
@@ -577,19 +565,28 @@ const Experience = () => {
         </div>
       )}
       {showPopup && (
-        <div className="fixed inset-0 flex items-start justify-center  bg-opacity-80 z-[103]">
+        <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
             <h2 className="text-2xl font-bold mb-4 text-black">Fight Over!</h2>
             <p className="mb-4 text-xl text-black">{popupMessage}</p>
             {restartCountdown !== null ? (
-              <p className="text-black">RESTARTING IN {restartCountdown}...</p>
+              <>
+                <p className="text-black mb-2">
+                  Game will restart automatically...
+                </p>
+              </>
             ) : (
-              <button
-                onClick={handleReset}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg"
-              >
-                Restart
-              </button>
+              <>
+                <p className="text-black mb-2">
+                  Game will restart automatically...
+                </p>
+                <button
+                  onClick={handleReset}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+                >
+                  Restart Now
+                </button>
+              </>
             )}
           </div>
         </div>
