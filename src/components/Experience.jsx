@@ -13,7 +13,6 @@ import {
   OrthographicCamera,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-
 import Joystick from "./Joystick";
 import AttackButtons from "./AttackButtons";
 import gsap from "gsap";
@@ -57,6 +56,7 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const [networkLatency, setNetworkLatency] = useState(0);
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
@@ -95,6 +95,22 @@ const Experience = () => {
     }
   };
 
+  // Network latency monitoring
+  useEffect(() => {
+    if (!socket) return;
+
+    const checkLatency = () => {
+      const start = Date.now();
+      socket.emit("ping", () => {
+        const latency = Date.now() - start;
+        setNetworkLatency(latency);
+      });
+    };
+
+    const interval = setInterval(checkLatency, 5000);
+    return () => clearInterval(interval);
+  }, [socket]);
+
   useEffect(() => {
     if (playerName.trim() !== "") {
       setIsUsernameValid(isUsernameUnique(playerName.trim()));
@@ -128,7 +144,6 @@ const Experience = () => {
       setLoser(null);
       setPlayerLeft(false);
       hasStarted.current = false;
-
       if (blockRef.current) blockRef.current.setEnabled(true);
       setShowWelcomeScreen(true);
       setPlayers([]);
@@ -138,7 +153,6 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
-      // Don't reload the page, just reset the state
     }, 2000);
   }, [socket]);
 
@@ -166,11 +180,9 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Use functional updates to ensure we get latest state
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
-
           if (newHealth <= 0) {
             setTimeout(() => {
               socket.emit("playerDefeated", {
@@ -186,7 +198,6 @@ const Experience = () => {
       } else if (players[1]?.id === data.attackerId) {
         setHealth1((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
-
           if (newHealth <= 0) {
             setTimeout(() => {
               socket.emit("playerDefeated", {
@@ -204,11 +215,8 @@ const Experience = () => {
     [socket, players, winner, loser, health1, health2]
   );
 
-  // In Experience.jsx, inside the onPlayerDefeated callback function
-  // In Experience.jsx, update the onPlayerDefeated callback
   const onPlayerDefeated = useCallback(
     (data) => {
-      // Set health first
       if (players[0]?.id === data.winnerId) {
         setHealth1(data.winnerHealth);
         setHealth2(data.loserHealth);
@@ -221,7 +229,6 @@ const Experience = () => {
         setLoser(players[0]);
       }
 
-      // Force animation update through car controllers
       if (carControllerRef1.current && carControllerRef2.current) {
         if (players[0]?.id === data.winnerId) {
           carControllerRef1.current.setVictory();
@@ -232,7 +239,6 @@ const Experience = () => {
         }
       }
 
-      // Show popup after 2 seconds
       setTimeout(() => {
         if (players[0]?.id === data.winnerId) {
           setPopupMessage(
@@ -244,12 +250,12 @@ const Experience = () => {
           );
         }
         setShowPopup(true);
-        // Start the automatic reset countdown
-        setRestartCountdown(5); // 5 seconds countdown
+        setRestartCountdown(5);
       }, 2000);
     },
     [players, socket?.id]
   );
+
   useEffect(() => {
     if (socket) {
       const updatePlayersHandler = (players) => {
@@ -337,7 +343,7 @@ const Experience = () => {
       }, 1000);
       return () => clearInterval(interval);
     } else if (restartCountdown === 0) {
-      handleReset(); // Automatically call reset when countdown reaches 0
+      handleReset();
     }
   }, [restartCountdown, handleReset]);
 

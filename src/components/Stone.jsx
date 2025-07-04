@@ -4,11 +4,7 @@ import { useGLTF, useAnimations } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 import { LoopOnce } from "three";
 
-export default function Stone({
-  animation = "idle",
-
-  ...props
-}) {
+export default function Stone({ animation = "idle", ...props }) {
   const group = React.useRef();
   const { scene, animations } = useGLTF("/stone.glb");
   const clone = React.useMemo(() => SkeletonUtils.clone(scene), [scene]);
@@ -21,21 +17,36 @@ export default function Stone({
     const handleResize = () => {
       setIsSmallScreen(window.innerWidth < 640);
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Configure fall animation to play once
   if (actions["fall"]) {
     actions["fall"].loop = LoopOnce;
     actions["fall"].clampWhenFinished = true;
   }
-  useEffect(() => {
-    // Reset and fade in the selected animation, default to "idle" if no animation is provided
-    actions[animation]?.reset().fadeIn(0.24).play();
 
-    return () => actions?.[animation]?.fadeOut(0.24); // Clean up on unmount or animation change
+  // Animation handling with crossfading
+  useEffect(() => {
+    if (actions[animation]) {
+      // Crossfade between animations
+      Object.keys(actions).forEach((key) => {
+        if (key !== animation) {
+          actions[key].fadeOut(0.1);
+        }
+      });
+
+      actions[animation].reset().setEffectiveTimeScale(1).fadeIn(0.1).play();
+    }
+
+    return () => {
+      if (actions[animation]) {
+        actions[animation].fadeOut(0.1);
+      }
+    };
   }, [animation, actions]);
+
   return (
     <group ref={group} {...props} dispose={null}>
       <group name="Scene" scale={0.07} position={[0, position, 0]}>

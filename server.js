@@ -28,17 +28,26 @@ Promise.all([pubClient.connect(), subClient.connect()])
         cors: {
           origin: "*",
         },
-        // Enable connection state recovery
         connectionStateRecovery: {
-          maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+          maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
+        pingInterval: 20000,
+        pingTimeout: 10000,
+        maxHttpBufferSize: 1e6,
+        transports: ["websocket"],
+        serveClient: false,
+        allowEIO3: true,
+        perMessageDeflate: {
+          threshold: 1024,
+        },
+        wsEngine: "ws",
       });
 
       // Use Redis adapter
       io.adapter(createAdapter(pubClient, subClient));
 
-      // Object to track room states (in-memory, Redis could be used for persistence if needed)
+      // Object to track room states
       const roomStates = new Map();
 
       // Generate unique room IDs
@@ -53,7 +62,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return roomId;
           }
         }
-        // Create new room if none available
         const newRoomId = generateRoomId();
         roomStates.set(newRoomId, {
           players: new Map(),
@@ -68,12 +76,25 @@ Promise.all([pubClient.connect(), subClient.connect()])
         const now = Date.now();
         for (const [roomId, state] of roomStates) {
           if (state.players.size === 0 && now - state.createdAt > 3600000) {
-            // 1 hour
             roomStates.delete(roomId);
             console.log(`Cleaned up empty room: ${roomId}`);
           }
         }
-      }, 60000); // Run every minute
+      }, 60000);
+
+      // Rate limiting middleware
+      io.use((socket, next) => {
+        const now = Date.now();
+        const lastEvent = socket._lastEvent || 0;
+        const delay = now - lastEvent;
+
+        if (delay < 50) {
+          return next(new Error("Too many messages"));
+        }
+
+        socket._lastEvent = now;
+        next();
+      });
 
       io.on("connection", (socket) => {
         console.log(`New connection: ${socket.id}`);
@@ -91,11 +112,9 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         // Handle player joining
         socket.on("joinRoom", (playerName) => {
-          if (roomState.players.has(socket.id)) {
-            return; // Already joined
-          }
+          if (roomState.players.has(socket.id)) return;
 
-          // Check if name is taken in this room
+          // Check if name is taken
           for (const player of roomState.players.values()) {
             if (player.name === playerName) {
               socket.emit("usernameTaken");
@@ -110,7 +129,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
             isReady: false,
           });
 
-          // Broadcast updated player list
           io.to(roomId).emit(
             "updatePlayers",
             Array.from(roomState.players.values())
@@ -127,7 +145,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
               Array.from(roomState.players.values())
             );
 
-            // Start game if all ready
             if (
               roomState.players.size === 2 &&
               Array.from(roomState.players.values()).every((p) => p.isReady)
@@ -138,17 +155,25 @@ Promise.all([pubClient.connect(), subClient.connect()])
           }
         });
 
-        // Handle game movements
+        // Handle game movements with timestamp
         socket.on("carMove", (data) => {
-          socket.to(roomId).emit("carMove", data);
+          socket
+            .to(roomId)
+            .compress(false)
+            .volatile.emit("carMove", {
+              ...data,
+              timestamp: Date.now(),
+            });
         });
 
         socket.on("playerHit", (data) => {
-          io.to(roomId).emit("playerHit", data); // Broadcast to everyone in the room
+          io.to(roomId).volatile.emit("playerHit", data);
         });
+
         socket.on("playerDefeated", (data) => {
           io.to(roomId).emit("playerDefeated", data);
         });
+
         // Handle game restarts
         socket.on("restartGame", () => {
           roomState.players.clear();
@@ -157,10 +182,19 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerRestart", (data) => {
-          console.log(
-            `Player ${data.playerName} (${data.playerId}) restarted their game`
-          );
+          console.log(`Player ${data.playerName} (${data.playerId}) restarted`);
         });
+
+        // Handle latency updates
+        socket.on("latencyUpdate", (latency) => {
+          socket.data.latency = latency;
+        });
+
+        // Handle ping
+        socket.on("ping", (callback) => {
+          callback();
+        });
+
         // Handle disconnections
         socket.on("disconnect", () => {
           console.log(`Disconnected: ${socket.id}`);
@@ -170,7 +204,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
               Array.from(roomState.players.values())
             );
 
-            // Notify if game was in progress
             if (roomState.gameStarted) {
               io.to(roomId).emit("playerDisconnected", socket.id);
             }
