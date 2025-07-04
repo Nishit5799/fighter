@@ -32,16 +32,12 @@ Promise.all([pubClient.connect(), subClient.connect()])
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
-        pingInterval: 20000,
-        pingTimeout: 10000,
-        maxHttpBufferSize: 1e6,
+        pingInterval: 10000,
+        pingTimeout: 5000,
+        maxHttpBufferSize: 1e8,
         transports: ["websocket"],
         serveClient: false,
         allowEIO3: true,
-        perMessageDeflate: {
-          threshold: 1024,
-        },
-        wsEngine: "ws",
       });
 
       // Use Redis adapter
@@ -160,7 +156,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
           socket
             .to(roomId)
             .compress(false)
-            .volatile.emit("carMove", {
+            .emit("carMove", {
               ...data,
               timestamp: Date.now(),
             });
@@ -183,11 +179,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         socket.on("playerRestart", (data) => {
           console.log(`Player ${data.playerName} (${data.playerId}) restarted`);
-        });
-
-        // Handle latency updates
-        socket.on("latencyUpdate", (latency) => {
-          socket.data.latency = latency;
         });
 
         // Handle ping
