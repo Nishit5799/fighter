@@ -10,12 +10,40 @@ const handle = app.getRequestHandler();
 
 const PORT = process.env.PORT || 3000;
 
-// Initialize Redis clients
+// Optimized Redis clients
 const pubClient = createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
+  socket: {
+    reconnectStrategy: (retries) => Math.min(retries * 100, 5000),
+  },
+  pingInterval: 30000,
 });
 
-const subClient = pubClient.duplicate();
+const subClient = pubClient.duplicate({
+  socket: {
+    reconnectStrategy: (retries) => Math.min(retries * 100, 5000),
+  },
+});
+
+class RoomState {
+  constructor() {
+    this.players = new Map();
+    this.gameStarted = false;
+    this.createdAt = Date.now();
+    this.lastActivity = Date.now();
+  }
+
+  getPlayerCount() {
+    return this.players.size;
+  }
+
+  allPlayersReady() {
+    for (const player of this.players.values()) {
+      if (!player.isReady) return false;
+    }
+    return true;
+  }
+}
 
 Promise.all([pubClient.connect(), subClient.connect()])
   .then(() => {
@@ -28,74 +56,112 @@ Promise.all([pubClient.connect(), subClient.connect()])
         cors: {
           origin: "*",
         },
-        // Enable connection state recovery
         connectionStateRecovery: {
-          maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+          maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
+        },
+        pingTimeout: 60000,
+        pingInterval: 25000,
+        maxHttpBufferSize: 1e8,
+        serveClient: false,
+        transports: ["websocket"],
+        perMessageDeflate: {
+          threshold: 1024,
+          zlibDeflateOptions: {
+            level: 3,
+          },
         },
       });
 
-      // Use Redis adapter
       io.adapter(createAdapter(pubClient, subClient));
 
-      // Object to track room states (in-memory, Redis could be used for persistence if needed)
       const roomStates = new Map();
 
-      // Generate unique room IDs
       const generateRoomId = () => {
         return `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       };
 
-      // Find or create available room
       const findAvailableRoom = () => {
         for (const [roomId, state] of roomStates) {
-          if (state.players.size < 2 && !state.gameStarted) {
+          if (state.getPlayerCount() < 2 && !state.gameStarted) {
             return roomId;
           }
         }
-        // Create new room if none available
         const newRoomId = generateRoomId();
-        roomStates.set(newRoomId, {
-          players: new Map(),
-          gameStarted: false,
-          createdAt: Date.now(),
-        });
+        roomStates.set(newRoomId, new RoomState());
         return newRoomId;
       };
 
-      // Cleanup empty rooms periodically
+      function broadcastToRoom(socket, roomId, event, data) {
+        const room = io.sockets.adapter.rooms.get(roomId);
+        if (!room) return;
+
+        const packet = [event, data];
+        const sockets = Array.from(room);
+
+        for (let i = 0; i < sockets.length; i++) {
+          const socketId = sockets[i];
+          if (socketId !== socket.id) {
+            io.to(socketId).emit(...packet);
+          }
+        }
+      }
+
       setInterval(() => {
         const now = Date.now();
         for (const [roomId, state] of roomStates) {
-          if (state.players.size === 0 && now - state.createdAt > 3600000) {
-            // 1 hour
+          if (
+            (state.getPlayerCount() === 0 && now - state.createdAt > 600000) ||
+            now - state.lastActivity > 1800000
+          ) {
             roomStates.delete(roomId);
-            console.log(`Cleaned up empty room: ${roomId}`);
           }
         }
-      }, 60000); // Run every minute
+      }, 300000);
 
       io.on("connection", (socket) => {
         console.log(`New connection: ${socket.id}`);
 
-        // Assign to room
+        // Connection quality monitoring
+        let latency = 0;
+        let lastPingTime;
+
+        socket.on("ping", () => {
+          lastPingTime = Date.now();
+          socket.emit("pong");
+        });
+
+        socket.on("pong", () => {
+          if (lastPingTime) {
+            latency = Date.now() - lastPingTime;
+            if (latency > 500) {
+              socket.emit("reduceQuality");
+            }
+          }
+        });
+
         const roomId = findAvailableRoom();
         socket.join(roomId);
         const roomState = roomStates.get(roomId);
 
-        // Send current room state to new player
         socket.emit("roomState", {
           players: Array.from(roomState.players.values()),
           gameStarted: roomState.gameStarted,
         });
 
-        // Handle player joining
-        socket.on("joinRoom", (playerName) => {
-          if (roomState.players.has(socket.id)) {
-            return; // Already joined
-          }
+        const movementRateLimiter = (data, next) => {
+          const now = Date.now();
+          const lastMovement = socket.lastMovement || 0;
 
-          // Check if name is taken in this room
+          if (now - lastMovement < 50) return;
+
+          socket.lastMovement = now;
+          next();
+        };
+
+        socket.on("joinRoom", (playerName) => {
+          if (roomState.players.has(socket.id)) return;
+
           for (const player of roomState.players.values()) {
             if (player.name === playerName) {
               socket.emit("usernameTaken");
@@ -103,87 +169,91 @@ Promise.all([pubClient.connect(), subClient.connect()])
             }
           }
 
-          // Add player to room
           roomState.players.set(socket.id, {
             id: socket.id,
             name: playerName,
             isReady: false,
+            lastUpdate: Date.now(),
           });
 
-          // Broadcast updated player list
-          io.to(roomId).emit(
+          broadcastToRoom(
+            socket,
+            roomId,
             "updatePlayers",
             Array.from(roomState.players.values())
           );
         });
 
-        // Handle player ready status
         socket.on("playerReady", () => {
           const player = roomState.players.get(socket.id);
           if (player) {
             player.isReady = true;
-            io.to(roomId).emit(
+            player.lastUpdate = Date.now();
+            roomState.lastActivity = Date.now();
+
+            broadcastToRoom(
+              socket,
+              roomId,
               "updatePlayers",
               Array.from(roomState.players.values())
             );
 
-            // Start game if all ready
-            if (
-              roomState.players.size === 2 &&
-              Array.from(roomState.players.values()).every((p) => p.isReady)
-            ) {
+            if (roomState.players.size === 2 && roomState.allPlayersReady()) {
               roomState.gameStarted = true;
+              roomState.lastActivity = Date.now();
               io.to(roomId).emit("startGame");
             }
           }
         });
 
-        // Handle game movements
-        socket.on("carMove", (data) => {
-          socket.to(roomId).emit("carMove", data);
+        socket.on("carMove", movementRateLimiter, (data) => {
+          roomState.lastActivity = Date.now();
+          broadcastToRoom(socket, roomId, "carMove", data);
         });
 
         socket.on("playerHit", (data) => {
-          io.to(roomId).emit("playerHit", data); // Broadcast to everyone in the room
+          roomState.lastActivity = Date.now();
+          broadcastToRoom(socket, roomId, "playerHit", data);
         });
+
         socket.on("playerDefeated", (data) => {
+          roomState.lastActivity = Date.now();
           io.to(roomId).emit("playerDefeated", data);
         });
-        // Handle game restarts
+
         socket.on("restartGame", () => {
           roomState.players.clear();
           roomState.gameStarted = false;
+          roomState.lastActivity = Date.now();
           io.to(roomId).emit("restartGame");
         });
 
         socket.on("playerRestart", (data) => {
-          console.log(
-            `Player ${data.playerName} (${data.playerId}) restarted their game`
-          );
+          console.log(`Player ${data.playerName} restarted`);
         });
-        // Handle disconnections
+
         socket.on("disconnect", () => {
           console.log(`Disconnected: ${socket.id}`);
           if (roomState.players.delete(socket.id)) {
-            io.to(roomId).emit(
+            roomState.lastActivity = Date.now();
+            broadcastToRoom(
+              socket,
+              roomId,
               "updatePlayers",
               Array.from(roomState.players.values())
             );
 
-            // Notify if game was in progress
             if (roomState.gameStarted) {
               io.to(roomId).emit("playerDisconnected", socket.id);
             }
           }
         });
 
-        // Error handling
         socket.on("error", (err) => {
           console.error(`Socket error (${socket.id}):`, err);
         });
       });
 
-      // Handle Redis client errors
       pubClient.on("error", (err) => {
         console.error("Redis pub client error:", err);
       });
@@ -191,6 +261,24 @@ Promise.all([pubClient.connect(), subClient.connect()])
       subClient.on("error", (err) => {
         console.error("Redis sub client error:", err);
       });
+
+      // Resource monitoring
+      setInterval(() => {
+        const memoryUsage = process.memoryUsage();
+        console.log(`Memory usage: 
+          RSS: ${Math.round(memoryUsage.rss / 1024 / 1024)}MB 
+          Heap: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}/${Math.round(
+          memoryUsage.heapTotal / 1024 / 1024
+        )}MB`);
+
+        if (memoryUsage.heapUsed / memoryUsage.heapTotal > 0.8) {
+          for (const [roomId, state] of roomStates) {
+            if (state.getPlayerCount() === 0) {
+              roomStates.delete(roomId);
+            }
+          }
+        }
+      }, 60000);
 
       server.listen(PORT, (err) => {
         if (err) throw err;
