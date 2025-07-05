@@ -33,12 +33,6 @@ const keyboardMap = [
   { name: "kick", keys: ["KeyK"] },
 ];
 
-// Memoized components to prevent unnecessary re-renders
-const MemoizedJoystick = React.memo(Joystick);
-const MemoizedAttackButtons = React.memo(AttackButtons);
-const MemoizedInfo = React.memo(Info);
-const MemoizedPlayerController = React.memo(PlayerController);
-
 const Experience = () => {
   const socket = useSocket();
   const shadowCameraRef = useRef();
@@ -69,16 +63,12 @@ const Experience = () => {
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
-  const socketListeners = useRef(new Map());
 
-  const isUsernameUnique = useCallback(
-    (name) => {
-      return !players.some((player) => player.name === name);
-    },
-    [players]
-  );
+  const isUsernameUnique = (name) => {
+    return !players.some((player) => player.name === name);
+  };
 
-  const handleJoinRoom = useCallback(() => {
+  const handleJoinRoom = () => {
     if (!socket) {
       console.error("Socket is not available");
       setPopupMessage("Connection error. Please refresh the page.");
@@ -103,18 +93,18 @@ const Experience = () => {
         setIsUsernameValid(false);
       }
     }
-  }, [socket, playerName, hasJoinedRoom, players.length, isUsernameUnique]);
+  };
 
   useEffect(() => {
     if (playerName.trim() !== "") {
       setIsUsernameValid(isUsernameUnique(playerName.trim()));
     }
-  }, [playerName, players, isUsernameUnique]);
+  }, [playerName, players]);
 
   useEffect(() => {
     if (showWelcomeScreen) {
       const letters = Array.from(welcomeTextRef.current.children);
-      const animation = gsap.fromTo(
+      gsap.fromTo(
         letters,
         { y: -10 },
         {
@@ -127,16 +117,12 @@ const Experience = () => {
           yoyo: true,
         }
       );
-
-      return () => {
-        animation.kill();
-      };
     }
   }, [showWelcomeScreen]);
 
   const handleReset = useCallback(() => {
     setRestartCountdown(2);
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       setShowPopup(false);
       setWinner(null);
       setLoser(null);
@@ -152,21 +138,20 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
+      // Don't reload the page, just reset the state
     }, 2000);
-
-    return () => clearTimeout(timer);
   }, [socket]);
 
   const handleInfoClick = useCallback(() => {
     setShowInfoPopup(true);
   }, []);
 
-  const handleReady = useCallback(() => {
+  const handleReady = () => {
     if (socket) {
       socket.emit("playerReady", playerName);
       setIsReady(true);
     }
-  }, [socket, playerName]);
+  };
 
   useEffect(() => {
     if (shouldReload) {
@@ -181,12 +166,14 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
+      // Use functional updates to ensure we get latest state
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
+
           if (newHealth <= 0) {
             setTimeout(() => {
-              socket?.emit("playerDefeated", {
+              socket.emit("playerDefeated", {
                 winnerId: players[0].id,
                 loserId: players[1]?.id,
                 winnerHealth: health1,
@@ -199,9 +186,10 @@ const Experience = () => {
       } else if (players[1]?.id === data.attackerId) {
         setHealth1((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
+
           if (newHealth <= 0) {
             setTimeout(() => {
-              socket?.emit("playerDefeated", {
+              socket.emit("playerDefeated", {
                 winnerId: players[1].id,
                 loserId: players[0]?.id,
                 winnerHealth: health2,
@@ -216,8 +204,11 @@ const Experience = () => {
     [socket, players, winner, loser, health1, health2]
   );
 
+  // In Experience.jsx, inside the onPlayerDefeated callback function
+  // In Experience.jsx, update the onPlayerDefeated callback
   const onPlayerDefeated = useCallback(
     (data) => {
+      // Set health first
       if (players[0]?.id === data.winnerId) {
         setHealth1(data.winnerHealth);
         setHealth2(data.loserHealth);
@@ -230,6 +221,7 @@ const Experience = () => {
         setLoser(players[0]);
       }
 
+      // Force animation update through car controllers
       if (carControllerRef1.current && carControllerRef2.current) {
         if (players[0]?.id === data.winnerId) {
           carControllerRef1.current.setVictory();
@@ -240,7 +232,8 @@ const Experience = () => {
         }
       }
 
-      const timer = setTimeout(() => {
+      // Show popup after 2 seconds
+      setTimeout(() => {
         if (players[0]?.id === data.winnerId) {
           setPopupMessage(
             players[0]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
@@ -251,80 +244,72 @@ const Experience = () => {
           );
         }
         setShowPopup(true);
-        setRestartCountdown(5);
+        // Start the automatic reset countdown
+        setRestartCountdown(5); // 5 seconds countdown
       }, 2000);
-
-      return () => clearTimeout(timer);
     },
     [players, socket?.id]
   );
-
-  // Socket event management
   useEffect(() => {
-    if (!socket) return;
-
-    const updatePlayersHandler = (players) => {
-      if (players.length > 2) {
-        const currentPlayerIndex = players.findIndex((p) => p.id === socket.id);
-        if (currentPlayerIndex >= 2) {
-          setShouldReload(true);
-          return;
+    if (socket) {
+      const updatePlayersHandler = (players) => {
+        if (players.length > 2) {
+          const currentPlayerIndex = players.findIndex(
+            (p) => p.id === socket.id
+          );
+          if (currentPlayerIndex >= 2) {
+            setShouldReload(true);
+            return;
+          }
         }
-      }
-      setPlayers(players);
+        setPlayers(players);
 
-      if (isGameStarted && players.length === 1) {
-        setPlayerLeft(true);
-        setPopupMessage("The other player has left the game.");
-        setShowPopup(true);
-        handleReset();
-      }
-    };
+        if (isGameStarted && players.length === 1) {
+          setPlayerLeft(true);
+          setPopupMessage("The other player has left the game.");
+          setShowPopup(true);
+          handleReset();
+        }
+      };
 
-    const startGameHandler = () => {
-      let count = 3;
-      setCountdown(count);
-      const interval = setInterval(() => {
-        count -= 1;
+      const startGameHandler = () => {
+        let count = 3;
         setCountdown(count);
-        if (count === 0) {
-          clearInterval(interval);
-          setShowWelcomeScreen(false);
-          setIsGameStarted(true);
-        }
-      }, 1000);
+        const interval = setInterval(() => {
+          count -= 1;
+          setCountdown(count);
+          if (count === 0) {
+            clearInterval(interval);
+            setShowWelcomeScreen(false);
+            setIsGameStarted(true);
+          }
+        }, 1000);
+      };
 
-      return () => clearInterval(interval);
-    };
+      const restartGameHandler = () => {
+        window.location.reload();
+      };
 
-    const restartGameHandler = () => {
-      window.location.reload();
-    };
+      const usernameTakenHandler = () => {
+        setIsUsernameValid(false);
+      };
 
-    const usernameTakenHandler = () => {
-      setIsUsernameValid(false);
-    };
+      socket.on("updatePlayers", updatePlayersHandler);
+      socket.on("startGame", startGameHandler);
+      socket.on("restartGame", restartGameHandler);
+      socket.on("usernameTaken", usernameTakenHandler);
+      socket.on("playerHit", onPlayerHit);
+      socket.on("playerDefeated", onPlayerDefeated);
 
-    // Store listeners for cleanup
-    socketListeners.current.set("updatePlayers", updatePlayersHandler);
-    socketListeners.current.set("startGame", startGameHandler);
-    socketListeners.current.set("restartGame", restartGameHandler);
-    socketListeners.current.set("usernameTaken", usernameTakenHandler);
-    socketListeners.current.set("playerHit", onPlayerHit);
-    socketListeners.current.set("playerDefeated", onPlayerDefeated);
-
-    // Add all listeners
-    socketListeners.current.forEach((handler, event) => {
-      socket.on(event, handler);
-    });
-
-    return () => {
-      // Remove all listeners
-      socketListeners.current.forEach((handler, event) => {
-        socket.off(event, handler);
-      });
-      socketListeners.current.clear();
-    };
+      return () => {
+        socket.off("updatePlayers", updatePlayersHandler);
+        socket.off("startGame", startGameHandler);
+        socket.off("restartGame", restartGameHandler);
+        socket.off("usernameTaken", usernameTakenHandler);
+        socket.off("playerHit", onPlayerHit);
+        socket.off("playerDefeated", onPlayerDefeated);
+      };
+    }
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
   useEffect(() => {
@@ -352,7 +337,7 @@ const Experience = () => {
       }, 1000);
       return () => clearInterval(interval);
     } else if (restartCountdown === 0) {
-      handleReset();
+      handleReset(); // Automatically call reset when countdown reaches 0
     }
   }, [restartCountdown, handleReset]);
 
@@ -398,7 +383,7 @@ const Experience = () => {
             <Ring />
             {isGameStarted && (
               <>
-                <MemoizedPlayerController
+                <PlayerController
                   ref={carControllerRef1}
                   characterType="cena"
                   joystickInput={
@@ -418,7 +403,7 @@ const Experience = () => {
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
                 />
-                <MemoizedPlayerController
+                <PlayerController
                   ref={carControllerRef2}
                   characterType="austin"
                   joystickInput={
@@ -540,6 +525,7 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {/* Player Health (always on left) */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -558,6 +544,7 @@ const Experience = () => {
             </div>
           </div>
 
+          {/* Opponent Health (always on right) */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -605,11 +592,13 @@ const Experience = () => {
         </div>
       )}
 
-      <MemoizedJoystick
+      <Joystick
         onMove={(data) => {
+          // Pass isRunning to the joystickInput
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
         onToggleRun={(isRunning) => {
+          // Update the run state when the button is toggled
           setJoystickInput((prev) => ({ ...prev, isRunning }));
         }}
         onStart={() => {}}
@@ -617,13 +606,13 @@ const Experience = () => {
       />
 
       {isGameStarted && (
-        <MemoizedAttackButtons
+        <AttackButtons
           onPunch={(punching) => setIsPunching(punching)}
           onKick={(kicking) => setIsKicking(kicking)}
         />
       )}
 
-      <MemoizedInfo
+      <Info
         onReset={handleReset}
         showPopup={showPopup}
         popupMessage={popupMessage}
@@ -635,4 +624,4 @@ const Experience = () => {
   );
 };
 
-export default React.memo(Experience);
+export default Experience;
