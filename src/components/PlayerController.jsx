@@ -19,6 +19,7 @@ const SOUNDS = {
   punch: "/punch.mp3",
   kick: "/kick.mp3",
   hit: "/hit.mp3",
+  fall: "/fall.mp3",
   victory: "/victory.mp3",
 };
 
@@ -60,6 +61,7 @@ const PlayerController = forwardRef(
     const punchSound = useRef(null);
     const kickSound = useRef(null);
     const hitSound = useRef(null);
+    const fallSound = useRef(null);
     const victorySound = useRef(null);
 
     const WALK_SPEED = 1.5;
@@ -83,24 +85,28 @@ const PlayerController = forwardRef(
       punchSound.current = new Audio(SOUNDS.punch);
       kickSound.current = new Audio(SOUNDS.kick);
       hitSound.current = new Audio(SOUNDS.hit);
+      fallSound.current = new Audio(SOUNDS.fall);
       victorySound.current = new Audio(SOUNDS.victory);
 
       // Set volume levels
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
       hitSound.current.volume = 0.4;
+      fallSound.current.volume = 0.5;
       victorySound.current.volume = 0.8;
 
       return () => {
         // Properly clean up audio objects
-        [punchSound, kickSound, hitSound, victorySound].forEach((soundRef) => {
-          if (soundRef.current) {
-            soundRef.current.pause();
-            soundRef.current.src = ""; // Clear the src to stop any loading
-            soundRef.current.remove(); // Remove the audio element
-            soundRef.current = null;
+        [punchSound, kickSound, hitSound, fallSound, victorySound].forEach(
+          (soundRef) => {
+            if (soundRef.current) {
+              soundRef.current.pause();
+              soundRef.current.src = ""; // Clear the src to stop any loading
+              soundRef.current.remove(); // Remove the audio element
+              soundRef.current = null;
+            }
           }
-        });
+        );
       };
     }, []);
 
@@ -220,6 +226,12 @@ const PlayerController = forwardRef(
         setIsDefeated(true);
         setCurrentAnimation("fall");
         movementEnabled.current = false;
+
+        // Play fall sound
+        if (fallSound.current) {
+          fallSound.current.currentTime = 0;
+          fallSound.current.play();
+        }
 
         socket.emit("playerDefeated", {
           winnerId: opponentRef.current?.id,
@@ -393,6 +405,12 @@ const PlayerController = forwardRef(
         setMatchResult("lost");
         setCurrentAnimation("fall");
         movementEnabled.current = false;
+
+        // Play fall sound
+        if (fallSound.current) {
+          fallSound.current.currentTime = 0;
+          fallSound.current.play();
+        }
       },
       translation: () => rb.current?.translation(),
       id: socket?.id,
@@ -407,12 +425,14 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
 
         // Clean up audio
-        [punchSound, kickSound, hitSound, victorySound].forEach((sound) => {
-          if (sound.current) {
-            sound.current.pause();
-            sound.current = null;
+        [punchSound, kickSound, hitSound, fallSound, victorySound].forEach(
+          (sound) => {
+            if (sound.current) {
+              sound.current.pause();
+              sound.current = null;
+            }
           }
-        });
+        );
       };
     }, []);
 
