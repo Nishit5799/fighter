@@ -13,7 +13,6 @@ import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
-import { Howl, Howler } from "howler";
 
 // Audio paths - adjust these to match your actual file paths
 const SOUNDS = {
@@ -48,7 +47,6 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
-    const [soundsReady, setSoundsReady] = useState(false);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
 
@@ -58,13 +56,11 @@ const PlayerController = forwardRef(
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
 
-    // Audio refs using Howler
-    const sounds = useRef({
-      punch: null,
-      kick: null,
-      hit: null,
-      victory: null,
-    });
+    // Audio refs
+    const punchSound = useRef(null);
+    const kickSound = useRef(null);
+    const hitSound = useRef(null);
+    const victorySound = useRef(null);
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -82,83 +78,39 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
-    // Initialize audio with Howler
+    // Initialize audio
     useEffect(() => {
-      // Configure Howler global settings
-      Howler.volume(0.7);
+      punchSound.current = new Audio(SOUNDS.punch);
+      kickSound.current = new Audio(SOUNDS.kick);
+      hitSound.current = new Audio(SOUNDS.hit);
+      victorySound.current = new Audio(SOUNDS.victory);
 
-      // Load sounds with error handling
-      sounds.current.punch = new Howl({
-        src: [SOUNDS.punch],
-        volume: 0.7,
-        onload: () => checkAllSoundsLoaded(),
-      });
-
-      sounds.current.kick = new Howl({
-        src: [SOUNDS.kick],
-        volume: 0.7,
-        onload: () => checkAllSoundsLoaded(),
-      });
-
-      sounds.current.hit = new Howl({
-        src: [SOUNDS.hit],
-        volume: 0.4,
-        onload: () => checkAllSoundsLoaded(),
-        onplayerror: function () {
-          console.log("Hit sound play failed, trying again...");
-          this.play();
-        },
-      });
-
-      sounds.current.victory = new Howl({
-        src: [SOUNDS.victory],
-        volume: 0.8,
-        onload: () => checkAllSoundsLoaded(),
-      });
-
-      // Handle mobile audio context unlocking
-      const unlockAudio = () => {
-        if (Howler.ctx.state === "suspended") {
-          Howler.ctx.resume().then(() => {
-            console.log("Audio context unlocked");
-          });
-        }
-
-        // Play and immediately stop sounds to unlock audio
-        Object.values(sounds.current).forEach((sound) => {
-          if (sound) {
-            sound.play();
-            sound.stop();
-          }
-        });
-
-        document.removeEventListener("click", unlockAudio);
-        document.removeEventListener("touchstart", unlockAudio);
-      };
-
-      document.addEventListener("click", unlockAudio);
-      document.addEventListener("touchstart", unlockAudio);
+      // Set volume levels
+      punchSound.current.volume = 0.7;
+      kickSound.current.volume = 0.7;
+      hitSound.current.volume = 0.4;
+      victorySound.current.volume = 0.8;
 
       return () => {
-        // Cleanup
-        Object.values(sounds.current).forEach((sound) => {
-          if (sound) sound.unload();
+        // Properly clean up audio objects
+        [punchSound, kickSound, hitSound, victorySound].forEach((soundRef) => {
+          if (soundRef.current) {
+            soundRef.current.pause();
+            soundRef.current.src = ""; // Clear the src to stop any loading
+            soundRef.current.remove(); // Remove the audio element
+            soundRef.current = null;
+          }
         });
-        Howler.unload();
-        document.removeEventListener("click", unlockAudio);
-        document.removeEventListener("touchstart", unlockAudio);
       };
     }, []);
 
-    const checkAllSoundsLoaded = () => {
-      if (
-        Object.values(sounds.current).every(
-          (sound) => sound && sound.state() === "loaded"
-        )
-      ) {
-        setSoundsReady(true);
-      }
-    };
+    useEffect(() => {
+      const handleResize = () => {
+        setIsSmallScreen(window.innerWidth < 640);
+      };
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
@@ -167,29 +119,20 @@ const PlayerController = forwardRef(
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
-      const damage = type === "kick" ? 20 : 10;
+      // Set damage based on attack type
+      const damage = type === "kick" ? 20 : 10; // Kick does 20 damage, punch does 10
 
       if (attackTimer.current) {
         clearTimeout(attackTimer.current);
       }
 
-      // Play sound with error handling
-      const playSound = () => {
-        try {
-          if (type === "punch" && sounds.current.punch) {
-            sounds.current.punch.play();
-          } else if (type === "kick" && sounds.current.kick) {
-            sounds.current.kick.play();
-          }
-        } catch (error) {
-          console.error(`Error playing ${type} sound:`, error);
-        }
-      };
-
-      if (Howler.ctx.state === "suspended") {
-        Howler.ctx.resume().then(playSound);
-      } else {
-        playSound();
+      // Play sound based on attack type
+      if (type === "punch" && punchSound.current) {
+        punchSound.current.currentTime = 0;
+        punchSound.current.play();
+      } else if (type === "kick" && kickSound.current) {
+        kickSound.current.currentTime = 0;
+        kickSound.current.play();
       }
 
       setIsAttacking(true);
@@ -204,7 +147,7 @@ const PlayerController = forwardRef(
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage,
+          damage: damage, // Send the appropriate damage based on attack type
           attackType: type,
         });
       }
@@ -224,31 +167,10 @@ const PlayerController = forwardRef(
         clearTimeout(hitTimer.current);
       }
 
-      // Play hit sound with robust error handling
-      const playHitSound = () => {
-        if (!sounds.current.hit) return;
-
-        try {
-          sounds.current.hit.play();
-        } catch (error) {
-          console.error("Error playing hit sound:", error);
-          // Try again after a short delay
-          setTimeout(() => {
-            sounds.current.hit.play();
-          }, 100);
-        }
-      };
-
-      // Ensure audio context is ready
-      if (Howler.ctx.state === "suspended") {
-        Howler.ctx
-          .resume()
-          .then(playHitSound)
-          .catch((error) => {
-            console.error("Failed to resume audio context:", error);
-          });
-      } else {
-        playHitSound();
+      // Play hit sound
+      if (hitSound.current) {
+        hitSound.current.currentTime = 0;
+        hitSound.current.play();
       }
 
       setIsHit(true);
@@ -461,8 +383,10 @@ const PlayerController = forwardRef(
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
-        if (sounds.current.victory) {
-          sounds.current.victory.play();
+        // Play victory sound
+        if (victorySound.current) {
+          victorySound.current.currentTime = 0;
+          victorySound.current.play();
         }
       },
       setDefeat: () => {
@@ -482,10 +406,13 @@ const PlayerController = forwardRef(
         if (hitTimer.current) clearTimeout(hitTimer.current);
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
 
-        Object.values(sounds.current).forEach((sound) => {
-          if (sound) sound.unload();
+        // Clean up audio
+        [punchSound, kickSound, hitSound, victorySound].forEach((sound) => {
+          if (sound.current) {
+            sound.current.pause();
+            sound.current = null;
+          }
         });
-        Howler.unload();
       };
     }, []);
 
