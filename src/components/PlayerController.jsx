@@ -190,25 +190,28 @@ const PlayerController = forwardRef(
     };
 
     const handleCollisionEnter = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-      const otherUserData = event.other.rigidBody?.userData;
-      if (otherUserData?.id === opponentRef.current?.id) {
-        setIsInContact(true);
-        if (contactTimeout.current) {
-          clearTimeout(contactTimeout.current);
-        }
-      }
-    };
+  if (!opponentRef.current || !rb.current) return;
+  
+  // More permissive collision detection
+  const otherUserData = event.other.rigidBody?.userData;
+  if (otherUserData?.isPlayer) { // Check if it's any player, not just opponent
+    setIsInContact(true);
+    if (contactTimeout.current) {
+      clearTimeout(contactTimeout.current);
+    }
+  }
+};
 
-    const handleCollisionExit = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-      const otherUserData = event.other.rigidBody?.userData;
-      if (otherUserData?.id === opponentRef.current?.id) {
-        contactTimeout.current = setTimeout(() => {
-          setIsInContact(false);
-        }, 100);
-      }
-    };
+const handleCollisionExit = (event) => {
+  if (!opponentRef.current || !rb.current) return;
+  
+  const otherUserData = event.other.rigidBody?.userData;
+  if (otherUserData?.isPlayer) {
+    contactTimeout.current = setTimeout(() => {
+      setIsInContact(false);
+    }, 200); // Increased timeout for iOS
+  }
+};
 
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
