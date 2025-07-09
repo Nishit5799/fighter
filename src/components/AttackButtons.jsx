@@ -17,7 +17,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
     if (type === "punch") {
       setPunchCooldown(true);
       onPunch(true);
-      setTimeout(() => onPunch(false), 800);
+      setTimeout(() => onPunch(false), 1000);
       setTimeout(() => setPunchCooldown(false), 1500); // total cooldown time
     } else {
       setKickCooldown(true);
