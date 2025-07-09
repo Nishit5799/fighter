@@ -350,26 +350,20 @@ const Experience = () => {
           <directionalLight
             intensity={1}
             castShadow
-            position={[0, 10, 0]}
-            shadow-mapSize-width={4096}
-            shadow-mapSize-height={4096}
+            position={[10, 10, 10]}
+            shadow-mapSize-width={8192}
+            shadow-mapSize-height={8192}
             shadow-bias={-0.0005}
-            shadow-camera-left={-500}
-            shadow-camera-right={500}
-            shadow-camera-top={500}
-            shadow-camera-bottom={-500}
             shadow-camera-near={1}
-            shadow-camera-far={2000}
+            shadow-camera-far={30}
+            shadow-camera-left={-10}
+            shadow-camera-right={10}
+            shadow-camera-top={10}
+            shadow-camera-bottom={-10}
           >
             <OrthographicCamera
-              left={-500}
-              right={500}
-              top={500}
-              bottom={-500}
-              near={1}
-              far={2000}
-              ref={shadowCameraRef}
-              attach={"shadow-camera"}
+              attach="shadow-camera"
+              args={[-10, 10, 10, -10, 1, 30]} // Match the light's frustum
             />
           </directionalLight>
 

@@ -4,11 +4,7 @@ import { useGLTF, useAnimations } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 import { LoopOnce } from "three";
 
-export default function Stone({
-  animation = "idle",
-
-  ...props
-}) {
+export default function Stone({ animation = "idle", ...props }) {
   const group = React.useRef();
   const { scene, animations } = useGLTF("/stone.glb");
   const clone = React.useMemo(() => SkeletonUtils.clone(scene), [scene]);
@@ -30,15 +26,15 @@ export default function Stone({
     actions["fall"].loop = LoopOnce;
     actions["fall"].clampWhenFinished = true;
   }
-  useEffect(() => {
-    // Reset and fade in the selected animation, default to "idle" if no animation is provided
-    actions[animation]?.reset().fadeIn(0.24).play();
 
-    return () => actions?.[animation]?.fadeOut(0.24); // Clean up on unmount or animation change
+  useEffect(() => {
+    actions[animation]?.reset().fadeIn(0.24).play();
+    return () => actions?.[animation]?.fadeOut(0.24);
   }, [animation, actions]);
+
   return (
     <group ref={group} {...props} dispose={null}>
-      <group name="Scene" scale={0.07} position={[0, position, 0]}>
+      <group name="Scene" scale={0.07} position={[0, position, 0]} castShadow>
         <group
           name="node_fa4db8f5_24ac_4ab4_bbf6_653508ff73e5"
           rotation={[Math.PI / 2, 0, 0]}
@@ -76,6 +72,7 @@ export default function Stone({
             skeleton={
               nodes.node_1ba5b01f_53fe_4b3c_aeec_e0fe77cc998e_mesh0.skeleton
             }
+            castShadow
           />
           <skinnedMesh
             name="node_22ba7ed6_d22d_40ac_9cb7_7be0612f6294_mesh0"
@@ -86,6 +83,7 @@ export default function Stone({
             skeleton={
               nodes.node_22ba7ed6_d22d_40ac_9cb7_7be0612f6294_mesh0.skeleton
             }
+            castShadow
           />
           <skinnedMesh
             name="node_6145c307_6cba_4858_a9ad_0eeafb7ad657_mesh0"
@@ -96,6 +94,7 @@ export default function Stone({
             skeleton={
               nodes.node_6145c307_6cba_4858_a9ad_0eeafb7ad657_mesh0.skeleton
             }
+            castShadow
           />
         </group>
       </group>
