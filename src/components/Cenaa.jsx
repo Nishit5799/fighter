@@ -11,7 +11,7 @@ export default function Cenaa({ animation = "idle", ...props }) {
   const { nodes, materials } = useGraph(clone);
   const { actions } = useAnimations(animations, group);
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
-  const position = isSmallScreen ? 1.0 : 0.83;
+  const position = isSmallScreen ? 0.94 : 0.83;
 
   useEffect(() => {
     const handleResize = () => {
