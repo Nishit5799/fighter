@@ -129,12 +129,15 @@ const PlayerController = forwardRef(
       // Play sound based on attack type
       if (type === "punch" && punchSound.current) {
         punchSound.current.currentTime = 0;
-        punchSound.current.play();
+        punchSound.current
+          .play()
+          .catch((e) => console.log("Audio play failed:", e));
       } else if (type === "kick" && kickSound.current) {
         kickSound.current.currentTime = 0;
-        kickSound.current.play();
+        kickSound.current
+          .play()
+          .catch((e) => console.log("Audio play failed:", e));
       }
-
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
@@ -190,29 +193,27 @@ const PlayerController = forwardRef(
     };
 
     const handleCollisionEnter = (event) => {
-  if (!opponentRef.current || !rb.current) return;
-  
-  // More permissive collision detection
-  const otherUserData = event.other.rigidBody?.userData;
-  if (otherUserData?.isPlayer) { // Check if it's any player, not just opponent
-    setIsInContact(true);
-    if (contactTimeout.current) {
-      clearTimeout(contactTimeout.current);
-    }
-  }
-};
+      if (!opponentRef.current || !rb.current) return;
 
-const handleCollisionExit = (event) => {
-  if (!opponentRef.current || !rb.current) return;
-  
-  const otherUserData = event.other.rigidBody?.userData;
-  if (otherUserData?.isPlayer) {
-    contactTimeout.current = setTimeout(() => {
-      setIsInContact(false);
-    }, 200); // Increased timeout for iOS
-  }
-};
+      const otherUserData = event.other.rigidBody?.userData;
+      if (otherUserData?.isPlayer) {
+        setIsInContact(true);
+        if (contactTimeout.current) {
+          clearTimeout(contactTimeout.current);
+        }
+      }
+    };
 
+    const handleCollisionExit = (event) => {
+      if (!opponentRef.current || !rb.current) return;
+
+      const otherUserData = event.other.rigidBody?.userData;
+      if (otherUserData?.isPlayer) {
+        contactTimeout.current = setTimeout(() => {
+          setIsInContact(false);
+        }, 500); // Increased timeout for iOS
+      }
+    };
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");

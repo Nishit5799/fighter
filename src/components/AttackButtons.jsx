@@ -11,62 +11,70 @@ const AttackButtons = ({ onPunch, onKick }) => {
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
-    )
-      return;
+    ) {
+      return false; // Return false if attack is blocked by cooldown
+    }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true);
-      setTimeout(() => onPunch(false), 1000);
+      onPunch(true); // Trigger punch state
+      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
       setTimeout(() => setPunchCooldown(false), 1500);
+      return true;
     } else {
       setKickCooldown(true);
-      onKick(true);
-      setTimeout(() => onKick(false), 1000);
+      onKick(true); // Trigger kick state
+      setTimeout(() => onKick(false), 1000); // Reset after 1 second
       setTimeout(() => setKickCooldown(false), 3000);
+      return true;
     }
   };
 
-  // iOS-compatible touch handlers
+  // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    handleAttackStart("punch");
+    return handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    handleAttackStart("kick");
+    return handleAttackStart("kick");
   };
 
   useEffect(() => {
     const punchBtn = punchRef.current;
     const kickBtn = kickRef.current;
 
-    // iOS requires more aggressive event handling
-    const options = {
-      passive: false,
-      capture: true, // Important for iOS
+    if (!punchBtn || !kickBtn) return;
+
+    const options = { passive: false, capture: true };
+
+    const touchPunchHandler = (e) => {
+      if (handlePunchStart(e)) {
+        e.preventDefault();
+      }
     };
 
-    // Add both touch and mouse events for cross-platform support
-    punchBtn.addEventListener("touchstart", handlePunchStart, options);
-    punchBtn.addEventListener("mousedown", handlePunchStart);
-    punchBtn.addEventListener("touchend", (e) => e.preventDefault(), options);
+    const touchKickHandler = (e) => {
+      if (handleKickStart(e)) {
+        e.preventDefault();
+      }
+    };
 
-    kickBtn.addEventListener("touchstart", handleKickStart, options);
+    punchBtn.addEventListener("touchstart", touchPunchHandler, options);
+    punchBtn.addEventListener("mousedown", handlePunchStart);
+
+    kickBtn.addEventListener("touchstart", touchKickHandler, options);
     kickBtn.addEventListener("mousedown", handleKickStart);
-    kickBtn.addEventListener("touchend", (e) => e.preventDefault(), options);
 
     return () => {
-      punchBtn.removeEventListener("touchstart", handlePunchStart);
+      punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
       punchBtn.removeEventListener("mousedown", handlePunchStart);
-      punchBtn.removeEventListener("touchend", (e) => e.preventDefault());
 
-      kickBtn.removeEventListener("touchstart", handleKickStart);
+      kickBtn.removeEventListener("touchstart", touchKickHandler, options);
       kickBtn.removeEventListener("mousedown", handleKickStart);
-      kickBtn.removeEventListener("touchend", (e) => e.preventDefault());
     };
   }, [punchCooldown, kickCooldown]);
 
@@ -117,12 +125,12 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => handleAttackStart(type)}
-        // Add iOS-specific CSS to prevent touch highlighting
+        onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
+          touchAction: "manipulation",
         }}
       >
         <span className="text-2xl font-bold">
@@ -146,7 +154,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
             stroke-dashoffset: 0;
           }
         }
-
         @keyframes progressAnim-kick {
           from {
             stroke-dashoffset: 100;
@@ -156,11 +163,18 @@ const AttackButtons = ({ onPunch, onKick }) => {
           }
         }
 
-        /* iOS-specific touch improvements */
+        /* iOS-specific improvements */
         button {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
           touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Prevent touch highlighting */
+        * {
+          -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
     </div>
