@@ -348,24 +348,22 @@ const Experience = () => {
           <Environment preset="sunset" />
           <Background />
           <directionalLight
-            intensity={1.5} // Increased intensity for better visibility
+            intensity={1.5}
             castShadow
-            position={[10, 20, 10]} // Adjusted position for better angle
-            shadow-mapSize-width={4096}
-            shadow-mapSize-height={4096}
-            shadow-bias={-0.0001} // Adjusted bias to prevent artifacts
+            position={[3, 10, 3]} // Higher Y position for better angle
+            shadow-mapSize-width={2048} // Changed from 4096 to 2048
+            shadow-mapSize-height={2048} // Changed from 4096 to 2048
+            shadow-bias={-0.0015} // Adjusted for better edge clarity
+            shadow-normalBias={0.03} // Slightly increased for curved surfaces
             shadow-camera-near={0.5}
-            shadow-camera-far={50}
-            shadow-camera-left={-20}
-            shadow-camera-right={20}
-            shadow-camera-top={20}
-            shadow-camera-bottom={-20}
-          >
-            <OrthographicCamera
-              attach="shadow-camera"
-              args={[-20, 20, 20, -20, 0.5, 50]}
-            />
-          </directionalLight>
+            shadow-camera-far={25} // Reduced far plane for better resolution
+            shadow-camera-left={-3} // Tighter shadow volume
+            shadow-camera-right={3}
+            shadow-camera-top={3}
+            shadow-camera-bottom={-3}
+          ></directionalLight>
+
+  
 
           <Physics
             contactPairPersistentThreshold={0.08}

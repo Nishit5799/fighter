@@ -442,12 +442,13 @@ const PlayerController = forwardRef(
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
-          <group ref={character} rotation-y={Math.PI}>
+          <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>
             {characterType === "cena" ? (
               <Cenaa
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 color={color}
+                castShadow // Add this
                 animation={
                   matchResult === "won"
                     ? "victory"
@@ -463,6 +464,7 @@ const PlayerController = forwardRef(
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 color={color}
+                castShadow // Add this
                 animation={
                   matchResult === "won"
                     ? "victory"
