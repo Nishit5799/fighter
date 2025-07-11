@@ -345,26 +345,25 @@ const Experience = () => {
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
+          <Environment preset="sunset" />
           <Background />
-          <ambientLight intensity={2} />
           <directionalLight
-            intensity={1.5}
+            intensity={1.5} // Increased intensity for better visibility
             castShadow
-            position={[2, 6, 2]}
+            position={[10, 20, 10]} // Adjusted position for better angle
             shadow-mapSize-width={4096}
             shadow-mapSize-height={4096}
-            shadow-bias={-0.001} // Increased negative bias
-            shadow-normalBias={0.05} // Keep normal bias
-            shadow-camera-near={0.5} // Increased near plane
-            shadow-camera-far={15} // Adjusted far plane
-            shadow-camera-left={-5} // Slightly larger frustum
-            shadow-camera-right={5}
-            shadow-camera-top={5}
-            shadow-camera-bottom={-5}
+            shadow-bias={-0.0001} // Adjusted bias to prevent artifacts
+            shadow-camera-near={0.5}
+            shadow-camera-far={50}
+            shadow-camera-left={-20}
+            shadow-camera-right={20}
+            shadow-camera-top={20}
+            shadow-camera-bottom={-20}
           >
             <OrthographicCamera
               attach="shadow-camera"
-              args={[-5, 5, 5, -5, 0.5, 15]} // Must match light's frustum!
+              args={[-20, 20, 20, -20, 0.5, 50]}
             />
           </directionalLight>
 
