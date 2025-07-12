@@ -57,12 +57,26 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const beginSoundRef = useRef(null);
+  const hasPlayedStartSound = useRef(false);
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
+
+  useEffect(() => {
+    beginSoundRef.current = new Audio("/begin.mp3");
+    beginSoundRef.current.volume = 0.7;
+
+    return () => {
+      if (beginSoundRef.current) {
+        beginSoundRef.current.pause();
+        beginSoundRef.current = null;
+      }
+    };
+  }, []);
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -121,6 +135,7 @@ const Experience = () => {
   }, [showWelcomeScreen]);
 
   const handleReset = useCallback(() => {
+    hasPlayedStartSound.current = false;
     setRestartCountdown(2);
     setTimeout(() => {
       setShowPopup(false);
@@ -138,7 +153,6 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
-      // Don't reload the page, just reset the state
     }, 2000);
   }, [socket]);
 
@@ -162,8 +176,7 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
- const onPlayerHit = useCallback(
-  (data) => {
+  const onPlayerHit = useCallback((data) => {
     if (winner || loser) return;
 
     if (players[0]?.id === data.attackerId) {
@@ -176,7 +189,7 @@ const Experience = () => {
               loserId: players[1]?.id,
               winnerHealth: health1,
               loserHealth: newHealth,
-              winningAttackTime: data.attackTime // Pass the attack time
+              winningAttackTime: data.attackTime
             });
           }, 50);
         }
@@ -192,123 +205,119 @@ const Experience = () => {
               loserId: players[0]?.id,
               winnerHealth: health2,
               loserHealth: newHealth,
-              winningAttackTime: data.attackTime // Pass the attack time
+              winningAttackTime: data.attackTime
             });
           }, 50);
         }
         return newHealth;
       });
     }
-  },
-  [socket, players, winner, loser, health1, health2]
-);
+  }, [socket, players, winner, loser, health1, health2]);
 
-  // In Experience.jsx, inside the onPlayerDefeated callback function
-  // In Experience.jsx, update the onPlayerDefeated callback
-  const onPlayerDefeated = useCallback(
-    (data) => {
-      // Set health first
-      if (players[0]?.id === data.winnerId) {
-        setHealth1(data.winnerHealth);
-        setHealth2(data.loserHealth);
-        setWinner(players[0]);
-        setLoser(players[1]);
-      } else if (players[1]?.id === data.winnerId) {
-        setHealth1(data.loserHealth);
-        setHealth2(data.winnerHealth);
-        setWinner(players[1]);
-        setLoser(players[0]);
-      }
-
-      // Force animation update through car controllers
-      if (carControllerRef1.current && carControllerRef2.current) {
-        if (players[0]?.id === data.winnerId) {
-          carControllerRef1.current.setVictory();
-          carControllerRef2.current.setDefeat();
-        } else {
-          carControllerRef1.current.setDefeat();
-          carControllerRef2.current.setVictory();
-        }
-      }
-
-      // Show popup after 2 seconds
-      setTimeout(() => {
-        if (players[0]?.id === data.winnerId) {
-          setPopupMessage(
-            players[0]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
-          );
-        } else {
-          setPopupMessage(
-            players[1]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
-          );
-        }
-        setShowPopup(true);
-        // Start the automatic reset countdown
-        setRestartCountdown(5); // 5 seconds countdown
-      }, 2000);
-    },
-    [players, socket?.id]
-  );
-  useEffect(() => {
-    if (socket) {
-      const updatePlayersHandler = (players) => {
-        if (players.length > 2) {
-          const currentPlayerIndex = players.findIndex(
-            (p) => p.id === socket.id
-          );
-          if (currentPlayerIndex >= 2) {
-            setShouldReload(true);
-            return;
-          }
-        }
-        setPlayers(players);
-
-        if (isGameStarted && players.length === 1) {
-          setPlayerLeft(true);
-          setPopupMessage("The other player has left the game.");
-          setShowPopup(true);
-          handleReset();
-        }
-      };
-
-      const startGameHandler = () => {
-        let count = 3;
-        setCountdown(count);
-        const interval = setInterval(() => {
-          count -= 1;
-          setCountdown(count);
-          if (count === 0) {
-            clearInterval(interval);
-            setShowWelcomeScreen(false);
-            setIsGameStarted(true);
-          }
-        }, 1000);
-      };
-
-      const restartGameHandler = () => {
-        window.location.reload();
-      };
-
-      const usernameTakenHandler = () => {
-        setIsUsernameValid(false);
-      };
-
-      socket.on("updatePlayers", updatePlayersHandler);
-      socket.on("startGame", startGameHandler);
-      socket.on("restartGame", restartGameHandler);
-      socket.on("usernameTaken", usernameTakenHandler);
-      socket.on("playerHit", onPlayerHit);
-      socket.on("playerDefeated", onPlayerDefeated);
-
-      return () => {
-        socket.off("updatePlayers", updatePlayersHandler);
-        socket.off("startGame", startGameHandler);
-        socket.off("restartGame", restartGameHandler);
-        socket.off("usernameTaken", usernameTakenHandler);
-        socket.off("playerHit", onPlayerHit);
-        socket.off("playerDefeated", onPlayerDefeated);
-      };
+  const onPlayerDefeated = useCallback((data) => {
+    if (players[0]?.id === data.winnerId) {
+      setHealth1(data.winnerHealth);
+      setHealth2(data.loserHealth);
+      setWinner(players[0]);
+      setLoser(players[1]);
+    } else if (players[1]?.id === data.winnerId) {
+      setHealth1(data.loserHealth);
+      setHealth2(data.winnerHealth);
+      setWinner(players[1]);
+      setLoser(players[0]);
     }
+
+    if (carControllerRef1.current && carControllerRef2.current) {
+      if (players[0]?.id === data.winnerId) {
+        carControllerRef1.current.setVictory();
+        carControllerRef2.current.setDefeat();
+      } else {
+        carControllerRef1.current.setDefeat();
+        carControllerRef2.current.setVictory();
+      }
+    }
+
+    setTimeout(() => {
+      if (players[0]?.id === data.winnerId) {
+        setPopupMessage(
+          players[0]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
+        );
+      } else {
+        setPopupMessage(
+          players[1]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
+        );
+      }
+      setShowPopup(true);
+      setRestartCountdown(5);
+    }, 2000);
+  }, [players, socket?.id]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const updatePlayersHandler = (players) => {
+      if (players.length > 2) {
+        const currentPlayerIndex = players.findIndex(
+          (p) => p.id === socket.id
+        );
+        if (currentPlayerIndex >= 2) {
+          setShouldReload(true);
+          return;
+        }
+      }
+      setPlayers(players);
+
+      if (isGameStarted && players.length === 1) {
+        setPlayerLeft(true);
+        setPopupMessage("The other player has left the game.");
+        setShowPopup(true);
+        handleReset();
+      }
+    };
+
+    const startGameHandler = () => {
+      let count = 3;
+      setCountdown(count);
+      const interval = setInterval(() => {
+        count -= 1;
+        setCountdown(count);
+        if (count === 0) {
+          clearInterval(interval);
+          setShowWelcomeScreen(false);
+          setIsGameStarted(true);
+          
+          if (!hasPlayedStartSound.current && beginSoundRef.current) {
+            beginSoundRef.current.currentTime = 0;
+            beginSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
+            hasPlayedStartSound.current = true;
+          }
+        }
+      }, 1000);
+    };
+
+    const restartGameHandler = () => {
+      window.location.reload();
+    };
+
+    const usernameTakenHandler = () => {
+      setIsUsernameValid(false);
+    };
+
+    socket.on("updatePlayers", updatePlayersHandler);
+    socket.on("startGame", startGameHandler);
+    socket.on("restartGame", restartGameHandler);
+    socket.on("usernameTaken", usernameTakenHandler);
+    socket.on("playerHit", onPlayerHit);
+    socket.on("playerDefeated", onPlayerDefeated);
+
+    return () => {
+      socket.off("updatePlayers", updatePlayersHandler);
+      socket.off("startGame", startGameHandler);
+      socket.off("restartGame", restartGameHandler);
+      socket.off("usernameTaken", usernameTakenHandler);
+      socket.off("playerHit", onPlayerHit);
+      socket.off("playerDefeated", onPlayerDefeated);
+    };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
   useEffect(() => {
@@ -336,7 +345,7 @@ const Experience = () => {
       }, 1000);
       return () => clearInterval(interval);
     } else if (restartCountdown === 0) {
-      handleReset(); // Automatically call reset when countdown reaches 0
+      handleReset();
     }
   }, [restartCountdown, handleReset]);
 
@@ -349,20 +358,18 @@ const Experience = () => {
           <directionalLight
             intensity={1.5}
             castShadow
-            position={[3, 10, 3]} // Higher Y position for better angle
-            shadow-mapSize-width={2048} // Changed from 4096 to 2048
-            shadow-mapSize-height={2048} // Changed from 4096 to 2048
-            shadow-bias={-0.0015} // Adjusted for better edge clarity
-            shadow-normalBias={0.03} // Slightly increased for curved surfaces
+            position={[3, 10, 3]}
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
+            shadow-bias={-0.0015}
+            shadow-normalBias={0.03}
             shadow-camera-near={0.5}
-            shadow-camera-far={25} // Reduced far plane for better resolution
-            shadow-camera-left={-3} // Tighter shadow volume
+            shadow-camera-far={25}
+            shadow-camera-left={-3}
             shadow-camera-right={3}
             shadow-camera-top={3}
             shadow-camera-bottom={-3}
           ></directionalLight>
-
-  
 
           <Physics
             contactPairPersistentThreshold={0.08}
@@ -516,7 +523,6 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
-          {/* Player Health (always on left) */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -535,7 +541,6 @@ const Experience = () => {
             </div>
           </div>
 
-          {/* Opponent Health (always on right) */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -585,11 +590,9 @@ const Experience = () => {
 
       <Joystick
         onMove={(data) => {
-          // Pass isRunning to the joystickInput
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
         onToggleRun={(isRunning) => {
-          // Update the run state when the button is toggled
           setJoystickInput((prev) => ({ ...prev, isRunning }));
         }}
         onStart={() => {}}

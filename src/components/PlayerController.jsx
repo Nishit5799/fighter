@@ -263,7 +263,7 @@ const PlayerController = forwardRef(
     }, [socket]);
 
     useFrame(({ camera }) => {
-      if (!rb.current || !isPlayer1 || isDefeated) return;
+      if (!rb.current || !isPlayer1 || isDefeated ) return;
 
       const vel = rb.current.linvel();
       const movement = { x: 0, z: 0 };
