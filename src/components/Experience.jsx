@@ -162,47 +162,46 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
-  const onPlayerHit = useCallback(
-    (data) => {
-      if (winner || loser) return;
+ const onPlayerHit = useCallback(
+  (data) => {
+    if (winner || loser) return;
 
-      // Use functional updates to ensure we get latest state
-      if (players[0]?.id === data.attackerId) {
-        setHealth2((prev) => {
-          const newHealth = Math.max(0, prev - data.damage);
-
-          if (newHealth <= 0) {
-            setTimeout(() => {
-              socket.emit("playerDefeated", {
-                winnerId: players[0].id,
-                loserId: players[1]?.id,
-                winnerHealth: health1,
-                loserHealth: newHealth,
-              });
-            }, 50);
-          }
-          return newHealth;
-        });
-      } else if (players[1]?.id === data.attackerId) {
-        setHealth1((prev) => {
-          const newHealth = Math.max(0, prev - data.damage);
-
-          if (newHealth <= 0) {
-            setTimeout(() => {
-              socket.emit("playerDefeated", {
-                winnerId: players[1].id,
-                loserId: players[0]?.id,
-                winnerHealth: health2,
-                loserHealth: newHealth,
-              });
-            }, 50);
-          }
-          return newHealth;
-        });
-      }
-    },
-    [socket, players, winner, loser, health1, health2]
-  );
+    if (players[0]?.id === data.attackerId) {
+      setHealth2((prev) => {
+        const newHealth = Math.max(0, prev - data.damage);
+        if (newHealth <= 0) {
+          setTimeout(() => {
+            socket.emit("playerDefeated", {
+              winnerId: players[0].id,
+              loserId: players[1]?.id,
+              winnerHealth: health1,
+              loserHealth: newHealth,
+              winningAttackTime: data.attackTime // Pass the attack time
+            });
+          }, 50);
+        }
+        return newHealth;
+      });
+    } else if (players[1]?.id === data.attackerId) {
+      setHealth1((prev) => {
+        const newHealth = Math.max(0, prev - data.damage);
+        if (newHealth <= 0) {
+          setTimeout(() => {
+            socket.emit("playerDefeated", {
+              winnerId: players[1].id,
+              loserId: players[0]?.id,
+              winnerHealth: health2,
+              loserHealth: newHealth,
+              winningAttackTime: data.attackTime // Pass the attack time
+            });
+          }, 50);
+        }
+        return newHealth;
+      });
+    }
+  },
+  [socket, players, winner, loser, health1, health2]
+);
 
   // In Experience.jsx, inside the onPlayerDefeated callback function
   // In Experience.jsx, update the onPlayerDefeated callback

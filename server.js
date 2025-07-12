@@ -143,9 +143,14 @@ Promise.all([pubClient.connect(), subClient.connect()])
           socket.to(roomId).emit("carMove", data);
         });
 
-        socket.on("playerHit", (data) => {
-          io.to(roomId).emit("playerHit", data); // Broadcast to everyone in the room
-        });
+      // Modify the playerHit handler
+socket.on("playerHit", (data) => {
+  // Broadcast with the attack time
+  io.to(roomId).emit("playerHit", {
+    ...data,
+    attackTime: data.attackTime || Date.now() // Fallback to current time if not provided
+  });
+});
         socket.on("playerDefeated", (data) => {
           io.to(roomId).emit("playerDefeated", data);
         });

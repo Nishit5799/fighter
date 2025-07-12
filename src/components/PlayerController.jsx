@@ -47,8 +47,10 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
+    const [lastAttackTime, setLastAttackTime] = useState(0);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
+    const opponentAttackTime = useRef(0);
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
@@ -121,6 +123,8 @@ const PlayerController = forwardRef(
 
       // Set damage based on attack type
       const damage = type === "kick" ? 20 : 10; // Kick does 20 damage, punch does 10
+      const currentTime = Date.now();
+      setLastAttackTime(currentTime);
 
       if (attackTimer.current) {
         clearTimeout(attackTimer.current);
@@ -150,8 +154,9 @@ const PlayerController = forwardRef(
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage, // Send the appropriate damage based on attack type
+          damage: damage,
           attackType: type,
+          attackTime: currentTime
         });
       }
 
@@ -163,8 +168,13 @@ const PlayerController = forwardRef(
       }, duration);
     };
 
-    const takeHit = (attackType) => {
+    const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
+      
+      // Only take hit if our attack was earlier (or we haven't attacked)
+      if (attackTime <= lastAttackTime) return;
+
+      opponentAttackTime.current = attackTime;
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
@@ -214,6 +224,7 @@ const PlayerController = forwardRef(
         }, 500); // Increased timeout for iOS
       }
     };
+
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
@@ -230,6 +241,7 @@ const PlayerController = forwardRef(
           loserId: socket.id,
           winnerHealth: opponentHealth,
           loserHealth: health,
+          winningAttackTime: opponentAttackTime.current
         });
       }
     }, [health, isDefeated, opponentHealth, socket]);
@@ -239,7 +251,7 @@ const PlayerController = forwardRef(
 
       const onPlayerHit = (data) => {
         if (data.attackerId !== socket.id) {
-          takeHit(data.attackType);
+          takeHit(data.attackType, data.attackTime);
         }
       };
 
@@ -448,7 +460,7 @@ const PlayerController = forwardRef(
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 color={color}
-                castShadow // Add this
+                castShadow
                 animation={
                   matchResult === "won"
                     ? "victory"
@@ -464,7 +476,7 @@ const PlayerController = forwardRef(
                 scale={isSmallScreen ? 2.7 : 3.18}
                 position-y={-0.25}
                 color={color}
-                castShadow // Add this
+                castShadow
                 animation={
                   matchResult === "won"
                     ? "victory"
