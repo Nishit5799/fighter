@@ -14,12 +14,12 @@ import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
 
-// Audio paths - adjust these to match your actual file paths
 const SOUNDS = {
   punch: "/punch.mp3",
   kick: "/kick.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
+  lost: "/lost.mp3",
 };
 
 const PlayerController = forwardRef(
@@ -51,6 +51,7 @@ const PlayerController = forwardRef(
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
     const opponentAttackTime = useRef(0);
+    const hasPlayedResultSound = useRef(false);
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
@@ -58,11 +59,11 @@ const PlayerController = forwardRef(
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
 
-    // Audio refs
     const punchSound = useRef(null);
     const kickSound = useRef(null);
     const hitSound = useRef(null);
     const victorySound = useRef(null);
+    const lostSound = useRef(null);
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -80,26 +81,25 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
-    // Initialize audio
     useEffect(() => {
       punchSound.current = new Audio(SOUNDS.punch);
       kickSound.current = new Audio(SOUNDS.kick);
       hitSound.current = new Audio(SOUNDS.hit);
       victorySound.current = new Audio(SOUNDS.victory);
+      lostSound.current = new Audio(SOUNDS.lost);
 
-      // Set volume levels
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
       hitSound.current.volume = 0.4;
       victorySound.current.volume = 0.8;
+      lostSound.current.volume = 0.8;
 
       return () => {
-        // Properly clean up audio objects
-        [punchSound, kickSound, hitSound, victorySound].forEach((soundRef) => {
+        [punchSound, kickSound, hitSound, victorySound, lostSound].forEach((soundRef) => {
           if (soundRef.current) {
             soundRef.current.pause();
-            soundRef.current.src = ""; // Clear the src to stop any loading
-            soundRef.current.remove(); // Remove the audio element
+            soundRef.current.src = "";
+            soundRef.current.remove();
             soundRef.current = null;
           }
         });
@@ -121,8 +121,7 @@ const PlayerController = forwardRef(
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
-      // Set damage based on attack type
-      const damage = type === "kick" ? 20 : 10; // Kick does 20 damage, punch does 10
+      const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
       setLastAttackTime(currentTime);
 
@@ -130,28 +129,19 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      // Play sound based on attack type
       if (type === "punch" && punchSound.current) {
         punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        punchSound.current.play().catch((e) => console.log("Audio play failed:", e));
       } else if (type === "kick" && kickSound.current) {
         kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        kickSound.current.play().catch((e) => console.log("Audio play failed:", e));
       }
+
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      if (
-        isInContact &&
-        socket &&
-        opponentRef.current &&
-        !opponentRef.current.isDefeated
-      ) {
+      if (isInContact && socket && opponentRef.current && !opponentRef.current.isDefeated) {
         socket.emit("playerHit", {
           attackerId: socket.id,
           damage: damage,
@@ -170,8 +160,6 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      
-      // Only take hit if our attack was earlier (or we haven't attacked)
       if (attackTime <= lastAttackTime) return;
 
       opponentAttackTime.current = attackTime;
@@ -180,7 +168,6 @@ const PlayerController = forwardRef(
         clearTimeout(hitTimer.current);
       }
 
-      // Play hit sound
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play();
@@ -221,7 +208,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 500); // Increased timeout for iOS
+        }, 500);
       }
     };
 
@@ -263,7 +250,7 @@ const PlayerController = forwardRef(
     }, [socket]);
 
     useFrame(({ camera }) => {
-      if (!rb.current || !isPlayer1 || isDefeated ) return;
+      if (!rb.current || !isPlayer1 || isDefeated) return;
 
       const vel = rb.current.linvel();
       const movement = { x: 0, z: 0 };
@@ -395,21 +382,33 @@ const PlayerController = forwardRef(
       setOpponentRef,
 
       setVictory: () => {
+        if (hasPlayedResultSound.current) return;
+        hasPlayedResultSound.current = true;
+        
         setMatchResult("won");
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
-        // Play victory sound
         if (victorySound.current) {
           victorySound.current.currentTime = 0;
-          victorySound.current.play();
+          victorySound.current.play().catch(e => console.log("Audio play failed:", e));
         }
       },
+      
       setDefeat: () => {
+        if (hasPlayedResultSound.current) return;
+        hasPlayedResultSound.current = true;
+        
         setMatchResult("lost");
         setCurrentAnimation("fall");
         movementEnabled.current = false;
+
+        if (lostSound.current) {
+          lostSound.current.currentTime = 0;
+          lostSound.current.play().catch(e => console.log("Audio play failed:", e));
+        }
       },
+      
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
@@ -422,8 +421,7 @@ const PlayerController = forwardRef(
         if (hitTimer.current) clearTimeout(hitTimer.current);
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
 
-        // Clean up audio
-        [punchSound, kickSound, hitSound, victorySound].forEach((sound) => {
+        [punchSound, kickSound, hitSound, victorySound, lostSound].forEach((sound) => {
           if (sound.current) {
             sound.current.pause();
             sound.current = null;
