@@ -214,43 +214,44 @@ const Experience = () => {
     }
   }, [socket, players, winner, loser, health1, health2]);
 
-  const onPlayerDefeated = useCallback((data) => {
-    if (players[0]?.id === data.winnerId) {
-      setHealth1(data.winnerHealth);
-      setHealth2(data.loserHealth);
-      setWinner(players[0]);
-      setLoser(players[1]);
-    } else if (players[1]?.id === data.winnerId) {
-      setHealth1(data.loserHealth);
-      setHealth2(data.winnerHealth);
-      setWinner(players[1]);
-      setLoser(players[0]);
+// In Experience.jsx, update the onPlayerDefeated callback
+const onPlayerDefeated = useCallback((data) => {
+  if (players[0]?.id === data.winnerId) {
+    setHealth1(data.winnerHealth);
+    setHealth2(data.loserHealth);
+    setWinner(players[0]);
+    setLoser(players[1]);
+    
+    // Set victory/defeat based on current player
+    if (carControllerRef1.current) {
+      carControllerRef1.current.setVictory(players[0]?.id === socket?.id);
     }
-
-    if (carControllerRef1.current && carControllerRef2.current) {
-      if (players[0]?.id === data.winnerId) {
-        carControllerRef1.current.setVictory();
-        carControllerRef2.current.setDefeat();
-      } else {
-        carControllerRef1.current.setDefeat();
-        carControllerRef2.current.setVictory();
-      }
+    if (carControllerRef2.current) {
+      carControllerRef2.current.setVictory(players[1]?.id === socket?.id);
     }
+  } else if (players[1]?.id === data.winnerId) {
+    setHealth1(data.loserHealth);
+    setHealth2(data.winnerHealth);
+    setWinner(players[1]);
+    setLoser(players[0]);
+    
+    // Set victory/defeat based on current player
+    if (carControllerRef1.current) {
+      carControllerRef1.current.setVictory(players[0]?.id === socket?.id);
+    }
+    if (carControllerRef2.current) {
+      carControllerRef2.current.setVictory(players[1]?.id === socket?.id);
+    }
+  }
 
-    setTimeout(() => {
-      if (players[0]?.id === data.winnerId) {
-        setPopupMessage(
-          players[0]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
-        );
-      } else {
-        setPopupMessage(
-          players[1]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
-        );
-      }
-      setShowPopup(true);
-      setRestartCountdown(5);
-    }, 2000);
-  }, [players, socket?.id]);
+  setTimeout(() => {
+    setPopupMessage(
+      data.winnerId === socket?.id ? "YOU WON!" : "YOU LOST!"
+    );
+    setShowPopup(true);
+    setRestartCountdown(5);
+  }, 2000);
+}, [players, socket?.id]);
 
   useEffect(() => {
     if (!socket) return;

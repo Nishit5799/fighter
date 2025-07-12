@@ -378,43 +378,39 @@ const PlayerController = forwardRef(
       return () => socket.off("carMove", onCarMove);
     }, [socket, isPlayer1]);
 
-    useImperativeHandle(ref, () => ({
-      setOpponentRef,
+  useImperativeHandle(ref, () => ({
+  setOpponentRef,
 
-      setVictory: () => {
-        if (hasPlayedResultSound.current) return;
-        hasPlayedResultSound.current = true;
-        
-        setMatchResult("won");
-        setCurrentAnimation("victory");
-        movementEnabled.current = false;
+  setVictory: (isWinner) => {
+    if (hasPlayedResultSound.current) return;
+    hasPlayedResultSound.current = true;
+    
+    if (isWinner) {
+      setMatchResult("won");
+      setCurrentAnimation("victory");
+      movementEnabled.current = false;
 
-        if (victorySound.current) {
-          victorySound.current.currentTime = 0;
-          victorySound.current.play().catch(e => console.log("Audio play failed:", e));
-        }
-      },
-      
-      setDefeat: () => {
-        if (hasPlayedResultSound.current) return;
-        hasPlayedResultSound.current = true;
-        
-        setMatchResult("lost");
-        setCurrentAnimation("fall");
-        movementEnabled.current = false;
+      if (victorySound.current) {
+        victorySound.current.currentTime = 0;
+        victorySound.current.play().catch(e => console.log("Audio play failed:", e));
+      }
+    } else {
+      setMatchResult("lost");
+      setCurrentAnimation("fall");
+      movementEnabled.current = false;
 
-        if (lostSound.current) {
-          lostSound.current.currentTime = 0;
-          lostSound.current.play().catch(e => console.log("Audio play failed:", e));
-        }
-      },
-      
-      translation: () => rb.current?.translation(),
-      id: socket?.id,
-      rigidBody: rb.current,
-      isDefeated,
-    }));
-
+      if (lostSound.current) {
+        lostSound.current.currentTime = 0;
+        lostSound.current.play().catch(e => console.log("Audio play failed:", e));
+      }
+    }
+  },
+  
+  translation: () => rb.current?.translation(),
+  id: socket?.id,
+  rigidBody: rb.current,
+  isDefeated,
+}));
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
