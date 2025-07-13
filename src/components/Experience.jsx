@@ -35,7 +35,6 @@ const keyboardMap = [
 
 const Experience = () => {
   const socket = useSocket();
-  const shadowCameraRef = useRef();
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
   const [isPunching, setIsPunching] = useState(false);
   const [isKicking, setIsKicking] = useState(false);
@@ -59,6 +58,7 @@ const Experience = () => {
   const [restartCountdown, setRestartCountdown] = useState(null);
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
+  const hasLoggedResult = useRef(false);
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
@@ -135,6 +135,7 @@ const Experience = () => {
   }, [showWelcomeScreen]);
 
   const handleReset = useCallback(() => {
+    hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
     setRestartCountdown(2);
     setTimeout(() => {
@@ -176,90 +177,156 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
-  const onPlayerHit = useCallback((data) => {
-    if (winner || loser) return;
+  const onPlayerHit = useCallback(
+    (data) => {
+      if (winner || loser) return;
 
-    if (players[0]?.id === data.attackerId) {
-      setHealth2((prev) => {
-        const newHealth = Math.max(0, prev - data.damage);
-        if (newHealth <= 0) {
-          setTimeout(() => {
-            socket.emit("playerDefeated", {
-              winnerId: players[0].id,
-              loserId: players[1]?.id,
-              winnerHealth: health1,
-              loserHealth: newHealth,
-              winningAttackTime: data.attackTime
-            });
-          }, 50);
-        }
-        return newHealth;
+      // Emit health update to opponent
+      socket.emit("updateHealth", {
+        health1:
+          data.attackerId === players[0]?.id
+            ? health1
+            : Math.max(0, health1 - data.damage),
+        health2:
+          data.attackerId === players[1]?.id
+            ? health2
+            : Math.max(0, health2 - data.damage),
       });
-    } else if (players[1]?.id === data.attackerId) {
-      setHealth1((prev) => {
-        const newHealth = Math.max(0, prev - data.damage);
-        if (newHealth <= 0) {
-          setTimeout(() => {
-            socket.emit("playerDefeated", {
-              winnerId: players[1].id,
-              loserId: players[0]?.id,
-              winnerHealth: health2,
-              loserHealth: newHealth,
-              winningAttackTime: data.attackTime
-            });
-          }, 50);
+
+      if (players[0]?.id === data.attackerId) {
+        setHealth2((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[0].id,
+                loserId: players[1]?.id,
+                winnerHealth: health1,
+                loserHealth: newHealth,
+                winningAttackTime: data.attackTime,
+              });
+            }, 50);
+          }
+          return newHealth;
+        });
+      } else if (players[1]?.id === data.attackerId) {
+        setHealth1((prev) => {
+          const newHealth = Math.max(0, prev - data.damage);
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[1].id,
+                loserId: players[0]?.id,
+                winnerHealth: health2,
+                loserHealth: newHealth,
+                winningAttackTime: data.attackTime,
+              });
+            }, 50);
+          }
+          return newHealth;
+        });
+      }
+    },
+    [socket, players, winner, loser, health1, health2]
+  );
+
+  const onPlayerDefeated = useCallback(
+    (data) => {
+      if (!hasLoggedResult.current) {
+        console.log("Received defeat data:", data);
+
+        if (!data || typeof data !== "object") {
+          console.error("Invalid data format");
+          return;
         }
-        return newHealth;
-      });
-    }
-  }, [socket, players, winner, loser, health1, health2]);
 
-  const onPlayerDefeated = useCallback((data) => {
-    if (players[0]?.id === data.winnerId) {
-      setHealth1(data.winnerHealth);
-      setHealth2(data.loserHealth);
-      setWinner(players[0]);
-      setLoser(players[1]);
-    } else if (players[1]?.id === data.winnerId) {
-      setHealth1(data.loserHealth);
-      setHealth2(data.winnerHealth);
-      setWinner(players[1]);
-      setLoser(players[0]);
-    }
+        if (data.winnerId === data.loserId) {
+          console.error(
+            "Server sent invalid data - winner and loser are the same"
+          );
+          return;
+        }
 
-    if (carControllerRef1.current && carControllerRef2.current) {
-      if (players[0]?.id === data.winnerId) {
-        carControllerRef1.current.setVictory();
-        carControllerRef2.current.setDefeat();
-      } else {
-        carControllerRef1.current.setDefeat();
-        carControllerRef2.current.setVictory();
-      }
-    }
+        const winnerPlayer = players.find((p) => p.id === data.winnerId);
+        const loserPlayer = players.find((p) => p.id === data.loserId);
 
-    setTimeout(() => {
-      if (players[0]?.id === data.winnerId) {
-        setPopupMessage(
-          players[0]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
+        if (!winnerPlayer || !loserPlayer) {
+          console.error("Couldn't find winner or loser in players array");
+          return;
+        }
+
+        console.log("All players:", players);
+        console.log(
+          `Validating - Winner: ${winnerPlayer?.name} (${data.winnerId}), Loser: ${loserPlayer?.name} (${data.loserId})`
         );
-      } else {
-        setPopupMessage(
-          players[1]?.id === socket?.id ? "YOU WON!" : "YOU LOST!"
+
+        if (players[0]?.id === data.winnerId) {
+          setHealth1(data.winnerHealth);
+          setHealth2(0);
+        } else {
+          setHealth1(0);
+          setHealth2(data.winnerHealth);
+        }
+
+        setWinner(winnerPlayer);
+        setLoser(loserPlayer);
+
+        console.log(
+          `Validated Winner: ${winnerPlayer.name} (ID: ${winnerPlayer.id})`
         );
+        console.log(
+          `Validated Loser: ${loserPlayer.name} (ID: ${loserPlayer.id})`
+        );
+
+        hasLoggedResult.current = true;
+
+        if (carControllerRef1.current && carControllerRef2.current) {
+          if (players[0]?.id === data.winnerId) {
+            carControllerRef1.current.setVictory();
+            carControllerRef2.current.setDefeat();
+          } else {
+            carControllerRef1.current.setDefeat();
+            carControllerRef2.current.setVictory();
+          }
+        }
       }
-      setShowPopup(true);
-      setRestartCountdown(5);
-    }, 2000);
-  }, [players, socket?.id]);
+
+      setTimeout(() => {
+        const isLocalPlayerWinner = socket?.id === data.winnerId;
+        setPopupMessage(isLocalPlayerWinner ? "YOU WON!" : "YOU LOST!");
+        setShowPopup(true);
+        setRestartCountdown(5);
+      }, 2000);
+    },
+    [players, socket?.id]
+  );
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // Add this to your existing socket effect
+    const updateHealthHandler = ({
+      health1: newHealth1,
+      health2: newHealth2,
+    }) => {
+      setHealth1(newHealth1);
+      setHealth2(newHealth2);
+    };
+
+    socket.on("updateHealth", updateHealthHandler);
+
+    return () => {
+      socket.off("updateHealth", updateHealthHandler);
+      // ... keep your other cleanup code
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!socket) return;
 
     const updatePlayersHandler = (players) => {
       if (players.length > 2) {
-        const currentPlayerIndex = players.findIndex(
-          (p) => p.id === socket.id
-        );
+        const currentPlayerIndex = players.findIndex((p) => p.id === socket.id);
         if (currentPlayerIndex >= 2) {
           setShouldReload(true);
           return;
@@ -285,10 +352,12 @@ const Experience = () => {
           clearInterval(interval);
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
-          
+
           if (!hasPlayedStartSound.current && beginSoundRef.current) {
             beginSoundRef.current.currentTime = 0;
-            beginSoundRef.current.play().catch(e => console.log("Audio play failed:", e));
+            beginSoundRef.current
+              .play()
+              .catch((e) => console.log("Audio play failed:", e));
             hasPlayedStartSound.current = true;
           }
         }
@@ -450,7 +519,7 @@ const Experience = () => {
               ref={welcomeTextRef}
               className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
             >
-              {"Welcome to NishGear".split("").map((letter, index) => (
+              {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
                   {letter === " " ? "\u00A0" : letter}
                 </span>
@@ -523,39 +592,31 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {/* Player 1 - Always left */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
                 className="h-full bg-green-500 transition-all duration-300"
-                style={{
-                  width: `${
-                    players[0]?.id === socket?.id ? health1 : health2
-                  }%`,
-                }}
+                style={{ width: `${health1}%` }}
               />
             </div>
             <div className="text-white font-bold mt-1">
-              {players[0]?.id === socket?.id
-                ? players[0]?.name
-                : players[1]?.name}
+              {players[0]?.name || "Player 1"}
+              {players[0]?.id === socket?.id && " (You)"}
             </div>
           </div>
 
+          {/* Player 2 - Always right */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
                 className="h-full bg-green-500 transition-all duration-300"
-                style={{
-                  width: `${
-                    players[0]?.id === socket?.id ? health2 : health1
-                  }%`,
-                }}
+                style={{ width: `${health2}%` }}
               />
             </div>
             <div className="text-white font-bold mt-1">
-              {players[0]?.id === socket?.id
-                ? players[1]?.name
-                : players[0]?.name}
+              {players[1]?.name || "Player 2"}
+              {players[1]?.id === socket?.id && " (You)"}
             </div>
           </div>
         </div>
