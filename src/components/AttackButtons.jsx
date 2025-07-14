@@ -132,13 +132,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
-        WebkitTapHighlightColor: "transparent",
-    WebkitTouchCallout: "none",
-    WebkitUserSelect: "none",
-    touchAction: "manipulation",
-    // Correct React syntax for webkit prefixes:
-    WebkitOverflowScrolling: "touch",
-    WebkitUserDrag: "none"
+          WebkitTapHighlightColor: "transparent",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          touchAction: "manipulation",
+          // Correct React syntax for webkit prefixes:
+          WebkitOverflowScrolling: "touch",
+          WebkitUserDrag: "none",
         }}
       >
         <span className="text-2xl font-bold">

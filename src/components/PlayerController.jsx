@@ -248,14 +248,14 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
-        console.log(`Emitting defeat - 
-          Winner: ${opponentRef.current.id}, 
-          Loser: ${socket.id},
-          WinnerHealth: ${opponentHealth},
-          LoserHealth: ${health}`);
-
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
+          console.log(`Emitting defeat - 
+        Winner: ${opponentRef.current.id}, 
+        Loser: ${socket.id},
+        WinnerHealth: ${opponentHealth},
+        LoserHealth: ${health}`);
+
           socket.emit("playerDefeated", {
             winnerId: opponentRef.current.id,
             loserId: socket.id,
@@ -420,9 +420,12 @@ const PlayerController = forwardRef(
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
-        if (victorySound.current) {
-          victorySound.current.currentTime = 0;
-          victorySound.current.play();
+        // Only play victory sound if this player is the winner
+        if (socket?.id === opponentRef.current?.id) {
+          if (victorySound.current) {
+            victorySound.current.currentTime = 0;
+            victorySound.current.play();
+          }
         }
       },
       setDefeat: () => {
@@ -430,10 +433,12 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
-        if (lostSound.current) {
-          // Add this block
-          lostSound.current.currentTime = 0;
-          lostSound.current.play();
+        // Only play lost sound if this player is the loser
+        if (socket?.id !== opponentRef.current?.id) {
+          if (lostSound.current) {
+            lostSound.current.currentTime = 0;
+            lostSound.current.play();
+          }
         }
       },
       translation: () => rb.current?.translation(),
