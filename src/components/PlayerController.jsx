@@ -215,6 +215,14 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
+
+        // Additional logging for iOS debugging
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: Date.now(),
+          isLocalPlayer,
+        });
       }
     };
 

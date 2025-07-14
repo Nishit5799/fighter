@@ -52,17 +52,22 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const options = { passive: false, capture: true };
 
     const touchPunchHandler = (e) => {
-      if (handlePunchStart(e)) {
+      const success = handlePunchStart(e);
+      if (success) {
         e.preventDefault();
+        e.stopPropagation();
       }
+      return !success; // Important for iOS
     };
 
     const touchKickHandler = (e) => {
-      if (handleKickStart(e)) {
+      const success = handleKickStart(e);
+      if (success) {
         e.preventDefault();
+        e.stopPropagation();
       }
+      return !success; // Important for iOS
     };
-
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
 
@@ -127,10 +132,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
-          WebkitTapHighlightColor: "transparent",
-          WebkitTouchCallout: "none",
-          WebkitUserSelect: "none",
-          touchAction: "manipulation",
+        WebkitTapHighlightColor: "transparent",
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    touchAction: "manipulation",
+    // Correct React syntax for webkit prefixes:
+    WebkitOverflowScrolling: "touch",
+    WebkitUserDrag: "none"
         }}
       >
         <span className="text-2xl font-bold">
