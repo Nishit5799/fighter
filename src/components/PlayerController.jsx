@@ -415,30 +415,28 @@ const PlayerController = forwardRef(
     useImperativeHandle(ref, () => ({
       setOpponentRef,
 
-      setVictory: () => {
+      setVictory: (isWinner) => {
+        // Add isWinner parameter
         setMatchResult("won");
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
         // Only play victory sound if this player is the winner
-        if (socket?.id === opponentRef.current?.id) {
-          if (victorySound.current) {
-            victorySound.current.currentTime = 0;
-            victorySound.current.play();
-          }
+        if (isWinner && victorySound.current) {
+          victorySound.current.currentTime = 0;
+          victorySound.current.play();
         }
       },
-      setDefeat: () => {
+      setDefeat: (isLoser) => {
+        // Add isLoser parameter
         setMatchResult("lost");
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
         // Only play lost sound if this player is the loser
-        if (socket?.id !== opponentRef.current?.id) {
-          if (lostSound.current) {
-            lostSound.current.currentTime = 0;
-            lostSound.current.play();
-          }
+        if (isLoser && lostSound.current) {
+          lostSound.current.currentTime = 0;
+          lostSound.current.play();
         }
       },
       translation: () => rb.current?.translation(),
