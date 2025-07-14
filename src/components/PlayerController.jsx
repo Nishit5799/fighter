@@ -415,30 +415,33 @@ const PlayerController = forwardRef(
     useImperativeHandle(ref, () => ({
       setOpponentRef,
 
-      setVictory: (isWinner) => {
-        // Add isWinner parameter
-        setMatchResult("won");
-        setCurrentAnimation("victory");
-        movementEnabled.current = false;
+     setVictory: (isLocalPlayerWinner) => {
+    setMatchResult("won");
+    setCurrentAnimation("victory");
+    movementEnabled.current = false;
 
-        // Only play victory sound if this player is the winner
-        if (isWinner && victorySound.current) {
-          victorySound.current.currentTime = 0;
-          victorySound.current.play();
-        }
-      },
-      setDefeat: (isLoser) => {
-        // Add isLoser parameter
-        setMatchResult("lost");
-        setCurrentAnimation("fall");
-        movementEnabled.current = false;
+    // Add delay for victory sound
+    setTimeout(() => {
+      if (isLocalPlayerWinner && victorySound.current) {
+        victorySound.current.currentTime = 0;
+        victorySound.current.play().catch(e => console.log("Victory sound error:", e));
+      }
+    }, 100); // 100ms delay
+  },
 
-        // Only play lost sound if this player is the loser
-        if (isLoser && lostSound.current) {
-          lostSound.current.currentTime = 0;
-          lostSound.current.play();
-        }
-      },
+  setDefeat: (isLocalPlayerLoser) => {
+    setMatchResult("lost");
+    setCurrentAnimation("fall");
+    movementEnabled.current = false;
+
+    // Add slightly longer delay for lost sound
+    setTimeout(() => {
+      if (isLocalPlayerLoser && lostSound.current) {
+        lostSound.current.currentTime = 0;
+        lostSound.current.play().catch(e => console.log("Lost sound error:", e));
+      }
+    }, 200); // 200ms delay
+  },
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,

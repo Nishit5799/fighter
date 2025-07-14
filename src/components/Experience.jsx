@@ -282,11 +282,11 @@ const Experience = () => {
 
         if (carControllerRef1.current && carControllerRef2.current) {
           if (players[0]?.id === data.winnerId) {
-            carControllerRef1.current.setVictory(true); // true means this is the winner
-            carControllerRef2.current.setDefeat(true); // true means this is the loser
+            carControllerRef1.current.setVictory(players[0]?.id === socket?.id);
+            carControllerRef2.current.setDefeat(players[1]?.id === socket?.id);
           } else {
-            carControllerRef1.current.setDefeat(true); // true means this is the loser
-            carControllerRef2.current.setVictory(true); // true means this is the winner
+            carControllerRef1.current.setDefeat(players[0]?.id === socket?.id);
+            carControllerRef2.current.setVictory(players[1]?.id === socket?.id);
           }
         }
       }
