@@ -66,3 +66,41 @@ body {
   }
 }
 
+@supports (-webkit-touch-callout: none) {
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  /* Prevent double-tap zoom */
+  * {
+    touch-action: manipulation;
+  }
+
+  /* Apply to Three.js containers */
+  canvas,
+  .animation-container,
+  .rigid-body-container {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: transform, opacity; /* Add this for better performance */
+  }
+
+  /* Specific to your attack buttons */
+  /* Attack buttons container */
+  .attack-button-container {
+    transform: translateZ(0); /* Let Autoprefixer handle -webkit- */
+    will-change: transform; /* Hint browser about upcoming changes */
+    backface-visibility: hidden; /* Improve 3D rendering */
+  }
+
+  /* If NOT using Autoprefixer, do this: */
+  .attack-button-container {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+}

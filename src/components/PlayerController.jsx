@@ -181,29 +181,42 @@ const PlayerController = forwardRef(
 
       opponentAttackTime.current = attackTime;
 
+      // Clear any pending hit timers
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
       }
 
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play();
-      }
+      // Use requestAnimationFrame for better iOS timing
+      requestAnimationFrame(() => {
+        setIsHit(true);
+        setCurrentAnimation("hit");
 
-      setIsHit(true);
-      setCurrentAnimation("hit");
+        // Play hit sound with iOS fallback
+        const playSound = () => {
+          if (hitSound.current) {
+            hitSound.current.currentTime = 0;
+            const playPromise = hitSound.current.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((e) => console.log("Sound play failed:", e));
+            }
+          }
+        };
 
-      if (character.current?.playHitSound) {
-        character.current.playHitSound();
-      }
+        // On iOS, we need to ensure this runs in the same event loop
+        playSound();
 
-      const duration = 1000;
-      hitTimer.current = setTimeout(() => {
-        setIsHit(false);
-        if (!isAttacking) {
-          setCurrentAnimation(isDefeated ? "fall" : "idle");
+        if (character.current?.playHitSound) {
+          character.current.playHitSound();
         }
-      }, duration);
+
+        const duration = 1000;
+        hitTimer.current = setTimeout(() => {
+          setIsHit(false);
+          if (!isAttacking) {
+            setCurrentAnimation(isDefeated ? "fall" : "idle");
+          }
+        }, duration);
+      });
     };
 
     const handleCollisionEnter = (event) => {
@@ -415,33 +428,37 @@ const PlayerController = forwardRef(
     useImperativeHandle(ref, () => ({
       setOpponentRef,
 
-     setVictory: (isLocalPlayerWinner) => {
-    setMatchResult("won");
-    setCurrentAnimation("victory");
-    movementEnabled.current = false;
+      setVictory: (isLocalPlayerWinner) => {
+        setMatchResult("won");
+        setCurrentAnimation("victory");
+        movementEnabled.current = false;
 
-    // Add delay for victory sound
-    setTimeout(() => {
-      if (isLocalPlayerWinner && victorySound.current) {
-        victorySound.current.currentTime = 0;
-        victorySound.current.play().catch(e => console.log("Victory sound error:", e));
-      }
-    }, 100); // 100ms delay
-  },
+        // Add delay for victory sound
+        setTimeout(() => {
+          if (isLocalPlayerWinner && victorySound.current) {
+            victorySound.current.currentTime = 0;
+            victorySound.current
+              .play()
+              .catch((e) => console.log("Victory sound error:", e));
+          }
+        }, 100); // 100ms delay
+      },
 
-  setDefeat: (isLocalPlayerLoser) => {
-    setMatchResult("lost");
-    setCurrentAnimation("fall");
-    movementEnabled.current = false;
+      setDefeat: (isLocalPlayerLoser) => {
+        setMatchResult("lost");
+        setCurrentAnimation("fall");
+        movementEnabled.current = false;
 
-    // Add slightly longer delay for lost sound
-    setTimeout(() => {
-      if (isLocalPlayerLoser && lostSound.current) {
-        lostSound.current.currentTime = 0;
-        lostSound.current.play().catch(e => console.log("Lost sound error:", e));
-      }
-    }, 200); // 200ms delay
-  },
+        // Add slightly longer delay for lost sound
+        setTimeout(() => {
+          if (isLocalPlayerLoser && lostSound.current) {
+            lostSound.current.currentTime = 0;
+            lostSound.current
+              .play()
+              .catch((e) => console.log("Lost sound error:", e));
+          }
+        }, 200); // 200ms delay
+      },
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
@@ -483,7 +500,7 @@ const PlayerController = forwardRef(
         sleepAfterStillness={0.2}
         canSleep={true}
       >
-        <group ref={container} position={position}>
+        <group ref={container} position={position}  className="animation-container" >
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>

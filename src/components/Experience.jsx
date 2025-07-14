@@ -421,7 +421,7 @@ const Experience = () => {
   return (
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
-        <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
+        <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows  className="animation-container">
           <Environment preset="sunset" />
           <Background />
           <directionalLight
