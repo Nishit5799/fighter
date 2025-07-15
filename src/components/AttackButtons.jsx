@@ -12,35 +12,28 @@ const AttackButtons = ({ onPunch, onKick }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
+      onPunch(true);
+      setTimeout(() => onPunch(false), 1000);
       setTimeout(() => setPunchCooldown(false), 1500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
+      onKick(true);
+      setTimeout(() => onKick(false), 1000);
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
   };
 
-  // Event handlers that return whether attack was successful
-  const handlePunchStart = (e) => {
+  const handleTouchStart = (type, e) => {
     e.preventDefault();
     e.stopPropagation();
-    return handleAttackStart("punch");
-  };
-
-  const handleKickStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("kick");
+    handleAttackStart(type);
   };
 
   useEffect(() => {
@@ -49,37 +42,35 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     if (!punchBtn || !kickBtn) return;
 
-    const options = { passive: false, capture: true };
-
-    const touchPunchHandler = (e) => {
-      const success = handlePunchStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      return !success; // Important for iOS
+    const options = {
+      passive: false,
+      capture: true,
     };
 
-    const touchKickHandler = (e) => {
-      const success = handleKickStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      return !success; // Important for iOS
-    };
+    const touchPunchHandler = (e) => handleTouchStart("punch", e);
+    const touchKickHandler = (e) => handleTouchStart("kick", e);
+
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
-    punchBtn.addEventListener("mousedown", handlePunchStart);
+    punchBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      handleAttackStart("punch");
+    });
 
     kickBtn.addEventListener("touchstart", touchKickHandler, options);
-    kickBtn.addEventListener("mousedown", handleKickStart);
+    kickBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      handleAttackStart("kick");
+    });
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
-      punchBtn.removeEventListener("mousedown", handlePunchStart);
-
+      punchBtn.removeEventListener("mousedown", (e) =>
+        handleAttackStart("punch")
+      );
       kickBtn.removeEventListener("touchstart", touchKickHandler, options);
-      kickBtn.removeEventListener("mousedown", handleKickStart);
+      kickBtn.removeEventListener("mousedown", (e) =>
+        handleAttackStart("kick")
+      );
     };
   }, [punchCooldown, kickCooldown]);
 
@@ -130,13 +121,11 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
-          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
         }}
