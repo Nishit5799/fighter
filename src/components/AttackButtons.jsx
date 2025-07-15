@@ -128,23 +128,17 @@ const AttackButtons = ({ onPunch, onKick }) => {
         ref={ref}
         disabled={isCooldown}
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
-    active:bg-opacity-100 transition-all select-none user-select-none
-    ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onTouchStart={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!isCooldown) handleAttackStart(type);
-        }}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          if (!isCooldown) handleAttackStart(type);
-        }}
+          active:bg-opacity-100 transition-all select-none user-select-none
+          ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
+        onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
           WebkitTapHighlightColor: "transparent",
-          touchAction: "manipulation",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
-          userSelect: "none",
+          touchAction: "manipulation",
+          // Correct React syntax for webkit prefixes:
+          WebkitOverflowScrolling: "touch",
+          WebkitUserDrag: "none",
         }}
       >
         <span className="text-2xl font-bold">

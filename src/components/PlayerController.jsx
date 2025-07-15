@@ -181,42 +181,29 @@ const PlayerController = forwardRef(
 
       opponentAttackTime.current = attackTime;
 
-      // Clear any pending hit timers
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
       }
 
-      // Use requestAnimationFrame for better iOS timing
-      requestAnimationFrame(() => {
-        setIsHit(true);
-        setCurrentAnimation("hit");
+      if (hitSound.current) {
+        hitSound.current.currentTime = 0;
+        hitSound.current.play();
+      }
 
-        // Play hit sound with iOS fallback
-        const playSound = () => {
-          if (hitSound.current) {
-            hitSound.current.currentTime = 0;
-            const playPromise = hitSound.current.play();
-            if (playPromise !== undefined) {
-              playPromise.catch((e) => console.log("Sound play failed:", e));
-            }
-          }
-        };
+      setIsHit(true);
+      setCurrentAnimation("hit");
 
-        // On iOS, we need to ensure this runs in the same event loop
-        playSound();
+      if (character.current?.playHitSound) {
+        character.current.playHitSound();
+      }
 
-        if (character.current?.playHitSound) {
-          character.current.playHitSound();
+      const duration = 1000;
+      hitTimer.current = setTimeout(() => {
+        setIsHit(false);
+        if (!isAttacking) {
+          setCurrentAnimation(isDefeated ? "fall" : "idle");
         }
-
-        const duration = 1000;
-        hitTimer.current = setTimeout(() => {
-          setIsHit(false);
-          if (!isAttacking) {
-            setCurrentAnimation(isDefeated ? "fall" : "idle");
-          }
-        }, duration);
-      });
+      }, duration);
     };
 
     const handleCollisionEnter = (event) => {
@@ -500,11 +487,7 @@ const PlayerController = forwardRef(
         sleepAfterStillness={0.2}
         canSleep={true}
       >
-        <group
-          ref={container}
-          position={position}
-          className="animation-container"
-        >
+        <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>
