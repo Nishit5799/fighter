@@ -27,15 +27,11 @@ Promise.all([pubClient.connect(), subClient.connect()])
       const io = new Server(server, {
         cors: {
           origin: "*",
-          methods: ["GET", "POST"],
         },
         connectionStateRecovery: {
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
-        pingInterval: 10000,
-        pingTimeout: 5000,
-        transports: ["websocket", "polling"],
       });
 
       io.adapter(createAdapter(pubClient, subClient));
@@ -134,17 +130,18 @@ Promise.all([pubClient.connect(), subClient.connect()])
           };
           socket.to(roomId).emit("playerHit", hitData);
         });
-
         socket.on("updateHealth", (data) => {
-          socket.to(roomId).emit("updateHealth", data);
+          socket.broadcast.emit("updateHealth", data);
         });
-
+        // Inside the socket.on("playerDefeated") handler in server.js
         socket.on("playerDefeated", (data) => {
+          // Skip if game isn't started or room doesn't exist
           if (!roomState.gameStarted || !roomState.players) {
             console.error("Game not started or room not found");
             return;
           }
 
+          // Validate data structure
           if (
             !data ||
             typeof data !== "object" ||
@@ -155,11 +152,13 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Check for duplicate IDs
           if (data.winnerId === data.loserId) {
             console.error(`Duplicate IDs: ${data.winnerId}`);
             return;
           }
 
+          // Check if players exist
           const winner = roomState.players.get(data.winnerId);
           const loser = roomState.players.get(data.loserId);
 
@@ -170,6 +169,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Prevent multiple defeat events for the same match
           if (roomState.matchResult) {
             console.log(
               "Match result already processed, ignoring duplicate event"
@@ -177,6 +177,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Mark the match as completed
           roomState.matchResult = {
             winnerId: data.winnerId,
             loserId: data.loserId,
@@ -194,12 +195,19 @@ Promise.all([pubClient.connect(), subClient.connect()])
           console.log(`Verified Match Result - 
     Winner: ${winner.name} (${winner.id}), 
     Loser: ${loser.name} (${loser.id})`);
+
+          // Reset the match result when game restarts
+          socket.on("restartGame", () => {
+            roomState.matchResult = null;
+            roomState.players.forEach((player) => (player.isReady = false));
+            roomState.gameStarted = false;
+            io.to(roomId).emit("restartGame");
+          });
         });
 
         socket.on("restartGame", () => {
-          roomState.players.forEach((player) => (player.isReady = false));
+          roomState.players.clear();
           roomState.gameStarted = false;
-          roomState.matchResult = null;
           io.to(roomId).emit("restartGame");
         });
 
