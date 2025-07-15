@@ -52,21 +52,26 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const options = { passive: false, capture: true };
 
     const touchPunchHandler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const success = handlePunchStart(e);
       if (success) {
-        e.preventDefault();
-        e.stopPropagation();
+        // Add vibration if supported
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+        return false;
       }
-      return !success; // Important for iOS
+      return false; // Always prevent default for iOS
     };
 
     const touchKickHandler = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const success = handleKickStart(e);
       if (success) {
-        e.preventDefault();
-        e.stopPropagation();
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+        return false;
       }
-      return !success; // Important for iOS
+      return false;
     };
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
@@ -162,6 +167,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
             stroke-dashoffset: 0;
           }
         }
+
         @keyframes progressAnim-kick {
           from {
             stroke-dashoffset: 100;
@@ -171,18 +177,91 @@ const AttackButtons = ({ onPunch, onKick }) => {
           }
         }
 
-        /* iOS-specific improvements */
+        /* Base styles for all devices */
         button {
+          -webkit-tap-highlight-color: transparent;
           -webkit-touch-callout: none;
           -webkit-user-select: none;
           touch-action: manipulation;
-          -webkit-tap-highlight-color: transparent;
+          user-select: none;
         }
 
-        /* Prevent touch highlighting */
+        /* iOS-specific overrides and enhancements */
+        @supports (-webkit-touch-callout: none) {
+          button {
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            -webkit-user-drag: none;
+          }
+
+          /* More aggressive touch prevention for iOS */
+          * {
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            -webkit-user-drag: none !important;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+            -webkit-tap-highlight-color: transparent !important;
+            touch-action: manipulation !important;
+          }
+
+          /* Specific button states for iOS */
+          button:active,
+          button:focus {
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+          }
+
+          /* Animation adjustments for iOS */
+          @keyframes progressAnim-punch {
+            from {
+              stroke-dashoffset: 100;
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+
+          @keyframes progressAnim-kick {
+            from {
+              stroke-dashoffset: 100;
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+        }
+
+        /* General touch improvements */
+        .relative {
+          position: relative;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        /* Prevent touch highlighting globally */
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
           -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Button active states */
+        button:active {
+          transform: scale(0.95);
+          transition: transform 0.1s ease;
+        }
+
+        /* Cooldown state visuals */
+        button[disabled] {
+          opacity: 0.6;
+          transform: none !important;
+        }
+
+        /* Animation performance optimizations */
+        svg {
+          will-change: transform, opacity;
+          transform: translateZ(0);
+          backface-visibility: hidden;
+          perspective: 1000px;
         }
       `}</style>
     </div>

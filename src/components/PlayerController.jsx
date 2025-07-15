@@ -82,27 +82,110 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
+    if (typeof window !== "undefined" && window.navigator.vibrate) {
+      window.navigator.vibrate(30); // Short vibration feedback
+    }
+
+    // In the takeHit function, add this:
+    if (typeof window !== "undefined" && window.navigator.vibrate) {
+      window.navigator.vibrate(100); // Longer vibration for hits
+    }
+
     useEffect(() => {
       opponentIdRef.current = opponentRef.current?.id;
     }, [opponentRef.current?.id]);
 
     useEffect(() => {
-      punchSound.current = new Audio(SOUNDS.punch);
-      kickSound.current = new Audio(SOUNDS.kick);
-      hitSound.current = new Audio(SOUNDS.hit);
-      victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost); // Add this line
+      // Check if we're on iOS
+      const isIOS = () => {
+        return (
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+        );
+      };
 
-      punchSound.current.volume = 0.7;
-      kickSound.current.volume = 0.7;
-      hitSound.current.volume = 0.4;
-      victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8; // Add this line
+      // Function to initialize sounds
+      const initializeSounds = () => {
+        punchSound.current = new Audio(SOUNDS.punch);
+        kickSound.current = new Audio(SOUNDS.kick);
+        hitSound.current = new Audio(SOUNDS.hit);
+        victorySound.current = new Audio(SOUNDS.victory);
+        lostSound.current = new Audio(SOUNDS.lost);
 
+        // Set volumes
+        punchSound.current.volume = 0.7;
+        kickSound.current.volume = 0.7;
+        hitSound.current.volume = 0.4;
+        victorySound.current.volume = 0.8;
+        lostSound.current.volume = 0.8;
+
+        // Preload sounds (iOS workaround)
+        if (isIOS()) {
+          [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
+            (sound) => {
+              if (sound.current) {
+                sound.current
+                  .load()
+                  .catch((e) => console.log("Sound preload error:", e));
+              }
+            }
+          );
+        }
+      };
+
+      // Check if we can play sounds immediately
+      const canPlaySoundsImmediately =
+        !isIOS() ||
+        document.body.dataset.userInteracted === "true" ||
+        document.body.dataset.soundsInitialized === "true";
+
+      if (canPlaySoundsImmediately) {
+        initializeSounds();
+        document.body.dataset.soundsInitialized = "true";
+      }
+
+      // iOS-specific interaction handling
+      if (isIOS() && !document.body.dataset.userInteracted) {
+        const interactionEvents = [
+          "touchstart",
+          "touchend",
+          "click",
+          "keydown",
+        ];
+
+        const handleFirstInteraction = () => {
+          if (!document.body.dataset.soundsInitialized) {
+            initializeSounds();
+            document.body.dataset.soundsInitialized = "true";
+          }
+          document.body.dataset.userInteracted = "true";
+
+          // Remove all listeners
+          interactionEvents.forEach((event) => {
+            document.removeEventListener(event, handleFirstInteraction);
+          });
+        };
+
+        // Add multiple interaction listeners for iOS
+        interactionEvents.forEach((event) => {
+          document.addEventListener(event, handleFirstInteraction, {
+            passive: true,
+            once: true,
+          });
+        });
+
+        return () => {
+          // Cleanup listeners if component unmounts before interaction
+          interactionEvents.forEach((event) => {
+            document.removeEventListener(event, handleFirstInteraction);
+          });
+        };
+      }
+
+      // Cleanup function
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (soundRef) => {
-            // Add lostSound here
             if (soundRef.current) {
               soundRef.current.pause();
               soundRef.current.src = "";
@@ -112,7 +195,7 @@ const PlayerController = forwardRef(
           }
         );
       };
-    }, []);
+    }, []); // Empty dependency array ensures this runs once on mount
 
     useEffect(() => {
       const handleResize = () => {
@@ -211,18 +294,14 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        setIsInContact(true);
+        // iOS workaround - force state update
+        requestAnimationFrame(() => {
+          setIsInContact(true);
+        });
+
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
-
-        // Additional logging for iOS debugging
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
       }
     };
 
@@ -231,8 +310,11 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
+        // iOS workaround - delay state update
         contactTimeout.current = setTimeout(() => {
-          setIsInContact(false);
+          requestAnimationFrame(() => {
+            setIsInContact(false);
+          });
         }, 500);
       }
     };
