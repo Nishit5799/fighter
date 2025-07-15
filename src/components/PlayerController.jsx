@@ -22,6 +22,8 @@ const SOUNDS = {
   lost: "/lost.mp3",
 };
 
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
 const PlayerController = forwardRef(
   (
     {
@@ -82,42 +84,32 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
+    // Audio initialization with iOS support
     useEffect(() => {
-      opponentIdRef.current = opponentRef.current?.id;
-    }, [opponentRef.current?.id]);
-
-    useEffect(() => {
-      const loadAudio = () => {
-        punchSound.current = new Audio(SOUNDS.punch);
-        kickSound.current = new Audio(SOUNDS.kick);
-        hitSound.current = new Audio(SOUNDS.hit);
-        victorySound.current = new Audio(SOUNDS.victory);
-        lostSound.current = new Audio(SOUNDS.lost);
-
-        // iOS requires this to be called in a user gesture
-        const playDummySound = () => {
-          const dummy = new Audio();
-          dummy.src =
-            "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...";
-          dummy.volume = 0;
-          dummy.play().catch((e) => console.log("Dummy audio play failed:", e));
-        };
-
-        // Try to play dummy sound on iOS to unlock audio
-        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-          document.addEventListener("touchstart", playDummySound, {
-            once: true,
-          });
-        }
-
-        punchSound.current.volume = 0.7;
-        kickSound.current.volume = 0.7;
-        hitSound.current.volume = 0.4;
-        victorySound.current.volume = 0.8;
-        lostSound.current.volume = 0.8;
+      const unlockAudio = () => {
+        const dummy = new Audio();
+        dummy.src =
+          "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...";
+        dummy.volume = 0;
+        dummy.play().catch((e) => console.log("iOS audio unlock attempt:", e));
       };
 
-      loadAudio();
+      punchSound.current = new Audio(SOUNDS.punch);
+      kickSound.current = new Audio(SOUNDS.kick);
+      hitSound.current = new Audio(SOUNDS.hit);
+      victorySound.current = new Audio(SOUNDS.victory);
+      lostSound.current = new Audio(SOUNDS.lost);
+
+      if (isIOS) {
+        document.addEventListener("touchstart", unlockAudio, { once: true });
+        document.addEventListener("touchend", unlockAudio, { once: true });
+      }
+
+      punchSound.current.volume = 0.7;
+      kickSound.current.volume = 0.7;
+      hitSound.current.volume = 0.4;
+      victorySound.current.volume = 0.8;
+      lostSound.current.volume = 0.8;
 
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
@@ -132,6 +124,23 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
+
+    const playSound = (soundRef) => {
+      if (!soundRef.current) return;
+
+      soundRef.current.currentTime = 0;
+      soundRef.current.play().catch((e) => {
+        if (isIOS && e.name === "NotAllowedError") {
+          const retryPlay = () => {
+            soundRef.current.currentTime = 0;
+            soundRef.current.play().finally(() => {
+              document.removeEventListener("touchstart", retryPlay);
+            });
+          };
+          document.addEventListener("touchstart", retryPlay, { once: true });
+        }
+      });
+    };
 
     useEffect(() => {
       const handleResize = () => {
@@ -155,25 +164,6 @@ const PlayerController = forwardRef(
       if (attackTimer.current) {
         clearTimeout(attackTimer.current);
       }
-
-      const playSound = (sound) => {
-        if (sound.current) {
-          sound.current.currentTime = 0;
-          sound.current.play().catch((e) => {
-            // iOS requires this to be called in a user gesture
-            if (e.name === "NotAllowedError") {
-              document.addEventListener(
-                "touchstart",
-                () => {
-                  sound.current.currentTime = 0;
-                  sound.current.play().catch(console.error);
-                },
-                { once: true }
-              );
-            }
-          });
-        }
-      };
 
       if (type === "punch") {
         playSound(punchSound);
@@ -217,21 +207,7 @@ const PlayerController = forwardRef(
         clearTimeout(hitTimer.current);
       }
 
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch((e) => {
-          if (e.name === "NotAllowedError") {
-            document.addEventListener(
-              "touchstart",
-              () => {
-                hitSound.current.currentTime = 0;
-                hitSound.current.play().catch(console.error);
-              },
-              { once: true }
-            );
-          }
-        });
-      }
+      playSound(hitSound);
 
       setIsHit(true);
       setCurrentAnimation("hit");
@@ -258,6 +234,12 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
+
+        if (isIOS) {
+          setTimeout(() => {
+            setIsInContact(true);
+          }, 50);
+        }
       }
     };
 
@@ -266,9 +248,12 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        contactTimeout.current = setTimeout(() => {
-          setIsInContact(false);
-        }, 500);
+        contactTimeout.current = setTimeout(
+          () => {
+            setIsInContact(false);
+          },
+          isIOS ? 800 : 500
+        );
       }
     };
 
@@ -451,19 +436,7 @@ const PlayerController = forwardRef(
 
         setTimeout(() => {
           if (isLocalPlayerWinner && victorySound.current) {
-            victorySound.current.currentTime = 0;
-            victorySound.current.play().catch((e) => {
-              if (e.name === "NotAllowedError") {
-                document.addEventListener(
-                  "touchstart",
-                  () => {
-                    victorySound.current.currentTime = 0;
-                    victorySound.current.play().catch(console.error);
-                  },
-                  { once: true }
-                );
-              }
-            });
+            playSound(victorySound);
           }
         }, 100);
       },
@@ -475,19 +448,7 @@ const PlayerController = forwardRef(
 
         setTimeout(() => {
           if (isLocalPlayerLoser && lostSound.current) {
-            lostSound.current.currentTime = 0;
-            lostSound.current.play().catch((e) => {
-              if (e.name === "NotAllowedError") {
-                document.addEventListener(
-                  "touchstart",
-                  () => {
-                    lostSound.current.currentTime = 0;
-                    lostSound.current.play().catch(console.error);
-                  },
-                  { once: true }
-                );
-              }
-            });
+            playSound(lostSound);
           }
         }, 200);
       },

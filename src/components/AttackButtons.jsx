@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
 const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
   const kickRef = useRef();
@@ -31,14 +33,20 @@ const AttackButtons = ({ onPunch, onKick }) => {
   };
 
   const handlePunchStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (isIOS) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
     return handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (isIOS) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
     return handleAttackStart("kick");
   };
 
@@ -48,48 +56,47 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     if (!punchBtn || !kickBtn) return;
 
-    const options = { passive: false, capture: true };
+    const options = {
+      passive: false,
+      capture: true,
+    };
 
     const touchPunchHandler = (e) => {
       const success = handlePunchStart(e);
-      if (success) {
+      if (success && isIOS) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
       }
       return !success;
     };
 
     const touchKickHandler = (e) => {
       const success = handleKickStart(e);
-      if (success) {
+      if (success && isIOS) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
       }
       return !success;
     };
 
-    // iOS needs these events to be added with { passive: false }
-    const addTouchListeners = () => {
-      punchBtn.addEventListener("touchstart", touchPunchHandler, options);
-      punchBtn.addEventListener("mousedown", handlePunchStart);
-      kickBtn.addEventListener("touchstart", touchKickHandler, options);
-      kickBtn.addEventListener("mousedown", handleKickStart);
-    };
-
-    // Try to unlock audio on iOS
-    const unlockAudio = () => {
-      const dummy = new Audio();
-      dummy.src =
-        "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...";
-      dummy.volume = 0;
-      dummy.play().catch(() => {});
-    };
-
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      document.addEventListener("touchstart", unlockAudio, { once: true });
+    if (isIOS) {
+      document.addEventListener(
+        "touchmove",
+        (e) => {
+          if (punchCooldown || kickCooldown) {
+            e.preventDefault();
+          }
+        },
+        { passive: false }
+      );
     }
 
-    addTouchListeners();
+    punchBtn.addEventListener("touchstart", touchPunchHandler, options);
+    punchBtn.addEventListener("mousedown", handlePunchStart);
+    kickBtn.addEventListener("touchstart", touchKickHandler, options);
+    kickBtn.addEventListener("mousedown", handleKickStart);
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);

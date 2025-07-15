@@ -13,7 +13,6 @@ import {
   OrthographicCamera,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-
 import Joystick from "./Joystick";
 import AttackButtons from "./AttackButtons";
 import gsap from "gsap";
@@ -32,6 +31,8 @@ const keyboardMap = [
   { name: "punch", keys: ["KeyP"] },
   { name: "kick", keys: ["KeyK"] },
 ];
+
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
 const Experience = () => {
   const socket = useSocket();
@@ -69,6 +70,18 @@ const Experience = () => {
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
+
+    // iOS audio unlock
+    if (isIOS) {
+      const unlockAudio = () => {
+        const dummy = new Audio();
+        dummy.src =
+          "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU...";
+        dummy.volume = 0;
+        dummy.play().catch((e) => console.log("iOS audio unlock attempt:", e));
+      };
+      document.addEventListener("touchstart", unlockAudio, { once: true });
+    }
 
     return () => {
       if (beginSoundRef.current) {
@@ -181,7 +194,6 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id
@@ -235,7 +247,12 @@ const Experience = () => {
       if (!hasLoggedResult.current) {
         console.log("Received defeat data:", data);
 
-        if (!data || typeof data !== "object") {
+        if (
+          !data ||
+          typeof data !== "object" ||
+          !data.winnerId ||
+          !data.loserId
+        ) {
           console.error("Invalid data format");
           return;
         }
@@ -304,7 +321,6 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
-    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -317,7 +333,6 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
-      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -355,9 +370,18 @@ const Experience = () => {
 
           if (!hasPlayedStartSound.current && beginSoundRef.current) {
             beginSoundRef.current.currentTime = 0;
-            beginSoundRef.current
-              .play()
-              .catch((e) => console.log("Audio play failed:", e));
+            beginSoundRef.current.play().catch((e) => {
+              if (isIOS && e.name === "NotAllowedError") {
+                document.addEventListener(
+                  "touchstart",
+                  () => {
+                    beginSoundRef.current.currentTime = 0;
+                    beginSoundRef.current.play().catch(console.error);
+                  },
+                  { once: true }
+                );
+              }
+            });
             hasPlayedStartSound.current = true;
           }
         }
@@ -441,11 +465,13 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.08}
+            contactPairPersistentThreshold={isIOS ? 0.1 : 0.08}
             sleepAfterStillness={0.2}
-            substeps={2}
-            solverIterations={8}
+            substeps={isIOS ? 4 : 2}
+            solverIterations={isIOS ? 12 : 8}
             timeStep="vary"
+            gravity={[0, -9.81, 0]}
+            colliders={false}
           >
             <Ring />
             {isGameStarted && (
@@ -592,7 +618,6 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
-          {/* Player 1 - Always left */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -606,7 +631,6 @@ const Experience = () => {
             </div>
           </div>
 
-          {/* Player 2 - Always right */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -621,6 +645,7 @@ const Experience = () => {
           </div>
         </div>
       )}
+
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
