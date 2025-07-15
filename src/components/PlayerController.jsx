@@ -500,7 +500,11 @@ const PlayerController = forwardRef(
         sleepAfterStillness={0.2}
         canSleep={true}
       >
-        <group ref={container} position={position}  className="animation-container" >
+        <group
+          ref={container}
+          position={position}
+          className="animation-container"
+        >
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>
