@@ -8,6 +8,11 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
+    // Add vibration feedback for iOS
+    if (window.navigator.vibrate) {
+      window.navigator.vibrate(50);
+    }
+
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
@@ -15,16 +20,25 @@ const AttackButtons = ({ onPunch, onKick }) => {
       return false;
     }
 
+    // Add immediate visual feedback
+    const button = type === "punch" ? punchRef.current : kickRef.current;
+    if (button) {
+      button.style.transform = "scale(0.9)";
+      setTimeout(() => {
+        if (button) button.style.transform = "scale(1)";
+      }, 100);
+    }
+
     if (type === "punch") {
       setPunchCooldown(true);
       onPunch(true);
-      setTimeout(() => onPunch(false), 1000);
+      setTimeout(() => onPunch(false), 100);
       setTimeout(() => setPunchCooldown(false), 1500);
       return true;
     } else {
       setKickCooldown(true);
       onKick(true);
-      setTimeout(() => onKick(false), 1000);
+      setTimeout(() => onKick(false), 100);
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }

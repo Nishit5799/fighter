@@ -441,11 +441,12 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.08}
-            sleepAfterStillness={0.2}
-            substeps={2}
-            solverIterations={8}
+            contactPairPersistentThreshold={0.1} // Increased for iOS
+            sleepAfterStillness={0.5} // Increased for iOS
+            substeps={4} // Increased for better collision detection
+            solverIterations={12} // Increased for iOS
             timeStep="vary"
+            gravity={[0, -30, 0]} // Stronger gravity for iOS
           >
             <Ring />
             {isGameStarted && (

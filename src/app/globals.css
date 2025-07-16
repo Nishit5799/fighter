@@ -65,3 +65,24 @@ body {
     background-position: calc(100% / 3) 0, calc(100% / -3) 100%;
   }
 }
+
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific styles */
+  button, input, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  
+  /* Prevent text selection */
+  * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Improve rendering performance */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -webkit-overflow-scrolling: touch;
+  }
+}
