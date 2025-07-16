@@ -8,42 +8,29 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
-    // Add vibration feedback for iOS
-    if (window.navigator.vibrate) {
-      window.navigator.vibrate(50);
-    }
-
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false;
-    }
-
-    // Add immediate visual feedback
-    const button = type === "punch" ? punchRef.current : kickRef.current;
-    if (button) {
-      button.style.transform = "scale(0.9)";
-      setTimeout(() => {
-        if (button) button.style.transform = "scale(1)";
-      }, 100);
+      return false; // Return false if attack is blocked by cooldown
     }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true);
-      setTimeout(() => onPunch(false), 100);
+      onPunch(true); // Trigger punch state
+      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
       setTimeout(() => setPunchCooldown(false), 1500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true);
-      setTimeout(() => onKick(false), 100);
+      onKick(true); // Trigger kick state
+      setTimeout(() => onKick(false), 1000); // Reset after 1 second
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
   };
 
+  // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -70,7 +57,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
         e.preventDefault();
         e.stopPropagation();
       }
-      return !success;
+      return !success; // Important for iOS
     };
 
     const touchKickHandler = (e) => {
@@ -79,9 +66,8 @@ const AttackButtons = ({ onPunch, onKick }) => {
         e.preventDefault();
         e.stopPropagation();
       }
-      return !success;
+      return !success; // Important for iOS
     };
-
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
 
@@ -144,11 +130,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
+        onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
+          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
         }}
@@ -194,6 +182,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
         /* Prevent touch highlighting */
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
     </div>

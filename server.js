@@ -124,23 +124,11 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerHit", (data) => {
-          // Add timestamp if missing (iOS sometimes drops it)
           const hitData = {
             ...data,
             attackTime: data.attackTime || Date.now(),
-            isIOS:
-              data.isIOS ||
-              /iPhone|iPad|iPod/i.test(socket.request.headers["user-agent"]),
           };
-
-          // Add slight delay for iOS clients
-          if (hitData.isIOS) {
-            setTimeout(() => {
-              socket.to(roomId).emit("playerHit", hitData);
-            }, 50);
-          } else {
-            socket.to(roomId).emit("playerHit", hitData);
-          }
+          socket.to(roomId).emit("playerHit", hitData);
         });
         socket.on("updateHealth", (data) => {
           socket.broadcast.emit("updateHealth", data);
