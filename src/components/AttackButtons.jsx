@@ -30,10 +30,16 @@ const AttackButtons = ({ onPunch, onKick }) => {
     }
   };
 
-  const handleTouchStart = (type, e) => {
+  const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    handleAttackStart(type);
+    return handleAttackStart("punch");
+  };
+
+  const handleKickStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    return handleAttackStart("kick");
   };
 
   useEffect(() => {
@@ -42,35 +48,38 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     if (!punchBtn || !kickBtn) return;
 
-    const options = {
-      passive: false,
-      capture: true,
+    const options = { passive: false, capture: true };
+
+    const touchPunchHandler = (e) => {
+      const success = handlePunchStart(e);
+      if (success) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return !success;
     };
 
-    const touchPunchHandler = (e) => handleTouchStart("punch", e);
-    const touchKickHandler = (e) => handleTouchStart("kick", e);
+    const touchKickHandler = (e) => {
+      const success = handleKickStart(e);
+      if (success) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return !success;
+    };
 
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
-    punchBtn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      handleAttackStart("punch");
-    });
+    punchBtn.addEventListener("mousedown", handlePunchStart);
 
     kickBtn.addEventListener("touchstart", touchKickHandler, options);
-    kickBtn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      handleAttackStart("kick");
-    });
+    kickBtn.addEventListener("mousedown", handleKickStart);
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
-      punchBtn.removeEventListener("mousedown", (e) =>
-        handleAttackStart("punch")
-      );
+      punchBtn.removeEventListener("mousedown", handlePunchStart);
+
       kickBtn.removeEventListener("touchstart", touchKickHandler, options);
-      kickBtn.removeEventListener("mousedown", (e) =>
-        handleAttackStart("kick")
-      );
+      kickBtn.removeEventListener("mousedown", handleKickStart);
     };
   }, [punchCooldown, kickCooldown]);
 
@@ -171,7 +180,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
         /* Prevent touch highlighting */
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
     </div>
