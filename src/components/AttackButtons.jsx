@@ -1,52 +1,59 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 
 const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
   const kickRef = useRef();
-
   const [punchCooldown, setPunchCooldown] = useState(false);
   const [kickCooldown, setKickCooldown] = useState(false);
+  const lastTouchTimeRef = useRef(0);
 
-  const handleAttackStart = (type) => {
-    if (
-      (type === "punch" && punchCooldown) ||
-      (type === "kick" && kickCooldown)
-    ) {
-      return false;
-    }
+  const handleAttackStart = useCallback(
+    (type) => {
+      const now = Date.now();
+      if (now - lastTouchTimeRef.current < 100) return false;
+      lastTouchTimeRef.current = now;
 
-    // Add vibration feedback for iOS
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
-    }
+      if (
+        (type === "punch" && punchCooldown) ||
+        (type === "kick" && kickCooldown)
+      ) {
+        return false;
+      }
 
-    if (type === "punch") {
-      setPunchCooldown(true);
-      onPunch(true);
-      setTimeout(() => onPunch(false), 500); // Reduce duration for more responsiveness
-      setTimeout(() => setPunchCooldown(false), 1500);
-      return true;
-    } else {
-      setKickCooldown(true);
-      onKick(true);
-      setTimeout(() => onKick(false), 500); // Reduce duration for more responsiveness
-      setTimeout(() => setKickCooldown(false), 3000);
-      return true;
-    }
-  };
+      if (type === "punch") {
+        setPunchCooldown(true);
+        onPunch(true);
+        setTimeout(() => onPunch(false), 1000);
+        setTimeout(() => setPunchCooldown(false), 1500);
+        return true;
+      } else {
+        setKickCooldown(true);
+        onKick(true);
+        setTimeout(() => onKick(false), 1000);
+        setTimeout(() => setKickCooldown(false), 3000);
+        return true;
+      }
+    },
+    [punchCooldown, kickCooldown, onPunch, onKick]
+  );
 
-  // Event handlers that return whether attack was successful
-  const handlePunchStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("punch");
-  };
+  const handlePunchStart = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return handleAttackStart("punch");
+    },
+    [handleAttackStart]
+  );
 
-  const handleKickStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("kick");
-  };
+  const handleKickStart = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return handleAttackStart("kick");
+    },
+    [handleAttackStart]
+  );
 
   useEffect(() => {
     const punchBtn = punchRef.current;
@@ -57,40 +64,30 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const options = { passive: false, capture: true };
 
     const touchPunchHandler = (e) => {
-      const success = handleAttackStart("punch");
-      if (success) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-      return false;
+      const success = handlePunchStart(e);
+      return !success;
     };
 
     const touchKickHandler = (e) => {
-      const success = handleAttackStart("kick");
-      if (success) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-      return false;
+      const success = handleKickStart(e);
+      return !success;
     };
+
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
-
     kickBtn.addEventListener("touchstart", touchKickHandler, options);
     kickBtn.addEventListener("mousedown", handleKickStart);
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
       punchBtn.removeEventListener("mousedown", handlePunchStart);
-
       kickBtn.removeEventListener("touchstart", touchKickHandler, options);
       kickBtn.removeEventListener("mousedown", handleKickStart);
     };
-  }, [punchCooldown, kickCooldown]);
+  }, [handlePunchStart, handleKickStart]);
 
   const renderButton = (type, ref, icon, isCooldown, duration) => (
     <div className="relative w-16 h-16">
-      {/* GREEN STATIC BORDER */}
       <svg
         className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
         viewBox="0 0 36 36"
@@ -105,7 +102,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
         />
       </svg>
 
-      {/* RED ANIMATED RING */}
       {isCooldown && (
         <svg
           className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
@@ -135,15 +131,11 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
-          // Correct React syntax for webkit prefixes:
-          WebkitOverflowScrolling: "touch",
-          WebkitUserDrag: "none",
         }}
       >
         <span className="text-2xl font-bold">
@@ -175,19 +167,19 @@ const AttackButtons = ({ onPunch, onKick }) => {
             stroke-dashoffset: 0;
           }
         }
-
-        /* iOS-specific improvements */
-        button {
-          -webkit-touch-callout: none;
-          -webkit-user-select: none;
-          touch-action: manipulation;
-          -webkit-tap-highlight-color: transparent;
+        button,
+        svg {
+          will-change: transform, opacity;
+          backface-visibility: hidden;
+          transform: translateZ(0);
+          -webkit-font-smoothing: subpixel-antialiased;
         }
-
-        /* Prevent touch highlighting */
+        circle[style*="animation"] {
+          animation-timing-function: linear;
+          animation-fill-mode: forwards;
+        }
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-          -webkit-tap-highlight-color: transparent;
         }
       `}</style>
     </div>
