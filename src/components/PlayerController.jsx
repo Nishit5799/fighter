@@ -66,8 +66,8 @@ const PlayerController = forwardRef(
     const victorySound = useRef(null);
     const lostSound = useRef(null);
 
-    const WALK_SPEED = 3.0; // Increased from 1.5
-    const RUN_SPEED = 4.5; // Increased from 2.5
+    const WALK_SPEED = 1.5;
+    const RUN_SPEED = 2.5;
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     const rb = useRef();
@@ -483,18 +483,18 @@ const PlayerController = forwardRef(
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={12} // Increased from 9
+        gravityScale={9}
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={8} // Reduced from 10
+        solverIterations={10}
         ccd={true}
-        linearDamping={0.3} // Reduced from 0.5
-        angularDamping={0.7} // Reduced from 1.0
-        sleepAfterStillness={0.3} // Reduced from 0.5
+        linearDamping={0.5}
+        angularDamping={1.0}
+        sleepAfterStillness={0.5}
         canSleep={true}
       >
         <group ref={container} position={position}>

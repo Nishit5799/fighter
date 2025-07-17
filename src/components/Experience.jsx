@@ -441,12 +441,11 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.08} // Reduced from 0.1
-            sleepAfterStillness={0.3} // Reduced from 0.5
-            substeps={3} // Reduced from 4
-            solverIterations={10} // Reduced from 12
+            contactPairPersistentThreshold={0.08}
+            sleepAfterStillness={0.2}
+            substeps={2}
+            solverIterations={8}
             timeStep="vary"
-            gravity={[0, -25, 0]} // Reduced from -30
           >
             <Ring />
             {isGameStarted && (
