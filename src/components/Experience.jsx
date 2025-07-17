@@ -181,50 +181,47 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
-      socket.emit("updateHealth", {
-        health1:
-          data.attackerId === players[0]?.id
-            ? health1
-            : Math.max(0, health1 - data.damage),
-        health2:
-          data.attackerId === players[1]?.id
-            ? health2
-            : Math.max(0, health2 - data.damage),
-      });
+      // Add timestamp check to prevent duplicate hits
+      const now = Date.now();
+      if (data.attackTime && now - data.attackTime > 2000) {
+        return; // Ignore stale hit events
+      }
+
+      // Calculate new health values
+      let newHealth1 = health1;
+      let newHealth2 = health2;
 
       if (players[0]?.id === data.attackerId) {
-        setHealth2((prev) => {
-          const newHealth = Math.max(0, prev - data.damage);
-          if (newHealth <= 0) {
-            setTimeout(() => {
-              socket.emit("playerDefeated", {
-                winnerId: players[0].id,
-                loserId: players[1]?.id,
-                winnerHealth: health1,
-                loserHealth: newHealth,
-                winningAttackTime: data.attackTime,
-              });
-            }, 50);
-          }
-          return newHealth;
-        });
+        newHealth2 = Math.max(0, health2 - data.damage);
       } else if (players[1]?.id === data.attackerId) {
-        setHealth1((prev) => {
-          const newHealth = Math.max(0, prev - data.damage);
-          if (newHealth <= 0) {
-            setTimeout(() => {
-              socket.emit("playerDefeated", {
-                winnerId: players[1].id,
-                loserId: players[0]?.id,
-                winnerHealth: health2,
-                loserHealth: newHealth,
-                winningAttackTime: data.attackTime,
-              });
-            }, 50);
-          }
-          return newHealth;
-        });
+        newHealth1 = Math.max(0, health1 - data.damage);
+      }
+
+      // Emit health update
+      socket.emit("updateHealth", {
+        health1: newHealth1,
+        health2: newHealth2,
+        timestamp: now,
+      });
+
+      // Update local state
+      setHealth1(newHealth1);
+      setHealth2(newHealth2);
+
+      // Check for defeat
+      if (newHealth1 <= 0 || newHealth2 <= 0) {
+        const winnerId = newHealth1 <= 0 ? players[1]?.id : players[0]?.id;
+        const loserId = newHealth1 <= 0 ? players[0]?.id : players[1]?.id;
+
+        setTimeout(() => {
+          socket.emit("playerDefeated", {
+            winnerId,
+            loserId,
+            winnerHealth: newHealth1 <= 0 ? newHealth2 : newHealth1,
+            loserHealth: newHealth1 <= 0 ? newHealth1 : newHealth2,
+            winningAttackTime: data.attackTime || now,
+          });
+        }, 100);
       }
     },
     [socket, players, winner, loser, health1, health2]

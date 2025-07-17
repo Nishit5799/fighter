@@ -66,23 +66,16 @@ body {
   }
 }
 
-@supports (-webkit-touch-callout: none) {
-  /* iOS-specific styles */
-  button, input, [role="button"] {
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    cursor: pointer;
-  }
-  
-  /* Prevent text selection */
-  * {
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  
-  /* Improve rendering performance */
-  body {
-    -webkit-font-smoothing: antialiased;
-    -webkit-overflow-scrolling: touch;
-  }
+/* Add to your global styles */
+html,
+body {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }

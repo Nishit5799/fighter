@@ -19,7 +19,7 @@ const SOUNDS = {
   kick: "/kick.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
-  lost: "/lost.mp3",
+  lost: "/lost.mp3", // Add this line
 };
 
 const PlayerController = forwardRef(
@@ -64,7 +64,7 @@ const PlayerController = forwardRef(
     const kickSound = useRef(null);
     const hitSound = useRef(null);
     const victorySound = useRef(null);
-    const lostSound = useRef(null);
+    const lostSound = useRef(null); // Add this ref
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -91,17 +91,18 @@ const PlayerController = forwardRef(
       kickSound.current = new Audio(SOUNDS.kick);
       hitSound.current = new Audio(SOUNDS.hit);
       victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost);
+      lostSound.current = new Audio(SOUNDS.lost); // Add this line
 
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
       hitSound.current.volume = 0.4;
       victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8;
+      lostSound.current.volume = 0.8; // Add this line
 
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (soundRef) => {
+            // Add lostSound here
             if (soundRef.current) {
               soundRef.current.pause();
               soundRef.current.src = "";
@@ -166,7 +167,7 @@ const PlayerController = forwardRef(
         });
       }
 
-      const duration = 800; // Reduced from 1000ms for iOS
+      const duration = 1000;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
@@ -177,6 +178,10 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
+
+      if (navigator.vibrate) {
+        navigator.vibrate(100);
+      }
 
       opponentAttackTime.current = attackTime;
 
@@ -196,7 +201,7 @@ const PlayerController = forwardRef(
         character.current.playHitSound();
       }
 
-      const duration = 800; // Reduced from 1000ms for iOS
+      const duration = 1000;
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
         if (!isAttacking) {
@@ -215,12 +220,14 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        console.log("COLLISION ENTER (iOS)", {
+        // iOS-specific logging
+        console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
           time: Date.now(),
           isLocalPlayer,
-          position: rb.current?.translation(),
+          platform: navigator.platform,
+          userAgent: navigator.userAgent,
         });
       }
     };
@@ -232,7 +239,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 300);
+        }, 500);
       }
     };
 
@@ -281,18 +288,6 @@ const PlayerController = forwardRef(
         socket.off("playerHit", onPlayerHit);
       };
     }, [socket]);
-
-    useEffect(() => {
-      if (!rb.current) return;
-
-      const interval = setInterval(() => {
-        if (rb.current && !isDefeated) {
-          rb.current.wakeUp();
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }, [isDefeated]);
 
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1 || isDefeated) return;
@@ -431,6 +426,7 @@ const PlayerController = forwardRef(
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
+        // Add delay for victory sound
         setTimeout(() => {
           if (isLocalPlayerWinner && victorySound.current) {
             victorySound.current.currentTime = 0;
@@ -438,7 +434,7 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Victory sound error:", e));
           }
-        }, 100);
+        }, 100); // 100ms delay
       },
 
       setDefeat: (isLocalPlayerLoser) => {
@@ -446,6 +442,7 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
+        // Add slightly longer delay for lost sound
         setTimeout(() => {
           if (isLocalPlayerLoser && lostSound.current) {
             lostSound.current.currentTime = 0;
@@ -453,14 +450,13 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Lost sound error:", e));
           }
-        }, 200);
+        }, 200); // 200ms delay
       },
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
     }));
-
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -469,6 +465,7 @@ const PlayerController = forwardRef(
 
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (sound) => {
+            // Add lostSound here
             if (sound.current) {
               sound.current.pause();
               sound.current = null;
@@ -477,7 +474,6 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
-
     return (
       <RigidBody
         colliders={false}
@@ -494,8 +490,10 @@ const PlayerController = forwardRef(
         ccd={true}
         linearDamping={0.5}
         angularDamping={1.0}
-        sleepAfterStillness={0.5}
+        sleepAfterStillness={0.2}
         canSleep={true}
+        contactForceEventThreshold={0.1}
+        contactEventsEnabled={true}
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />

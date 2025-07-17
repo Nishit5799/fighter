@@ -15,7 +15,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
       return false;
     }
 
-    // Vibrate on attack for better feedback
+    // Add vibration feedback for iOS
     if (navigator.vibrate) {
       navigator.vibrate(50);
     }
@@ -23,22 +23,19 @@ const AttackButtons = ({ onPunch, onKick }) => {
     if (type === "punch") {
       setPunchCooldown(true);
       onPunch(true);
-      setTimeout(() => {
-        onPunch(false);
-        setTimeout(() => setPunchCooldown(false), 500);
-      }, 500);
+      setTimeout(() => onPunch(false), 500); // Reduce duration for more responsiveness
+      setTimeout(() => setPunchCooldown(false), 1500);
       return true;
     } else {
       setKickCooldown(true);
       onKick(true);
-      setTimeout(() => {
-        onKick(false);
-        setTimeout(() => setKickCooldown(false), 2000);
-      }, 800);
+      setTimeout(() => onKick(false), 500); // Reduce duration for more responsiveness
+      setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
   };
 
+  // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -51,11 +48,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
     return handleAttackStart("kick");
   };
 
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
   useEffect(() => {
     const punchBtn = punchRef.current;
     const kickBtn = kickRef.current;
@@ -65,44 +57,40 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const options = { passive: false, capture: true };
 
     const touchPunchHandler = (e) => {
-      const success = handlePunchStart(e);
+      const success = handleAttackStart("punch");
       if (success) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
       }
-      return !success;
+      return false;
     };
 
     const touchKickHandler = (e) => {
-      const success = handleKickStart(e);
+      const success = handleAttackStart("kick");
       if (success) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
       }
-      return !success;
+      return false;
     };
-
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
-    punchBtn.addEventListener("touchend", handleTouchEnd, options);
 
     kickBtn.addEventListener("touchstart", touchKickHandler, options);
     kickBtn.addEventListener("mousedown", handleKickStart);
-    kickBtn.addEventListener("touchend", handleTouchEnd, options);
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
       punchBtn.removeEventListener("mousedown", handlePunchStart);
-      punchBtn.removeEventListener("touchend", handleTouchEnd, options);
 
       kickBtn.removeEventListener("touchstart", touchKickHandler, options);
       kickBtn.removeEventListener("mousedown", handleKickStart);
-      kickBtn.removeEventListener("touchend", handleTouchEnd, options);
     };
   }, [punchCooldown, kickCooldown]);
 
   const renderButton = (type, ref, icon, isCooldown, duration) => (
     <div className="relative w-16 h-16">
+      {/* GREEN STATIC BORDER */}
       <svg
         className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
         viewBox="0 0 36 36"
@@ -117,6 +105,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
         />
       </svg>
 
+      {/* RED ANIMATED RING */}
       {isCooldown && (
         <svg
           className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
@@ -152,6 +141,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
+          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
         }}
@@ -186,6 +176,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
           }
         }
 
+        /* iOS-specific improvements */
         button {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
@@ -193,6 +184,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
           -webkit-tap-highlight-color: transparent;
         }
 
+        /* Prevent touch highlighting */
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
           -webkit-tap-highlight-color: transparent;

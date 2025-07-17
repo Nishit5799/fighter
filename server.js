@@ -123,12 +123,37 @@ Promise.all([pubClient.connect(), subClient.connect()])
           socket.to(roomId).emit("carMove", data);
         });
 
+        // server.js
         socket.on("playerHit", (data) => {
-          const hitData = {
+          // Validate data
+          if (
+            !data ||
+            typeof data !== "object" ||
+            !data.attackerId ||
+            typeof data.damage !== "number" ||
+            data.damage <= 0 ||
+            data.damage > 30
+          ) {
+            console.error("Invalid playerHit data:", data);
+            return;
+          }
+
+          // Validate room state
+          if (!roomState || !roomState.players.has(data.attackerId)) {
+            console.error("Invalid attacker or room state");
+            return;
+          }
+
+          // Add timestamp if missing
+          if (!data.attackTime) {
+            data.attackTime = Date.now();
+          }
+
+          // Broadcast to room
+          socket.to(roomId).emit("playerHit", {
             ...data,
-            attackTime: data.attackTime || Date.now(),
-          };
-          socket.to(roomId).emit("playerHit", hitData);
+            attackTime: data.attackTime,
+          });
         });
         socket.on("updateHealth", (data) => {
           socket.broadcast.emit("updateHealth", data);
