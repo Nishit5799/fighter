@@ -66,7 +66,7 @@ const PlayerController = forwardRef(
       kick: [],
       hit: [],
       victory: [],
-      lost: [],
+      lost: []
     });
 
     const WALK_SPEED = 1.5;
@@ -92,14 +92,12 @@ const PlayerController = forwardRef(
     useEffect(() => {
       // Create a pool of audio objects for each sound
       const createSoundPool = (src, poolSize = 3) => {
-        return Array(poolSize)
-          .fill()
-          .map(() => {
-            const audio = new Audio(src);
-            audio.preload = "auto";
-            audio.load();
-            return audio;
-          });
+        return Array(poolSize).fill().map(() => {
+          const audio = new Audio(src);
+          audio.preload = 'auto';
+          audio.load();
+          return audio;
+        });
       };
 
       soundPools.current = {
@@ -107,15 +105,15 @@ const PlayerController = forwardRef(
         kick: createSoundPool(SOUNDS.kick),
         hit: createSoundPool(SOUNDS.hit),
         victory: createSoundPool(SOUNDS.victory),
-        lost: createSoundPool(SOUNDS.lost),
+        lost: createSoundPool(SOUNDS.lost)
       };
 
       return () => {
         // Cleanup all audio objects
-        Object.values(soundPools.current).forEach((pool) => {
-          pool.forEach((audio) => {
+        Object.values(soundPools.current).forEach(pool => {
+          pool.forEach(audio => {
             audio.pause();
-            audio.src = "";
+            audio.src = '';
             audio.remove();
           });
         });
@@ -125,16 +123,17 @@ const PlayerController = forwardRef(
     const playFromPool = (type) => {
       const pool = soundPools.current[type];
       if (!pool) return;
-
-      const availableSound = pool.find((s) => s.paused);
+      
+      const availableSound = pool.find(s => s.paused);
       if (availableSound) {
         availableSound.currentTime = 0;
-        availableSound.volume = type === "hit" ? 0.4 : 0.7;
-        availableSound.play().catch((e) => {
-          console.log(`${type} sound error:`, e);
-          setShowSoundError(true);
-          setTimeout(() => setShowSoundError(false), 2000);
-        });
+        availableSound.volume = type === 'hit' ? 0.4 : 0.7;
+        availableSound.play()
+          .catch(e => {
+            console.log(`${type} sound error:`, e);
+            setShowSoundError(true);
+            setTimeout(() => setShowSoundError(false), 2000);
+          });
       }
     };
 
@@ -163,11 +162,11 @@ const PlayerController = forwardRef(
 
       // Play sound with vibration feedback on mobile
       if (type === "punch") {
-        playFromPool("punch");
-        if ("vibrate" in navigator) navigator.vibrate(50);
+        playFromPool('punch');
+        if ('vibrate' in navigator) navigator.vibrate(50);
       } else if (type === "kick") {
-        playFromPool("kick");
-        if ("vibrate" in navigator) navigator.vibrate(100);
+        playFromPool('kick');
+        if ('vibrate' in navigator) navigator.vibrate(100);
       }
 
       setIsAttacking(true);
@@ -207,8 +206,8 @@ const PlayerController = forwardRef(
       }
 
       // Play hit sound with vibration
-      playFromPool("hit");
-      if ("vibrate" in navigator) navigator.vibrate(200);
+      playFromPool('hit');
+      if ('vibrate' in navigator) navigator.vibrate(200);
 
       setIsHit(true);
       setCurrentAnimation("hit");
@@ -438,7 +437,7 @@ const PlayerController = forwardRef(
 
         setTimeout(() => {
           if (isLocalPlayerWinner) {
-            playFromPool("victory");
+            playFromPool('victory');
           }
         }, 100);
       },
@@ -450,7 +449,7 @@ const PlayerController = forwardRef(
 
         setTimeout(() => {
           if (isLocalPlayerLoser) {
-            playFromPool("lost");
+            playFromPool('lost');
           }
         }, 200);
       },
