@@ -78,34 +78,43 @@ const Experience = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
+  // In Experience.jsx - enhance the unlockAudio function
+  const unlockAudio = () => {
+    const sounds = [
+      "/punch.mp3",
+      "/kick.mp3",
+      "/hit.mp3",
+      "/victory.mp3",
+      "/lost.mp3",
+      "/begin.mp3",
+    ];
 
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
+    // Create a single unlock sound
+    const unlockSound = new Audio();
+    unlockSound.muted = true;
+    unlockSound.src = sounds[0]; // Use first sound for unlock
+
+    const playAndCleanup = () => {
+      unlockSound
+        .play()
+        .then(() => {
+          // Now create all other sounds
+          sounds.forEach((src) => {
+            const audio = new Audio(src);
+            audio.load(); // Preload
+            audio.volume = 0; // Mute during preload
+            audio.play().then(() => audio.pause());
+          });
+        })
+        .catch(console.error);
+
+      window.removeEventListener("touchstart", playAndCleanup);
+      window.removeEventListener("mousedown", playAndCleanup);
     };
 
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
-  }, []);
+    window.addEventListener("touchstart", playAndCleanup, { once: true });
+    window.addEventListener("mousedown", playAndCleanup, { once: true });
+  };
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
