@@ -56,21 +56,19 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
+
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
-  const frameCountRef = useRef(0);
 
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
-    beginSoundRef.current.preload = "auto";
 
     return () => {
       if (beginSoundRef.current) {
@@ -80,14 +78,40 @@ const Experience = () => {
     };
   }, []);
 
-  const isUsernameUnique = useCallback(
-    (name) => {
-      return !players.some((player) => player.name === name);
-    },
-    [players]
-  );
+  useEffect(() => {
+    const unlockAudio = () => {
+      const sounds = [
+        "/punch.mp3",
+        "/kick.mp3",
+        "/hit.mp3",
+        "/victory.mp3",
+        "/lost.mp3",
+      ];
+      sounds.forEach((src) => {
+        const audio = new Audio(src);
+        audio.muted = true;
+        audio
+          .play()
+          .then(() => {
+            audio.pause();
+            audio.muted = false;
+          })
+          .catch(() => {});
+      });
 
-  const handleJoinRoom = useCallback(() => {
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("mousedown", unlockAudio);
+    };
+
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("mousedown", unlockAudio, { once: true });
+  }, []);
+
+  const isUsernameUnique = (name) => {
+    return !players.some((player) => player.name === name);
+  };
+
+  const handleJoinRoom = () => {
     if (!socket) {
       console.error("Socket is not available");
       setPopupMessage("Connection error. Please refresh the page.");
@@ -112,13 +136,13 @@ const Experience = () => {
         setIsUsernameValid(false);
       }
     }
-  }, [socket, playerName, hasJoinedRoom, players, isUsernameUnique]);
+  };
 
   useEffect(() => {
     if (playerName.trim() !== "") {
       setIsUsernameValid(isUsernameUnique(playerName.trim()));
     }
-  }, [playerName, players, isUsernameUnique]);
+  }, [playerName, players]);
 
   useEffect(() => {
     if (showWelcomeScreen) {
@@ -166,12 +190,12 @@ const Experience = () => {
     setShowInfoPopup(true);
   }, []);
 
-  const handleReady = useCallback(() => {
+  const handleReady = () => {
     if (socket) {
       socket.emit("playerReady", playerName);
       setIsReady(true);
     }
-  }, [socket, playerName]);
+  };
 
   useEffect(() => {
     if (shouldReload) {
@@ -186,6 +210,7 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
+      // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id
@@ -239,12 +264,7 @@ const Experience = () => {
       if (!hasLoggedResult.current) {
         console.log("Received defeat data:", data);
 
-        if (
-          !data ||
-          typeof data !== "object" ||
-          !data.winnerId ||
-          !data.loserId
-        ) {
+        if (!data || typeof data !== "object") {
           console.error("Invalid data format");
           return;
         }
@@ -264,6 +284,11 @@ const Experience = () => {
           return;
         }
 
+        console.log("All players:", players);
+        console.log(
+          `Validating - Winner: ${winnerPlayer?.name} (${data.winnerId}), Loser: ${loserPlayer?.name} (${data.loserId})`
+        );
+
         if (players[0]?.id === data.winnerId) {
           setHealth1(data.winnerHealth);
           setHealth2(0);
@@ -274,6 +299,14 @@ const Experience = () => {
 
         setWinner(winnerPlayer);
         setLoser(loserPlayer);
+
+        console.log(
+          `Validated Winner: ${winnerPlayer.name} (ID: ${winnerPlayer.id})`
+        );
+        console.log(
+          `Validated Loser: ${loserPlayer.name} (ID: ${loserPlayer.id})`
+        );
+
         hasLoggedResult.current = true;
 
         if (carControllerRef1.current && carControllerRef2.current) {
@@ -300,6 +333,7 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -312,6 +346,7 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
+      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -415,17 +450,7 @@ const Experience = () => {
   return (
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
-        <Canvas
-          camera={{ position: [0, 5, 10], fov: 60 }}
-          shadows
-          gl={{
-            powerPreference: "high-performance",
-            antialias: false,
-            stencil: false,
-            depth: false,
-          }}
-          dpr={Math.min(window.devicePixelRatio, 2)}
-        >
+        <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <Environment preset="sunset" />
           <Background />
           <directionalLight
@@ -445,10 +470,10 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.1}
-            sleepAfterStillness={0.3}
-            substeps={1}
-            solverIterations={6}
+            contactPairPersistentThreshold={0.08}
+            sleepAfterStillness={0.2}
+            substeps={2}
+            solverIterations={8}
             timeStep="vary"
           >
             <Ring />
@@ -596,6 +621,7 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {/* Player 1 - Always left */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -609,6 +635,7 @@ const Experience = () => {
             </div>
           </div>
 
+          {/* Player 2 - Always right */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -623,7 +650,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">

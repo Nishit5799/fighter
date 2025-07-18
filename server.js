@@ -10,30 +10,12 @@ const handle = app.getRequestHandler();
 
 const PORT = process.env.PORT || 3000;
 
-// Initialize Redis clients with retry strategy
+// Initialize Redis clients
 const pubClient = createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
-  socket: {
-    reconnectStrategy: (retries) => {
-      if (retries > 5) {
-        console.log("Too many retries on Redis. Connection terminated");
-        return new Error("Too many retries");
-      }
-      return Math.min(retries * 100, 5000);
-    },
-  },
 });
 
 const subClient = pubClient.duplicate();
-
-// Handle Redis connection errors
-pubClient.on("error", (err) => {
-  console.error("Redis pub client error:", err);
-});
-
-subClient.on("error", (err) => {
-  console.error("Redis sub client error:", err);
-});
 
 Promise.all([pubClient.connect(), subClient.connect()])
   .then(() => {
@@ -45,16 +27,11 @@ Promise.all([pubClient.connect(), subClient.connect()])
       const io = new Server(server, {
         cors: {
           origin: "*",
-          methods: ["GET", "POST"],
         },
         connectionStateRecovery: {
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
-        pingInterval: 10000,
-        pingTimeout: 5000,
-        maxHttpBufferSize: 1e8,
-        serveClient: false,
       });
 
       io.adapter(createAdapter(pubClient, subClient));
@@ -75,12 +52,10 @@ Promise.all([pubClient.connect(), subClient.connect()])
           players: new Map(),
           gameStarted: false,
           createdAt: Date.now(),
-          matchResult: null,
         });
         return newRoomId;
       };
 
-      // Clean up empty rooms periodically
       setInterval(() => {
         const now = Date.now();
         for (const [roomId, state] of roomStates) {
@@ -106,7 +81,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("joinRoom", (playerName) => {
           if (roomState.players.has(socket.id)) return;
 
-          // Check for duplicate names
           for (const player of roomState.players.values()) {
             if (player.name === playerName) {
               socket.emit("usernameTaken");
@@ -156,17 +130,18 @@ Promise.all([pubClient.connect(), subClient.connect()])
           };
           socket.to(roomId).emit("playerHit", hitData);
         });
-
         socket.on("updateHealth", (data) => {
-          socket.to(roomId).emit("updateHealth", data);
+          socket.broadcast.emit("updateHealth", data);
         });
-
+        // Inside the socket.on("playerDefeated") handler in server.js
         socket.on("playerDefeated", (data) => {
+          // Skip if game isn't started or room doesn't exist
           if (!roomState.gameStarted || !roomState.players) {
             console.error("Game not started or room not found");
             return;
           }
 
+          // Validate data structure
           if (
             !data ||
             typeof data !== "object" ||
@@ -177,11 +152,13 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Check for duplicate IDs
           if (data.winnerId === data.loserId) {
             console.error(`Duplicate IDs: ${data.winnerId}`);
             return;
           }
 
+          // Check if players exist
           const winner = roomState.players.get(data.winnerId);
           const loser = roomState.players.get(data.loserId);
 
@@ -192,6 +169,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Prevent multiple defeat events for the same match
           if (roomState.matchResult) {
             console.log(
               "Match result already processed, ignoring duplicate event"
@@ -199,6 +177,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Mark the match as completed
           roomState.matchResult = {
             winnerId: data.winnerId,
             loserId: data.loserId,
@@ -213,14 +192,21 @@ Promise.all([pubClient.connect(), subClient.connect()])
           };
 
           io.to(roomId).emit("playerDefeated", defeatData);
-          console.log(
-            `Verified Match Result - Winner: ${winner.name} (${winner.id}), Loser: ${loser.name} (${loser.id})`
-          );
+          console.log(`Verified Match Result - 
+    Winner: ${winner.name} (${winner.id}), 
+    Loser: ${loser.name} (${loser.id})`);
+
+          // Reset the match result when game restarts
+          socket.on("restartGame", () => {
+            roomState.matchResult = null;
+            roomState.players.forEach((player) => (player.isReady = false));
+            roomState.gameStarted = false;
+            io.to(roomId).emit("restartGame");
+          });
         });
 
         socket.on("restartGame", () => {
-          roomState.matchResult = null;
-          roomState.players.forEach((player) => (player.isReady = false));
+          roomState.players.clear();
           roomState.gameStarted = false;
           io.to(roomId).emit("restartGame");
         });
