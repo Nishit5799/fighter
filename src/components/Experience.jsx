@@ -56,7 +56,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
@@ -67,46 +66,9 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
-  const unlockAudio = useCallback(() => {
-    const sounds = [
-      "/punch.mp3",
-      "/kick.mp3",
-      "/hit.mp3",
-      "/victory.mp3",
-      "/lost.mp3",
-      "/begin.mp3"
-    ];
-    
-    // Create a single unlock sound
-    const unlockSound = new Audio();
-    unlockSound.muted = true;
-    unlockSound.src = sounds[0]; // Use first sound for unlock
-    
-    const playAndCleanup = () => {
-      unlockSound.play()
-        .then(() => {
-          // Now create all other sounds
-          sounds.forEach((src) => {
-            const audio = new Audio(src);
-            audio.load(); // Preload
-            audio.volume = 0; // Mute during preload
-            audio.play().then(() => audio.pause());
-          });
-        })
-        .catch(console.error);
-      
-      window.removeEventListener("touchstart", playAndCleanup);
-      window.removeEventListener("mousedown", playAndCleanup);
-    };
-
-    window.addEventListener("touchstart", playAndCleanup, { once: true });
-    window.addEventListener("mousedown", playAndCleanup, { once: true });
-  }, []);
-
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
-    beginSoundRef.current.preload = "auto";
 
     return () => {
       if (beginSoundRef.current) {
@@ -117,18 +79,32 @@ const Experience = () => {
   }, []);
 
   useEffect(() => {
-    // Initial audio unlock on first user interaction
-    unlockAudio();
+    const unlockAudio = () => {
+      const sounds = [
+        "/punch.mp3",
+        "/kick.mp3",
+        "/hit.mp3",
+        "/victory.mp3",
+        "/lost.mp3",
+      ];
+      sounds.forEach((src) => {
+        const audio = new Audio(src);
+        audio.muted = true;
+        audio
+          .play()
+          .then(() => {
+            audio.pause();
+            audio.muted = false;
+          })
+          .catch(() => {});
+      });
 
-    return () => {
       window.removeEventListener("touchstart", unlockAudio);
       window.removeEventListener("mousedown", unlockAudio);
     };
-  }, [unlockAudio]);
 
-  const isIOS = useCallback(() => {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {
@@ -357,6 +333,7 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -369,6 +346,7 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
+      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -404,7 +382,7 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
-          if (!hasPlayedStartSound.current && beginSoundRef.current && soundEnabled) {
+          if (!hasPlayedStartSound.current && beginSoundRef.current) {
             beginSoundRef.current.currentTime = 0;
             beginSoundRef.current
               .play()
@@ -438,7 +416,7 @@ const Experience = () => {
       socket.off("playerHit", onPlayerHit);
       socket.off("playerDefeated", onPlayerDefeated);
     };
-  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated, soundEnabled]);
+  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
   useEffect(() => {
     if (
@@ -604,14 +582,6 @@ const Experience = () => {
                 JOIN ROOM
               </button>
             </div>
-            {isIOS() && (
-              <button 
-                onClick={unlockAudio}
-                className="mt-4 px-4 py-2 bg-purple-500 text-white rounded-lg"
-              >
-                Tap to Enable Sound
-              </button>
-            )}
             <div
               onClick={handleInfoClick}
               className="mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
@@ -650,46 +620,36 @@ const Experience = () => {
       )}
 
       {isGameStarted && (
-        <>
-          <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
-            {/* Player 1 - Always left */}
-            <div className="flex flex-col items-start">
-              <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
-                <div
-                  className="h-full bg-green-500 transition-all duration-300"
-                  style={{ width: `${health1}%` }}
-                />
-              </div>
-              <div className="text-white font-bold mt-1">
-                {players[0]?.name || "Player 1"}
-                {players[0]?.id === socket?.id && " (You)"}
-              </div>
+        <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {/* Player 1 - Always left */}
+          <div className="flex flex-col items-start">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{ width: `${health1}%` }}
+              />
             </div>
-
-            {/* Player 2 - Always right */}
-            <div className="flex flex-col items-end">
-              <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
-                <div
-                  className="h-full bg-green-500 transition-all duration-300"
-                  style={{ width: `${health2}%` }}
-                />
-              </div>
-              <div className="text-white font-bold mt-1">
-                {players[1]?.name || "Player 2"}
-                {players[1]?.id === socket?.id && " (You)"}
-              </div>
+            <div className="text-white font-bold mt-1">
+              {players[0]?.name || "Player 1"}
+              {players[0]?.id === socket?.id && " (You)"}
             </div>
           </div>
 
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="fixed top-4 right-4 p-2 bg-gray-800 text-white rounded-lg z-50"
-          >
-            {soundEnabled ? "🔊" : "🔇"}
-          </button>
-        </>
+          {/* Player 2 - Always right */}
+          <div className="flex flex-col items-end">
+            <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{ width: `${health2}%` }}
+              />
+            </div>
+            <div className="text-white font-bold mt-1">
+              {players[1]?.name || "Player 2"}
+              {players[1]?.id === socket?.id && " (You)"}
+            </div>
+          </div>
+        </div>
       )}
-
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">

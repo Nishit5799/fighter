@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 
 const AttackButtons = ({ onPunch, onKick }) => {
