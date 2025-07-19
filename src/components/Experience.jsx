@@ -470,6 +470,7 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
+            debug
             contactPairPersistentThreshold={0.08}
             sleepAfterStillness={0.2}
             substeps={2}
