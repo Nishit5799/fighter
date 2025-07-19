@@ -126,7 +126,8 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("playerHit", (data) => {
           const hitData = {
             ...data,
-            attackTime: data.attackTime || Date.now(),
+            attackerId: socket.id,
+            attackTime: Date.now(), // Ensure timestamp is set on server
           };
           socket.to(roomId).emit("playerHit", hitData);
         });

@@ -210,18 +210,14 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
-      socket.emit("updateHealth", {
-        health1:
-          data.attackerId === players[0]?.id
-            ? health1
-            : Math.max(0, health1 - data.damage),
-        health2:
-          data.attackerId === players[1]?.id
-            ? health2
-            : Math.max(0, health2 - data.damage),
+      // iOS-specific logging
+      console.log("PLAYER HIT RECEIVED (iOS)", {
+        data,
+        currentTime: Date.now(),
+        players,
       });
 
+      // Update health based on attacker
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
           const newHealth = Math.max(0, prev - data.damage);
@@ -470,11 +466,10 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            debug
-            contactPairPersistentThreshold={0.08}
-            sleepAfterStillness={0.2}
-            substeps={2}
-            solverIterations={8}
+            contactPairPersistentThreshold={0.1} // Increased for iOS
+            sleepAfterStillness={0.5} // Increased for iOS
+            substeps={4} // Increased for better collision detection
+            solverIterations={12} // Increased for iOS
             timeStep="vary"
           >
             <Ring />
