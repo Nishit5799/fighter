@@ -115,25 +115,6 @@ const PlayerController = forwardRef(
     }, []);
 
     useEffect(() => {
-      // iOS-specific audio unlock
-      const unlockAudio = () => {
-        if (hitSound.current) {
-          hitSound.current.muted = true;
-          hitSound.current
-            .play()
-            .then(() => {
-              hitSound.current.pause();
-              hitSound.current.muted = false;
-            })
-            .catch((e) => console.log("iOS audio unlock attempt:", e));
-        }
-      };
-
-      window.addEventListener("touchstart", unlockAudio, { once: true });
-      return () => window.removeEventListener("touchstart", unlockAudio);
-    }, []);
-
-    useEffect(() => {
       const handleResize = () => {
         setIsSmallScreen(window.innerWidth < 640);
       };
@@ -241,28 +222,21 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        // iOS-specific logging
-        console.log("COLLISION ENTERED (iOS)", {
-          self: socket?.id,
+        // Additional logging for iOS debugging
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
           other: otherUserData?.id,
-          time: performance.now(),
+          time: Date.now(),
           isLocalPlayer,
-          contact: true,
         });
       }
     };
 
     const handleCollisionExit = (event) => {
+      if (!opponentRef.current || !rb.current) return;
+
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        console.log("COLLISION EXITED (iOS)", {
-          self: socket?.id,
-          other: otherUserData?.id,
-          time: performance.now(),
-          isLocalPlayer,
-          contact: false,
-        });
-
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
         }, 500);
@@ -274,17 +248,6 @@ const PlayerController = forwardRef(
       if (isKicking && !isHit) startAttack("kick");
     }, [isPunching, isKicking]);
 
-    useEffect(() => {
-      if (isHit) {
-        setCurrentAnimation("hit");
-        const timer = setTimeout(() => {
-          if (!isAttacking && !isDefeated) {
-            setCurrentAnimation("idle");
-          }
-        }, 1000);
-        return () => clearTimeout(timer);
-      }
-    }, [isHit]);
     useEffect(() => {
       if (health <= 0 && !isDefeated && socket && opponentRef.current) {
         setIsDefeated(true);
