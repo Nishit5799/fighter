@@ -124,17 +124,11 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerHit", (data) => {
-          // Add timestamp if not present
           const hitData = {
             ...data,
             attackTime: data.attackTime || Date.now(),
-            timestamp: Date.now(), // Add server timestamp
           };
-
-          // Add small delay for iOS synchronization
-          setTimeout(() => {
-            socket.to(roomId).emit("playerHit", hitData);
-          }, 50);
+          socket.to(roomId).emit("playerHit", hitData);
         });
         socket.on("updateHealth", (data) => {
           socket.broadcast.emit("updateHealth", data);

@@ -32,14 +32,14 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
   // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
+    e.preventDefault();
+    e.stopPropagation();
     return handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
+    e.preventDefault();
+    e.stopPropagation();
     return handleAttackStart("kick");
   };
 
@@ -56,10 +56,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
       if (success) {
         e.preventDefault();
         e.stopPropagation();
-        // iOS-specific: force a reflow to ensure animation starts
-        document.body.offsetHeight;
+        return false;
       }
-      return !success;
+      return true;
     };
 
     const touchKickHandler = (e) => {
@@ -67,12 +66,10 @@ const AttackButtons = ({ onPunch, onKick }) => {
       if (success) {
         e.preventDefault();
         e.stopPropagation();
-        // iOS-specific: force a reflow to ensure animation starts
-        document.body.offsetHeight;
+        return false;
       }
-      return !success;
+      return true;
     };
-
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
 
@@ -141,11 +138,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
+          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
-          transform: "translateZ(0)",
-          backfaceVisibility: "hidden",
-          perspective: "1000px",
         }}
       >
         <span className="text-2xl font-bold">
@@ -164,25 +159,17 @@ const AttackButtons = ({ onPunch, onKick }) => {
         @keyframes progressAnim-punch {
           from {
             stroke-dashoffset: 100;
-            -webkit-transform: rotate(-90deg) translateZ(0);
-            transform: rotate(-90deg) translateZ(0);
           }
           to {
             stroke-dashoffset: 0;
-            -webkit-transform: rotate(-90deg) translateZ(0);
-            transform: rotate(-90deg) translateZ(0);
           }
         }
         @keyframes progressAnim-kick {
           from {
             stroke-dashoffset: 100;
-            -webkit-transform: rotate(-90deg) translateZ(0);
-            transform: rotate(-90deg) translateZ(0);
           }
           to {
             stroke-dashoffset: 0;
-            -webkit-transform: rotate(-90deg) translateZ(0);
-            transform: rotate(-90deg) translateZ(0);
           }
         }
 
@@ -192,12 +179,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
           -webkit-user-select: none;
           touch-action: manipulation;
           -webkit-tap-highlight-color: transparent;
-          -webkit-transform: translateZ(0);
-          transform: translateZ(0);
-          -webkit-backface-visibility: hidden;
-          backface-visibility: hidden;
-          -webkit-perspective: 1000;
-          perspective: 1000;
         }
 
         /* Prevent touch highlighting */
