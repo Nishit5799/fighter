@@ -12,25 +12,24 @@ const AttackButtons = ({ onPunch, onKick }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
+      onPunch(true);
+      setTimeout(() => onPunch(false), 1000);
       setTimeout(() => setPunchCooldown(false), 1500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
+      onKick(true);
+      setTimeout(() => onKick(false), 1000);
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
   };
 
-  // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -70,24 +69,29 @@ const AttackButtons = ({ onPunch, onKick }) => {
       }
       return true;
     };
+
+    // iOS-specific: Use both touch and mouse events
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
+    punchBtn.addEventListener("click", handlePunchStart);
 
     kickBtn.addEventListener("touchstart", touchKickHandler, options);
     kickBtn.addEventListener("mousedown", handleKickStart);
+    kickBtn.addEventListener("click", handleKickStart);
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
       punchBtn.removeEventListener("mousedown", handlePunchStart);
+      punchBtn.removeEventListener("click", handlePunchStart);
 
       kickBtn.removeEventListener("touchstart", touchKickHandler, options);
       kickBtn.removeEventListener("mousedown", handleKickStart);
+      kickBtn.removeEventListener("click", handleKickStart);
     };
   }, [punchCooldown, kickCooldown]);
 
   const renderButton = (type, ref, icon, isCooldown, duration) => (
     <div className="relative w-16 h-16">
-      {/* GREEN STATIC BORDER */}
       <svg
         className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
         viewBox="0 0 36 36"
@@ -102,7 +106,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
         />
       </svg>
 
-      {/* RED ANIMATED RING */}
       {isCooldown && (
         <svg
           className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
@@ -132,13 +135,15 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => !isCooldown && handleAttackStart(type)}
+        onClick={(e) => {
+          if (!isCooldown) handleAttackStart(type);
+          e.preventDefault();
+        }}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
-          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
         }}
@@ -173,7 +178,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
           }
         }
 
-        /* iOS-specific improvements */
         button {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
@@ -181,7 +185,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
           -webkit-tap-highlight-color: transparent;
         }
 
-        /* Prevent touch highlighting */
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
           -webkit-tap-highlight-color: transparent;
