@@ -178,27 +178,24 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
-
-      // Try to play sound but don't let failure block the animation
       if (hitSound.current) {
-        try {
-          hitSound.current.currentTime = 0;
-          hitSound.current.play().catch(() => {
-            console.log("Audio play failed, continuing with animation");
-          });
-        } catch (e) {
-          console.log("Audio error:", e);
-        }
+        hitSound.current.currentTime = 0;
+        hitSound.current.play().catch(() => {
+          console.log("iOS blocked audio, still animating hit");
+        });
       }
 
       opponentAttackTime.current = attackTime;
 
-      // Clear any existing hit timer
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
       }
 
-      // Force the hit animation regardless of sound
+      if (hitSound.current) {
+        hitSound.current.currentTime = 0;
+        hitSound.current.play();
+      }
+
       setIsHit(true);
       setCurrentAnimation("hit");
 
@@ -220,17 +217,18 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        console.log("Collision detected with opponent", {
-          time: Date.now(),
-          selfPosition: rb.current.translation(),
-          otherPosition: event.other.rigidBody.translation(),
-          isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
-        });
-
         setIsInContact(true);
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
+
+        // Additional logging for iOS debugging
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: Date.now(),
+          isLocalPlayer,
+        });
       }
     };
 
