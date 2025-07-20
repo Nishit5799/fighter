@@ -12,33 +12,34 @@ const AttackButtons = ({ onPunch, onKick }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false;
+      return false; // Return false if attack is blocked by cooldown
     }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true);
-      setTimeout(() => onPunch(false), 1000);
+      onPunch(true); // Trigger punch state
+      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
       setTimeout(() => setPunchCooldown(false), 1500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true);
-      setTimeout(() => onKick(false), 1000);
+      onKick(true); // Trigger kick state
+      setTimeout(() => onKick(false), 1000); // Reset after 1 second
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
   };
 
+  // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
     return handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
     return handleAttackStart("kick");
   };
 
@@ -55,9 +56,10 @@ const AttackButtons = ({ onPunch, onKick }) => {
       if (success) {
         e.preventDefault();
         e.stopPropagation();
-        return false;
+        // iOS-specific: force a reflow to ensure animation starts
+        document.body.offsetHeight;
       }
-      return true;
+      return !success;
     };
 
     const touchKickHandler = (e) => {
@@ -65,33 +67,30 @@ const AttackButtons = ({ onPunch, onKick }) => {
       if (success) {
         e.preventDefault();
         e.stopPropagation();
-        return false;
+        // iOS-specific: force a reflow to ensure animation starts
+        document.body.offsetHeight;
       }
-      return true;
+      return !success;
     };
 
-    // iOS-specific: Use both touch and mouse events
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
-    punchBtn.addEventListener("click", handlePunchStart);
 
     kickBtn.addEventListener("touchstart", touchKickHandler, options);
     kickBtn.addEventListener("mousedown", handleKickStart);
-    kickBtn.addEventListener("click", handleKickStart);
 
     return () => {
       punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
       punchBtn.removeEventListener("mousedown", handlePunchStart);
-      punchBtn.removeEventListener("click", handlePunchStart);
 
       kickBtn.removeEventListener("touchstart", touchKickHandler, options);
       kickBtn.removeEventListener("mousedown", handleKickStart);
-      kickBtn.removeEventListener("click", handleKickStart);
     };
   }, [punchCooldown, kickCooldown]);
 
   const renderButton = (type, ref, icon, isCooldown, duration) => (
     <div className="relative w-16 h-16">
+      {/* GREEN STATIC BORDER */}
       <svg
         className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
         viewBox="0 0 36 36"
@@ -106,6 +105,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
         />
       </svg>
 
+      {/* RED ANIMATED RING */}
       {isCooldown && (
         <svg
           className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
@@ -135,10 +135,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onClick={(e) => {
-          if (!isCooldown) handleAttackStart(type);
-          e.preventDefault();
-        }}
+        onMouseDown={() => !isCooldown && handleAttackStart(type)}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
@@ -146,6 +143,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
           touchAction: "manipulation",
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
+          transform: "translateZ(0)",
+          backfaceVisibility: "hidden",
+          perspective: "1000px",
         }}
       >
         <span className="text-2xl font-bold">
@@ -164,27 +164,43 @@ const AttackButtons = ({ onPunch, onKick }) => {
         @keyframes progressAnim-punch {
           from {
             stroke-dashoffset: 100;
+            -webkit-transform: rotate(-90deg) translateZ(0);
+            transform: rotate(-90deg) translateZ(0);
           }
           to {
             stroke-dashoffset: 0;
+            -webkit-transform: rotate(-90deg) translateZ(0);
+            transform: rotate(-90deg) translateZ(0);
           }
         }
         @keyframes progressAnim-kick {
           from {
             stroke-dashoffset: 100;
+            -webkit-transform: rotate(-90deg) translateZ(0);
+            transform: rotate(-90deg) translateZ(0);
           }
           to {
             stroke-dashoffset: 0;
+            -webkit-transform: rotate(-90deg) translateZ(0);
+            transform: rotate(-90deg) translateZ(0);
           }
         }
 
+        /* iOS-specific improvements */
         button {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
           touch-action: manipulation;
           -webkit-tap-highlight-color: transparent;
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          -webkit-perspective: 1000;
+          perspective: 1000;
         }
 
+        /* Prevent touch highlighting */
         * {
           -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
           -webkit-tap-highlight-color: transparent;
