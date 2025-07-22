@@ -127,7 +127,12 @@ const PlayerController = forwardRef(
     };
 
     const startAttack = (type) => {
-      if (isAttacking || isDefeated) return;
+      if (
+        isAttacking ||
+        isDefeated ||
+        (opponentRef.current?.isAttacking && !isInContact)
+      )
+        return;
 
       const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
@@ -178,12 +183,6 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
-        });
-      }
 
       opponentAttackTime.current = attackTime;
 
@@ -277,7 +276,6 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
@@ -421,7 +419,7 @@ const PlayerController = forwardRef(
 
     useImperativeHandle(ref, () => ({
       setOpponentRef,
-
+      isAttacking, // Add this line
       setVictory: (isLocalPlayerWinner) => {
         setMatchResult("won");
         setCurrentAnimation("victory");

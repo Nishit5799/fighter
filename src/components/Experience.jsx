@@ -59,6 +59,7 @@ const Experience = () => {
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
+  const lastAttackTimeRef = useRef(0);
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
@@ -76,35 +77,6 @@ const Experience = () => {
         beginSoundRef.current = null;
       }
     };
-  }, []);
-
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
-
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
-    };
-
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {
@@ -210,50 +182,55 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
-      socket.emit("updateHealth", {
-        health1:
-          data.attackerId === players[0]?.id
-            ? health1
-            : Math.max(0, health1 - data.damage),
-        health2:
-          data.attackerId === players[1]?.id
-            ? health2
-            : Math.max(0, health2 - data.damage),
-      });
+      // Only process the hit if it's the first one
+      if (data.attackTime > lastAttackTimeRef.current) {
+        lastAttackTimeRef.current = data.attackTime;
 
-      if (players[0]?.id === data.attackerId) {
-        setHealth2((prev) => {
-          const newHealth = Math.max(0, prev - data.damage);
-          if (newHealth <= 0) {
-            setTimeout(() => {
-              socket.emit("playerDefeated", {
-                winnerId: players[0].id,
-                loserId: players[1]?.id,
-                winnerHealth: health1,
-                loserHealth: newHealth,
-                winningAttackTime: data.attackTime,
-              });
-            }, 50);
-          }
-          return newHealth;
+        // Emit health update to opponent
+        socket.emit("updateHealth", {
+          health1:
+            data.attackerId === players[0]?.id
+              ? health1
+              : Math.max(0, health1 - data.damage),
+          health2:
+            data.attackerId === players[1]?.id
+              ? health2
+              : Math.max(0, health2 - data.damage),
         });
-      } else if (players[1]?.id === data.attackerId) {
-        setHealth1((prev) => {
-          const newHealth = Math.max(0, prev - data.damage);
-          if (newHealth <= 0) {
-            setTimeout(() => {
-              socket.emit("playerDefeated", {
-                winnerId: players[1].id,
-                loserId: players[0]?.id,
-                winnerHealth: health2,
-                loserHealth: newHealth,
-                winningAttackTime: data.attackTime,
-              });
-            }, 50);
-          }
-          return newHealth;
-        });
+
+        if (players[0]?.id === data.attackerId) {
+          setHealth2((prev) => {
+            const newHealth = Math.max(0, prev - data.damage);
+            if (newHealth <= 0) {
+              setTimeout(() => {
+                socket.emit("playerDefeated", {
+                  winnerId: players[0].id,
+                  loserId: players[1]?.id,
+                  winnerHealth: health1,
+                  loserHealth: newHealth,
+                  winningAttackTime: data.attackTime,
+                });
+              }, 50);
+            }
+            return newHealth;
+          });
+        } else if (players[1]?.id === data.attackerId) {
+          setHealth1((prev) => {
+            const newHealth = Math.max(0, prev - data.damage);
+            if (newHealth <= 0) {
+              setTimeout(() => {
+                socket.emit("playerDefeated", {
+                  winnerId: players[1].id,
+                  loserId: players[0]?.id,
+                  winnerHealth: health2,
+                  loserHealth: newHealth,
+                  winningAttackTime: data.attackTime,
+                });
+              }, 50);
+            }
+            return newHealth;
+          });
+        }
       }
     },
     [socket, players, winner, loser, health1, health2]
