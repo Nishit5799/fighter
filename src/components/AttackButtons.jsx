@@ -8,26 +8,38 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
+    // iOS workaround: use touch events directly
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const now = Date.now();
+
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
 
+    // Force immediate feedback for iOS
+    if (isIOS) {
+      if (type === "punch") {
+        onPunch(true);
+      } else {
+        onKick(true);
+      }
+    }
+
+    // Set cooldown
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
+      setTimeout(() => onPunch(false), 1000);
       setTimeout(() => setPunchCooldown(false), 1500);
-      return true;
     } else {
       setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
+      setTimeout(() => onKick(false), 1000);
       setTimeout(() => setKickCooldown(false), 3000);
-      return true;
     }
+
+    return true;
   };
 
   // Event handlers that return whether attack was successful
@@ -154,23 +166,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 
       <style jsx>{`
-        @keyframes progressAnim-punch {
-          from {
-            stroke-dashoffset: 100;
-          }
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-        @keyframes progressAnim-kick {
-          from {
-            stroke-dashoffset: 100;
-          }
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-
         /* iOS-specific improvements */
         button {
           -webkit-touch-callout: none;

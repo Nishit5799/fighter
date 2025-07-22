@@ -182,11 +182,9 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Only process the hit if it's the first one
-      if (data.attackTime > lastAttackTimeRef.current) {
-        lastAttackTimeRef.current = data.attackTime;
-
-        // Emit health update to opponent
+      // iOS workaround: use requestAnimationFrame for better sync
+      requestAnimationFrame(() => {
+        // Emit health update
         socket.emit("updateHealth", {
           health1:
             data.attackerId === players[0]?.id
@@ -198,40 +196,13 @@ const Experience = () => {
               : Math.max(0, health2 - data.damage),
         });
 
+        // Handle health update
         if (players[0]?.id === data.attackerId) {
-          setHealth2((prev) => {
-            const newHealth = Math.max(0, prev - data.damage);
-            if (newHealth <= 0) {
-              setTimeout(() => {
-                socket.emit("playerDefeated", {
-                  winnerId: players[0].id,
-                  loserId: players[1]?.id,
-                  winnerHealth: health1,
-                  loserHealth: newHealth,
-                  winningAttackTime: data.attackTime,
-                });
-              }, 50);
-            }
-            return newHealth;
-          });
+          setHealth2((prev) => Math.max(0, prev - data.damage));
         } else if (players[1]?.id === data.attackerId) {
-          setHealth1((prev) => {
-            const newHealth = Math.max(0, prev - data.damage);
-            if (newHealth <= 0) {
-              setTimeout(() => {
-                socket.emit("playerDefeated", {
-                  winnerId: players[1].id,
-                  loserId: players[0]?.id,
-                  winnerHealth: health2,
-                  loserHealth: newHealth,
-                  winningAttackTime: data.attackTime,
-                });
-              }, 50);
-            }
-            return newHealth;
-          });
+          setHealth1((prev) => Math.max(0, prev - data.damage));
         }
-      }
+      });
     },
     [socket, players, winner, loser, health1, health2]
   );
