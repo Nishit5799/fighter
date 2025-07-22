@@ -78,35 +78,6 @@ const Experience = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
-
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
-    };
-
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
-  }, []);
-
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
   };
