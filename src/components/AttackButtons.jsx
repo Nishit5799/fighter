@@ -56,8 +56,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
       if (success) {
         e.preventDefault();
         e.stopPropagation();
+        return false;
       }
-      return !success; // Important for iOS
+      return true;
     };
 
     const touchKickHandler = (e) => {
@@ -65,8 +66,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
       if (success) {
         e.preventDefault();
         e.stopPropagation();
+        return false;
       }
-      return !success; // Important for iOS
+      return true;
     };
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
