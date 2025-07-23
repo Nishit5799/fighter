@@ -178,6 +178,12 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
+      if (hitSound.current) {
+        hitSound.current.currentTime = 0;
+        hitSound.current.play().catch(() => {
+          console.log("iOS blocked audio, still animating hit");
+        });
+      }
 
       opponentAttackTime.current = attackTime;
 
@@ -271,6 +277,7 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
+        console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
