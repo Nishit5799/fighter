@@ -66,10 +66,6 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
-  const isIOS =
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
@@ -80,35 +76,6 @@ const Experience = () => {
         beginSoundRef.current = null;
       }
     };
-  }, []);
-
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
-
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
-    };
-
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {
@@ -168,10 +135,6 @@ const Experience = () => {
   }, [showWelcomeScreen]);
 
   const handleReset = useCallback(() => {
-      if (isIOS) {
-    // For iOS, do a more aggressive reload
-    window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now();
-  } else {
     hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
     setRestartCountdown(2);
@@ -192,7 +155,7 @@ const Experience = () => {
       setHealth2(100);
       if (socket) socket.emit("restartGame");
     }, 2000);
-  }}, [socket]);
+  }, [socket]);
 
   const handleInfoClick = useCallback(() => {
     setShowInfoPopup(true);
@@ -402,9 +365,7 @@ const Experience = () => {
     };
 
     const restartGameHandler = () => {
-      // Add cache-busting parameter
-      window.location.href =
-        window.location.href.split("?")[0] + "?t=" + Date.now();
+      window.location.reload();
     };
 
     const usernameTakenHandler = () => {

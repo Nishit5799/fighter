@@ -178,12 +178,6 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
-        });
-      }
 
       opponentAttackTime.current = attackTime;
 
@@ -277,7 +271,6 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
@@ -458,7 +451,6 @@ const PlayerController = forwardRef(
       rigidBody: rb.current,
       isDefeated,
     }));
-    // In the cleanup useEffect
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -466,12 +458,11 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
 
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (soundRef) => {
-            if (soundRef.current) {
-              soundRef.current.pause();
-              soundRef.current.src = "";
-              soundRef.current.load(); // Add this line for iOS
-              soundRef.current = null;
+          (sound) => {
+            // Add lostSound here
+            if (sound.current) {
+              sound.current.pause();
+              sound.current = null;
             }
           }
         );
