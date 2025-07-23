@@ -59,6 +59,8 @@ const Experience = () => {
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
+  const [reloadCount, setReloadCount] = useState(0);
+  const maxReloads = 3; // Maximum number of reloads
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
@@ -153,6 +155,16 @@ const Experience = () => {
       setPlayerName("");
       setHealth1(100);
       setHealth2(100);
+
+      // Increment reload count and check if we should reload
+      setReloadCount((prev) => {
+        if (prev < maxReloads) {
+          setTimeout(() => window.location.reload(), 500);
+          return prev + 1;
+        }
+        return prev;
+      });
+
       if (socket) socket.emit("restartGame");
     }, 2000);
   }, [socket]);
@@ -365,7 +377,13 @@ const Experience = () => {
     };
 
     const restartGameHandler = () => {
-      window.location.reload();
+      setReloadCount((prev) => {
+        if (prev < maxReloads) {
+          setTimeout(() => window.location.reload(), 500);
+          return prev + 1;
+        }
+        return prev;
+      });
     };
 
     const usernameTakenHandler = () => {
@@ -413,10 +431,10 @@ const Experience = () => {
         setRestartCountdown((prev) => prev - 1);
       }, 1000);
       return () => clearInterval(interval);
-    } else if (restartCountdown === 0) {
+    } else if (restartCountdown === 0 && reloadCount < maxReloads) {
       handleReset();
     }
-  }, [restartCountdown, handleReset]);
+  }, [restartCountdown, handleReset, reloadCount]);
 
   return (
     <>
@@ -508,6 +526,7 @@ const Experience = () => {
                       playerName,
                     });
                   }
+                  setReloadCount(0); // Reset the counter when exiting
                   window.location.reload();
                 }}
                 className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
