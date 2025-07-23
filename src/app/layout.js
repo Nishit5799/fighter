@@ -16,8 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Fight Arena",
   description: "Fight till you die",
+  other: {
+    "http-equiv": "Cache-Control, Pragma, Expires",
+    content: "no-cache, no-store, must-revalidate, no-cache, 0",
+  },
 };
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
