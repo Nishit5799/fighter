@@ -59,14 +59,17 @@ const Experience = () => {
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
-  const [reloadCount, setReloadCount] = useState(0);
-  const maxReloads = 3; // Maximum number of reloads
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
+
+  useEffect(() => {
+    // Reset reload counter when component mounts
+    localStorage.removeItem("reloadCount");
+  }, []);
 
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
@@ -140,33 +143,38 @@ const Experience = () => {
     hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
     setRestartCountdown(2);
-    setTimeout(() => {
-      setShowPopup(false);
-      setWinner(null);
-      setLoser(null);
-      setPlayerLeft(false);
-      hasStarted.current = false;
 
-      if (blockRef.current) blockRef.current.setEnabled(true);
-      setShowWelcomeScreen(true);
-      setPlayers([]);
-      setIsReady(false);
-      setHasJoinedRoom(false);
-      setPlayerName("");
-      setHealth1(100);
-      setHealth2(100);
+    // Add a reload counter
+    const reloadCount = localStorage.getItem("reloadCount")
+      ? parseInt(localStorage.getItem("reloadCount"))
+      : 0;
 
-      // Increment reload count and check if we should reload
-      setReloadCount((prev) => {
-        if (prev < maxReloads) {
-          setTimeout(() => window.location.reload(), 500);
-          return prev + 1;
-        }
-        return prev;
-      });
+    if (reloadCount < 3) {
+      localStorage.setItem("reloadCount", reloadCount + 1);
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } else {
+      // Reset the counter after 3 reloads
+      localStorage.removeItem("reloadCount");
+      setTimeout(() => {
+        setShowPopup(false);
+        setWinner(null);
+        setLoser(null);
+        setPlayerLeft(false);
+        hasStarted.current = false;
 
-      if (socket) socket.emit("restartGame");
-    }, 2000);
+        if (blockRef.current) blockRef.current.setEnabled(true);
+        setShowWelcomeScreen(true);
+        setPlayers([]);
+        setIsReady(false);
+        setHasJoinedRoom(false);
+        setPlayerName("");
+        setHealth1(100);
+        setHealth2(100);
+        if (socket) socket.emit("restartGame");
+      }, 2000);
+    }
   }, [socket]);
 
   const handleInfoClick = useCallback(() => {
@@ -377,13 +385,15 @@ const Experience = () => {
     };
 
     const restartGameHandler = () => {
-      setReloadCount((prev) => {
-        if (prev < maxReloads) {
-          setTimeout(() => window.location.reload(), 500);
-          return prev + 1;
-        }
-        return prev;
-      });
+      const reloadCount = localStorage.getItem("reloadCount")
+        ? parseInt(localStorage.getItem("reloadCount"))
+        : 0;
+      if (reloadCount < 3) {
+        localStorage.setItem("reloadCount", reloadCount + 1);
+        window.location.reload();
+      } else {
+        localStorage.removeItem("reloadCount");
+      }
     };
 
     const usernameTakenHandler = () => {
@@ -431,10 +441,10 @@ const Experience = () => {
         setRestartCountdown((prev) => prev - 1);
       }, 1000);
       return () => clearInterval(interval);
-    } else if (restartCountdown === 0 && reloadCount < maxReloads) {
+    } else if (restartCountdown === 0) {
       handleReset();
     }
-  }, [restartCountdown, handleReset, reloadCount]);
+  }, [restartCountdown, handleReset]);
 
   return (
     <>
@@ -526,7 +536,6 @@ const Experience = () => {
                       playerName,
                     });
                   }
-                  setReloadCount(0); // Reset the counter when exiting
                   window.location.reload();
                 }}
                 className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
