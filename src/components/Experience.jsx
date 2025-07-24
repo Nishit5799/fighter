@@ -57,7 +57,6 @@ const Experience = () => {
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
   const [reloadCount, setReloadCount] = useState(0);
-  const maxReloads = 3; // Maximum number of reloads
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
@@ -78,35 +77,6 @@ const Experience = () => {
         beginSoundRef.current = null;
       }
     };
-  }, []);
-
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
-
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
-    };
-
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {
@@ -168,7 +138,8 @@ const Experience = () => {
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
-    setRestartCountdown(2);
+    setRestartCountdown(3); // Increased from 2 to 3 seconds
+
     setTimeout(() => {
       setShowPopup(false);
       setWinner(null);
@@ -186,15 +157,26 @@ const Experience = () => {
       setHealth2(100);
       if (socket) socket.emit("restartGame");
 
-      // Add reload logic here
-      if (reloadCount < maxReloads - 1) {
-        setReloadCount((prev) => prev + 1);
+      // Triple reload with 2-second intervals
+      setReloadCount(1);
+      setTimeout(() => {
+        setReloadCount(2);
+        setTimeout(() => {
+          setReloadCount(3);
+          window.location.reload();
+        }, 2000); // 2-second delay
+      }, 2000); // 2-second delay
+    }, 3000); // Increased from 2000 to 3000ms
+  }, [socket]);
+
+  useEffect(() => {
+    if (reloadCount > 0 && reloadCount < 3) {
+      const timer = setTimeout(() => {
         window.location.reload();
-      } else {
-        setReloadCount(0); // Reset counter if we reach max reloads
-      }
-    }, 2000);
-  }, [socket, reloadCount]);
+      }, 2000); // 2-second delay between reloads
+      return () => clearTimeout(timer);
+    }
+  }, [reloadCount]);
 
   const handleInfoClick = useCallback(() => {
     setShowInfoPopup(true);
@@ -404,13 +386,7 @@ const Experience = () => {
     };
 
     const restartGameHandler = () => {
-      if (reloadCount < maxReloads - 1) {
-        setReloadCount((prev) => prev + 1);
-        window.location.reload();
-      } else {
-        setReloadCount(0);
-        window.location.reload();
-      }
+      window.location.reload();
     };
 
     const usernameTakenHandler = () => {
@@ -674,15 +650,13 @@ const Experience = () => {
             {restartCountdown !== null ? (
               <>
                 <p className="text-black mb-2">
-                  Game will restart automatically...{" "}
-                  {maxReloads - reloadCount - 1} times remaining
+                  Game will restart automatically...
                 </p>
               </>
             ) : (
               <>
                 <p className="text-black mb-2">
-                  Game will restart automatically...{" "}
-                  {maxReloads - reloadCount - 1} times remaining
+                  Game will restart automatically...
                 </p>
                 <button
                   onClick={handleReset}
