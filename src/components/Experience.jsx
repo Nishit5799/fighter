@@ -56,6 +56,8 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const [reloadCount, setReloadCount] = useState(0);
+  const maxReloads = 3; // Maximum number of reloads
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
@@ -183,8 +185,16 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
+
+      // Add reload logic here
+      if (reloadCount < maxReloads - 1) {
+        setReloadCount((prev) => prev + 1);
+        window.location.reload();
+      } else {
+        setReloadCount(0); // Reset counter if we reach max reloads
+      }
     }, 2000);
-  }, [socket]);
+  }, [socket, reloadCount]);
 
   const handleInfoClick = useCallback(() => {
     setShowInfoPopup(true);
@@ -394,7 +404,13 @@ const Experience = () => {
     };
 
     const restartGameHandler = () => {
-      window.location.reload();
+      if (reloadCount < maxReloads - 1) {
+        setReloadCount((prev) => prev + 1);
+        window.location.reload();
+      } else {
+        setReloadCount(0);
+        window.location.reload();
+      }
     };
 
     const usernameTakenHandler = () => {
@@ -658,13 +674,15 @@ const Experience = () => {
             {restartCountdown !== null ? (
               <>
                 <p className="text-black mb-2">
-                  Game will restart automatically...
+                  Game will restart automatically...{" "}
+                  {maxReloads - reloadCount - 1} times remaining
                 </p>
               </>
             ) : (
               <>
                 <p className="text-black mb-2">
-                  Game will restart automatically...
+                  Game will restart automatically...{" "}
+                  {maxReloads - reloadCount - 1} times remaining
                 </p>
                 <button
                   onClick={handleReset}
