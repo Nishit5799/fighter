@@ -13,12 +13,13 @@ import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
+
 const SOUNDS = {
-  punch: `/punch.mp3?${Date.now()}`,
-  kick: `/kick.mp3?${Date.now()}`,
-  hit: `/hit.mp3?${Date.now()}`,
-  victory: `/victory.mp3?${Date.now()}`,
-  lost: `/lost.mp3?${Date.now()}`,
+  punch: "/punch.mp3",
+  kick: "/kick.mp3",
+  hit: "/hit.mp3",
+  victory: "/victory.mp3",
+  lost: "/lost.mp3", // Add this line
 };
 
 const PlayerController = forwardRef(
@@ -86,43 +87,17 @@ const PlayerController = forwardRef(
     }, [opponentRef.current?.id]);
 
     useEffect(() => {
-      const loadAudio = () => {
-        punchSound.current = new Audio(SOUNDS.punch);
-        kickSound.current = new Audio(SOUNDS.kick);
-        hitSound.current = new Audio(SOUNDS.hit);
-        victorySound.current = new Audio(SOUNDS.victory);
-        lostSound.current = new Audio(SOUNDS.lost);
+      punchSound.current = new Audio(SOUNDS.punch);
+      kickSound.current = new Audio(SOUNDS.kick);
+      hitSound.current = new Audio(SOUNDS.hit);
+      victorySound.current = new Audio(SOUNDS.victory);
+      lostSound.current = new Audio(SOUNDS.lost); // Add this line
 
-        // iOS requires muted first play
-        const initAudio = (sound) => {
-          sound.muted = true;
-          sound
-            .play()
-            .then(() => {
-              sound.pause();
-              sound.muted = false;
-            })
-            .catch(() => {});
-        };
-
-        [
-          punchSound.current,
-          kickSound.current,
-          hitSound.current,
-          victorySound.current,
-          lostSound.current,
-        ].forEach(initAudio);
-      };
-
-      // Load audio on user interaction
-      const handleInteraction = () => {
-        loadAudio();
-        window.removeEventListener("touchstart", handleInteraction);
-        window.removeEventListener("mousedown", handleInteraction);
-      };
-
-      window.addEventListener("touchstart", handleInteraction, { once: true });
-      window.addEventListener("mousedown", handleInteraction, { once: true });
+      punchSound.current.volume = 0.7;
+      kickSound.current.volume = 0.7;
+      hitSound.current.volume = 0.4;
+      victorySound.current.volume = 0.8;
+      lostSound.current.volume = 0.8; // Add this line
 
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
@@ -237,21 +212,22 @@ const PlayerController = forwardRef(
       }, duration);
     };
 
-    // In PlayerController.jsx
     const handleCollisionEnter = (event) => {
       if (!opponentRef.current || !rb.current) return;
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        // Use a more aggressive approach for iOS
         setIsInContact(true);
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
 
-        // Force a state update to ensure consistency
-        requestAnimationFrame(() => {
-          setIsInContact(true);
+        // Additional logging for iOS debugging
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: Date.now(),
+          isLocalPlayer,
         });
       }
     };
@@ -261,12 +237,9 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        // Use a shorter timeout for iOS
         contactTimeout.current = setTimeout(() => {
-          requestAnimationFrame(() => {
-            setIsInContact(false);
-          });
-        }, 300); // Reduced from 500ms
+          setIsInContact(false);
+        }, 500);
       }
     };
 
@@ -317,121 +290,117 @@ const PlayerController = forwardRef(
       };
     }, [socket]);
 
-    useFrame(
-      ({ camera }) => {
-        if (typeof window !== "undefined" && window.document.hidden) return;
-        if (!rb.current || !isPlayer1 || isDefeated) return;
+    useFrame(({ camera }) => {
+      if (!rb.current || !isPlayer1 || isDefeated) return;
 
-        const vel = rb.current.linvel();
-        const movement = { x: 0, z: 0 };
-        const isUsingJoystick =
-          joystickInput &&
-          (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
-        const { forward, backward, left, right, run, punch, kick } = get();
+      const vel = rb.current.linvel();
+      const movement = { x: 0, z: 0 };
+      const isUsingJoystick =
+        joystickInput &&
+        (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
+      const { forward, backward, left, right, run, punch, kick } = get();
 
-        if (punch && !isAttacking && !isHit) startAttack("punch");
-        if (kick && !isAttacking && !isHit) startAttack("kick");
+      if (punch && !isAttacking && !isHit) startAttack("punch");
+      if (kick && !isAttacking && !isHit) startAttack("kick");
 
-        if (movementEnabled.current && !isHit) {
-          if (forward) {
-            movement.z = run ? -RUN_SPEED : -WALK_SPEED;
-            if (!isAttacking) setCurrentAnimation(run ? "run" : "walk");
-          } else if (backward) {
-            movement.z = 0;
-            if (!isAttacking) setCurrentAnimation("idle");
-          } else {
-            if (!isAttacking && !isHit) setCurrentAnimation("idle");
-          }
-
-          if (joystickInput) {
-            const joystickMagnitude = Math.sqrt(
-              joystickInput.x * joystickInput.x +
-                joystickInput.y * joystickInput.y
-            );
-
-            if (
-              Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
-              joystickChangeThreshold
-            ) {
-              lastJoystickMagnitude.current = joystickMagnitude;
-            }
-
-            if (joystickMagnitude > 0.1) {
-              if (Math.abs(joystickInput.x) > 0.1) {
-                rotationTarget.current += ROTATION_SPEED * joystickInput.x;
-              }
-
-              if (joystickInput.y < 0) {
-                movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
-                if (!isAttacking)
-                  setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
-              } else if (joystickInput.y > 0) {
-                movement.z = 0;
-                if (!isAttacking) setCurrentAnimation("idle");
-              }
-            }
-          }
-
-          if (left) movement.x = 1;
-          if (right) movement.x = -1;
+      if (movementEnabled.current && !isHit) {
+        if (forward) {
+          movement.z = run ? -RUN_SPEED : -WALK_SPEED;
+          if (!isAttacking) setCurrentAnimation(run ? "run" : "walk");
+        } else if (backward) {
+          movement.z = 0;
+          if (!isAttacking) setCurrentAnimation("idle");
+        } else {
+          if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
-        if (movement.x !== 0 && movementEnabled.current && !isHit) {
-          rotationTarget.current += ROTATION_SPEED * movement.x;
-        }
-
-        if (movementEnabled.current && !isHit) {
-          if (isUsingJoystick && joystickInput.y < 0) {
-            const moveDirection = new Vector3(
-              Math.sin(rotationTarget.current),
-              0,
-              Math.cos(rotationTarget.current)
-            ).normalize();
-            vel.x =
-              moveDirection.x *
-              (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
-            vel.z =
-              moveDirection.z *
-              (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
-          } else if (movement.x !== 0 || movement.z !== 0) {
-            vel.x = Math.sin(rotationTarget.current) * movement.z;
-            vel.z = Math.cos(rotationTarget.current) * movement.z;
-          }
-        }
-
-        rb.current.setLinvel(vel, true);
-
-        if (socket && !isDefeated) {
-          socket.emit("carMove", {
-            position: rb.current.translation(),
-            rotation: container.current.rotation.y,
-            isPlayer1,
-            animation: currentAnimation,
-            isAttacking,
-            isHit,
-            health,
-          });
-        }
-
-        if (isPlayer1) {
-          container.current.rotation.y = MathUtils.lerp(
-            container.current.rotation.y,
-            rotationTarget.current,
-            0.1
+        if (joystickInput) {
+          const joystickMagnitude = Math.sqrt(
+            joystickInput.x * joystickInput.x +
+              joystickInput.y * joystickInput.y
           );
-          cameraPosition.current.getWorldPosition(cameraworldPosition.current);
-          camera.position.lerp(cameraworldPosition.current, 0.1);
-          if (cameraTarget.current) {
-            cameraTarget.current.getWorldPosition(
-              cameraLookAtWorldPosition.current
-            );
-            cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
-            camera.lookAt(cameraLookAt.current);
+
+          if (
+            Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
+            joystickChangeThreshold
+          ) {
+            lastJoystickMagnitude.current = joystickMagnitude;
+          }
+
+          if (joystickMagnitude > 0.1) {
+            if (Math.abs(joystickInput.x) > 0.1) {
+              rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+            }
+
+            if (joystickInput.y < 0) {
+              movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
+              if (!isAttacking)
+                setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
+            } else if (joystickInput.y > 0) {
+              movement.z = 0;
+              if (!isAttacking) setCurrentAnimation("idle");
+            }
           }
         }
-      },
-      { priority: 1 }
-    );
+
+        if (left) movement.x = 1;
+        if (right) movement.x = -1;
+      }
+
+      if (movement.x !== 0 && movementEnabled.current && !isHit) {
+        rotationTarget.current += ROTATION_SPEED * movement.x;
+      }
+
+      if (movementEnabled.current && !isHit) {
+        if (isUsingJoystick && joystickInput.y < 0) {
+          const moveDirection = new Vector3(
+            Math.sin(rotationTarget.current),
+            0,
+            Math.cos(rotationTarget.current)
+          ).normalize();
+          vel.x =
+            moveDirection.x *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+          vel.z =
+            moveDirection.z *
+            (joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED);
+        } else if (movement.x !== 0 || movement.z !== 0) {
+          vel.x = Math.sin(rotationTarget.current) * movement.z;
+          vel.z = Math.cos(rotationTarget.current) * movement.z;
+        }
+      }
+
+      rb.current.setLinvel(vel, true);
+
+      if (socket && !isDefeated) {
+        socket.emit("carMove", {
+          position: rb.current.translation(),
+          rotation: container.current.rotation.y,
+          isPlayer1,
+          animation: currentAnimation,
+          isAttacking,
+          isHit,
+          health,
+        });
+      }
+
+      if (isPlayer1) {
+        container.current.rotation.y = MathUtils.lerp(
+          container.current.rotation.y,
+          rotationTarget.current,
+          0.1
+        );
+        cameraPosition.current.getWorldPosition(cameraworldPosition.current);
+        camera.position.lerp(cameraworldPosition.current, 0.1);
+        if (cameraTarget.current) {
+          cameraTarget.current.getWorldPosition(
+            cameraLookAtWorldPosition.current
+          );
+          cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
+          camera.lookAt(cameraLookAt.current);
+        }
+      }
+    });
 
     useEffect(() => {
       if (!socket) return;
