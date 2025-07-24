@@ -56,7 +56,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [reloadCount, setReloadCount] = useState(0);
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
@@ -77,6 +76,35 @@ const Experience = () => {
         beginSoundRef.current = null;
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      const sounds = [
+        "/punch.mp3",
+        "/kick.mp3",
+        "/hit.mp3",
+        "/victory.mp3",
+        "/lost.mp3",
+      ];
+      sounds.forEach((src) => {
+        const audio = new Audio(src);
+        audio.muted = true;
+        audio
+          .play()
+          .then(() => {
+            audio.pause();
+            audio.muted = false;
+          })
+          .catch(() => {});
+      });
+
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("mousedown", unlockAudio);
+    };
+
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {
@@ -138,8 +166,7 @@ const Experience = () => {
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
-    setRestartCountdown(3); // Increased from 2 to 3 seconds
-
+    setRestartCountdown(2);
     setTimeout(() => {
       setShowPopup(false);
       setWinner(null);
@@ -156,27 +183,8 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
-
-      // Triple reload with 2-second intervals
-      setReloadCount(1);
-      setTimeout(() => {
-        setReloadCount(2);
-        setTimeout(() => {
-          setReloadCount(3);
-          window.location.reload();
-        }, 2000); // 2-second delay
-      }, 2000); // 2-second delay
-    }, 3000); // Increased from 2000 to 3000ms
+    }, 2000);
   }, [socket]);
-
-  useEffect(() => {
-    if (reloadCount > 0 && reloadCount < 3) {
-      const timer = setTimeout(() => {
-        window.location.reload();
-      }, 2000); // 2-second delay between reloads
-      return () => clearTimeout(timer);
-    }
-  }, [reloadCount]);
 
   const handleInfoClick = useCallback(() => {
     setShowInfoPopup(true);

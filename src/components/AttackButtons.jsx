@@ -8,6 +8,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
+    if (typeof window !== "undefined" && window.navigator.vibrate) {
+      window.navigator.vibrate(50);
+    }
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
@@ -52,23 +55,17 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const options = { passive: false, capture: true };
 
     const touchPunchHandler = (e) => {
-      const success = handlePunchStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      return true;
+      e.preventDefault();
+      e.stopPropagation();
+      const success = handleAttackStart("punch");
+      return false;
     };
 
     const touchKickHandler = (e) => {
-      const success = handleKickStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      return true;
+      e.preventDefault();
+      e.stopPropagation();
+      const success = handleAttackStart("kick");
+      return false;
     };
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
