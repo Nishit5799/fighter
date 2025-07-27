@@ -56,7 +56,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [connectionQuality, setConnectionQuality] = useState("good");
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
@@ -334,14 +333,6 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("connect_error", () => {
-      setConnectionQuality("poor");
-    });
-
-    socket.on("connect", () => {
-      setConnectionQuality("good");
-    });
-
     // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
@@ -355,8 +346,6 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
-      socket.off("connect_error");
-      socket.off("connect");
       // ... keep your other cleanup code
     };
   }, [socket]);
@@ -460,11 +449,6 @@ const Experience = () => {
 
   return (
     <>
-      {connectionQuality === "poor" && (
-        <div className="fixed top-2 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-black px-4 py-2 rounded-lg z-[100]">
-          Poor Connection - Game may be laggy
-        </div>
-      )}
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <Environment preset="sunset" />
