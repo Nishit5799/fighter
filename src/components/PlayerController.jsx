@@ -53,6 +53,7 @@ const PlayerController = forwardRef(
     const opponentAttackTime = useRef(0);
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
+    const lastPositions = useRef([]);
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
@@ -276,6 +277,23 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!socket) return;
 
+      const checkConnectionQuality = () => {
+        const startTime = Date.now();
+        socket.emit("ping", () => {
+          const latency = Date.now() - startTime;
+          if (latency > 500) {
+            // High latency threshold
+            socket.emit("connection_quality", "low");
+          }
+        });
+      };
+
+      // Initial check
+      checkConnectionQuality();
+
+      // Periodic checks
+      const qualityCheckInterval = setInterval(checkConnectionQuality, 30000);
+
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
@@ -287,6 +305,7 @@ const PlayerController = forwardRef(
 
       return () => {
         socket.off("playerHit", onPlayerHit);
+        clearInterval(qualityCheckInterval);
       };
     }, [socket]);
 
@@ -373,15 +392,18 @@ const PlayerController = forwardRef(
       rb.current.setLinvel(vel, true);
 
       if (socket && !isDefeated) {
-        socket.emit("carMove", {
-          position: rb.current.translation(),
-          rotation: container.current.rotation.y,
-          isPlayer1,
-          animation: currentAnimation,
-          isAttacking,
-          isHit,
-          health,
-        });
+        if (!socket._lowQualityMode || frameCount % 2 === 0) {
+          socket.emit("carMove", {
+            position: rb.current.translation(),
+            rotation: container.current.rotation.y,
+            isPlayer1,
+            animation: currentAnimation,
+            isAttacking,
+            isHit,
+            health,
+            timestamp: Date.now(),
+          });
+        }
       }
 
       if (isPlayer1) {
@@ -407,8 +429,36 @@ const PlayerController = forwardRef(
 
       const onCarMove = (data) => {
         if (data.isPlayer1 !== isPlayer1) {
-          rb.current.setTranslation(data.position);
-          container.current.rotation.y = data.rotation;
+          // Store last few positions for interpolation
+          lastPositions.current.push({
+            ...data,
+            receivedAt: Date.now(),
+          });
+
+          // Keep only last 3 positions
+          if (lastPositions.current.length > 3) {
+            lastPositions.current.shift();
+          }
+
+          // If slow connection, use interpolation
+          if (socket._lowQualityMode) {
+            const now = Date.now();
+            const recent = lastPositions.current.filter(
+              (pos) => now - pos.receivedAt < 200
+            );
+
+            if (recent.length > 1) {
+              // Simple linear interpolation
+              const latest = recent[recent.length - 1];
+              rb.current.setTranslation(latest.position);
+              container.current.rotation.y = latest.rotation;
+            }
+          } else {
+            // Normal immediate update
+            rb.current.setTranslation(data.position);
+            container.current.rotation.y = data.rotation;
+          }
+
           setCurrentAnimation(data.animation || "idle");
           setIsAttacking(data.isAttacking || false);
           setIsHit(data.isHit || false);
