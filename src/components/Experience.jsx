@@ -7,11 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { Canvas } from "@react-three/fiber";
-import {
-  Environment,
-  KeyboardControls,
-  OrthographicCamera,
-} from "@react-three/drei";
+import { KeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 
 import Joystick from "./Joystick";
@@ -451,7 +447,7 @@ const Experience = () => {
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
-          <Environment preset="sunset" />
+          <ambientLight intensity={2.5} />
           <Background />
           <directionalLight
             intensity={1.5}
