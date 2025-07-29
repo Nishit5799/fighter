@@ -32,10 +32,8 @@ Promise.all([pubClient.connect(), subClient.connect()])
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
-        pingTimeout: 30000,
-        pingInterval: 10000,
-        transports: ["websocket", "polling"],
-        upgradeTimeout: 30000,
+        pingTimeout: 60000, // Increased from default (5000)
+        pingInterval: 10000, // Increased from default (25000)
       });
 
       io.adapter(createAdapter(pubClient, subClient));
@@ -73,21 +71,8 @@ Promise.all([pubClient.connect(), subClient.connect()])
       io.on("connection", (socket) => {
         console.log(`New connection: ${socket.id}`);
 
-        let latency = 0;
-        let packetLoss = 0;
-        let lastPingTime = Date.now();
-
-        socket.on("ping", () => {
-          socket.emit("pong", { sent: lastPingTime });
-        });
-
-        socket.on("pong", (data) => {
-          latency = Date.now() - data.sent;
-          socket.emit("connection_quality", { latency, packetLoss });
-        });
-
         socket.on("connection_quality", (quality) => {
-          if (quality === "low" || latency > 300) {
+          if (quality === "low") {
             socket._lowQualityMode = true;
           }
         });
@@ -142,42 +127,29 @@ Promise.all([pubClient.connect(), subClient.connect()])
           }
         });
 
-        const moveBuffer = [];
-        let moveInterval = setInterval(() => {
-          if (moveBuffer.length > 0) {
-            const lastMove = moveBuffer[moveBuffer.length - 1];
-            socket.to(roomId).emit("carMove", lastMove);
-            moveBuffer.length = 0;
-          }
-        }, 100);
-
         socket.on("carMove", (data) => {
-          moveBuffer.push(data);
+          socket.to(roomId).emit("carMove", data);
         });
 
         socket.on("playerHit", (data) => {
-          const now = Date.now();
           const hitData = {
             ...data,
-            serverReceivedTime: now,
-            attackTime: data.attackTime || now,
+            attackTime: data.attackTime || Date.now(),
           };
-
-          if (now - hitData.attackTime < 2000) {
-            socket.to(roomId).emit("playerHit", hitData);
-          }
+          socket.to(roomId).emit("playerHit", hitData);
         });
-
         socket.on("updateHealth", (data) => {
           socket.broadcast.emit("updateHealth", data);
         });
-
+        // Inside the socket.on("playerDefeated") handler in server.js
         socket.on("playerDefeated", (data) => {
+          // Skip if game isn't started or room doesn't exist
           if (!roomState.gameStarted || !roomState.players) {
             console.error("Game not started or room not found");
             return;
           }
 
+          // Validate data structure
           if (
             !data ||
             typeof data !== "object" ||
@@ -188,11 +160,13 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Check for duplicate IDs
           if (data.winnerId === data.loserId) {
             console.error(`Duplicate IDs: ${data.winnerId}`);
             return;
           }
 
+          // Check if players exist
           const winner = roomState.players.get(data.winnerId);
           const loser = roomState.players.get(data.loserId);
 
@@ -203,6 +177,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Prevent multiple defeat events for the same match
           if (roomState.matchResult) {
             console.log(
               "Match result already processed, ignoring duplicate event"
@@ -210,6 +185,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Mark the match as completed
           roomState.matchResult = {
             winnerId: data.winnerId,
             loserId: data.loserId,
@@ -228,6 +204,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
     Winner: ${winner.name} (${winner.id}), 
     Loser: ${loser.name} (${loser.id})`);
 
+          // Reset the match result when game restarts
           socket.on("restartGame", () => {
             roomState.matchResult = null;
             roomState.players.forEach((player) => (player.isReady = false));
@@ -244,7 +221,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         socket.on("disconnect", () => {
           console.log(`Disconnected: ${socket.id}`);
-          clearInterval(moveInterval);
           if (roomState.players.delete(socket.id)) {
             io.to(roomId).emit(
               "updatePlayers",
