@@ -32,8 +32,8 @@ Promise.all([pubClient.connect(), subClient.connect()])
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
-        pingTimeout: 60000,
-        pingInterval: 10000,
+        pingTimeout: 60000, // Increased from default (5000)
+        pingInterval: 10000, // Increased from default (25000)
       });
 
       io.adapter(createAdapter(pubClient, subClient));
@@ -75,10 +75,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
           if (quality === "low") {
             socket._lowQualityMode = true;
           }
-        });
-
-        socket.on("ping", (startTime, callback) => {
-          callback();
         });
 
         const roomId = findAvailableRoom();
@@ -132,37 +128,28 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("carMove", (data) => {
-          if (!roomState.gameStarted) return;
-
-          // Add timestamp to the data
-          const moveData = {
-            ...data,
-            timestamp: Date.now(),
-          };
-
-          socket.to(roomId).volatile.emit("carMove", moveData);
+          socket.to(roomId).emit("carMove", data);
         });
 
         socket.on("playerHit", (data) => {
-          if (!roomState.gameStarted) return;
-
           const hitData = {
             ...data,
             attackTime: data.attackTime || Date.now(),
           };
           socket.to(roomId).emit("playerHit", hitData);
         });
-
         socket.on("updateHealth", (data) => {
-          socket.to(roomId).emit("updateHealth", data);
+          socket.broadcast.emit("updateHealth", data);
         });
-
+        // Inside the socket.on("playerDefeated") handler in server.js
         socket.on("playerDefeated", (data) => {
+          // Skip if game isn't started or room doesn't exist
           if (!roomState.gameStarted || !roomState.players) {
             console.error("Game not started or room not found");
             return;
           }
 
+          // Validate data structure
           if (
             !data ||
             typeof data !== "object" ||
@@ -173,11 +160,13 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Check for duplicate IDs
           if (data.winnerId === data.loserId) {
             console.error(`Duplicate IDs: ${data.winnerId}`);
             return;
           }
 
+          // Check if players exist
           const winner = roomState.players.get(data.winnerId);
           const loser = roomState.players.get(data.loserId);
 
@@ -188,6 +177,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Prevent multiple defeat events for the same match
           if (roomState.matchResult) {
             console.log(
               "Match result already processed, ignoring duplicate event"
@@ -195,6 +185,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             return;
           }
 
+          // Mark the match as completed
           roomState.matchResult = {
             winnerId: data.winnerId,
             loserId: data.loserId,
@@ -213,6 +204,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
     Winner: ${winner.name} (${winner.id}), 
     Loser: ${loser.name} (${loser.id})`);
 
+          // Reset the match result when game restarts
           socket.on("restartGame", () => {
             roomState.matchResult = null;
             roomState.players.forEach((player) => (player.isReady = false));

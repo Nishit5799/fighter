@@ -29,10 +29,6 @@ const keyboardMap = [
   { name: "kick", keys: ["KeyK"] },
 ];
 
-const NETWORK_UPDATE_RATE = 15; // Updates per second
-const NETWORK_BUFFER_SIZE = 3; // Number of states to buffer
-const LAG_COMPENSATION_THRESHOLD = 300; // ms
-
 const Experience = () => {
   const socket = useSocket();
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
@@ -56,50 +52,15 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [networkQuality, setNetworkQuality] = useState("high");
-
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
-  const lastUpdateTime = useRef(0);
-  const inputBuffer = useRef([]);
-  const stateBuffer = useRef([]);
-  const pingRef = useRef(0);
-  const pingIntervalRef = useRef(null);
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
-
-  // Network quality detection
-  useEffect(() => {
-    if (!socket) return;
-
-    const checkNetworkQuality = () => {
-      const startTime = Date.now();
-      socket.volatile.emit("ping", startTime, () => {
-        const newPing = Date.now() - startTime;
-        pingRef.current = newPing;
-
-        if (newPing > 200) {
-          setNetworkQuality("low");
-          socket.emit("connection_quality", "low");
-        } else {
-          setNetworkQuality("high");
-          socket.emit("connection_quality", "high");
-        }
-      });
-    };
-
-    pingIntervalRef.current = setInterval(checkNetworkQuality, 5000);
-    checkNetworkQuality();
-
-    return () => {
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-    };
-  }, [socket]);
 
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
@@ -245,19 +206,6 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Apply lag compensation
-      const now = Date.now();
-      const latency = pingRef.current;
-      const compensatedTime = now - latency / 2;
-
-      if (
-        data.attackTime &&
-        data.attackTime < compensatedTime - LAG_COMPENSATION_THRESHOLD
-      ) {
-        console.log("Ignoring outdated attack due to lag compensation");
-        return;
-      }
-
       // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:
@@ -381,6 +329,7 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -393,6 +342,7 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
+      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -447,17 +397,12 @@ const Experience = () => {
       setIsUsernameValid(false);
     };
 
-    const pingHandler = (startTime, callback) => {
-      callback();
-    };
-
     socket.on("updatePlayers", updatePlayersHandler);
     socket.on("startGame", startGameHandler);
     socket.on("restartGame", restartGameHandler);
     socket.on("usernameTaken", usernameTakenHandler);
     socket.on("playerHit", onPlayerHit);
     socket.on("playerDefeated", onPlayerDefeated);
-    socket.on("ping", pingHandler);
 
     return () => {
       socket.off("updatePlayers", updatePlayersHandler);
@@ -466,7 +411,6 @@ const Experience = () => {
       socket.off("usernameTaken", usernameTakenHandler);
       socket.off("playerHit", onPlayerHit);
       socket.off("playerDefeated", onPlayerDefeated);
-      socket.off("ping", pingHandler);
     };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
@@ -550,7 +494,6 @@ const Experience = () => {
                   isLocalPlayer={players[0]?.id === socket?.id}
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
-                  networkQuality={networkQuality}
                 />
                 <PlayerController
                   ref={carControllerRef2}
@@ -571,7 +514,6 @@ const Experience = () => {
                   isLocalPlayer={players[1]?.id === socket?.id}
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
-                  networkQuality={networkQuality}
                 />
               </>
             )}
