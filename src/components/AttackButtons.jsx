@@ -19,7 +19,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
       setPunchCooldown(true);
       onPunch(true); // Trigger punch state
       setTimeout(() => onPunch(false), 1000); // Reset after 1 second
-      setTimeout(() => setPunchCooldown(false), 1500);
+      setTimeout(() => setPunchCooldown(false), 2200);
       return true;
     } else {
       setKickCooldown(true);
@@ -152,7 +152,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
   return (
     <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 sm:hidden select-none user-select-none z-[100]">
-      {renderButton("punch", punchRef, "👊", punchCooldown, 1.5)}
+      {renderButton("punch", punchRef, "👊", punchCooldown, 2.2)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 
       <style jsx>{`

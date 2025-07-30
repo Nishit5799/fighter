@@ -212,10 +212,14 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        setIsInContact(true);
+        // Clear any pending timeout immediately
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
+          contactTimeout.current = null;
         }
+
+        // Set contact state immediately
+        setIsInContact(true);
 
         console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
@@ -231,9 +235,14 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        contactTimeout.current = setTimeout(() => {
-          setIsInContact(false);
-        }, 500);
+        // Clear any pending timeout immediately
+        if (contactTimeout.current) {
+          clearTimeout(contactTimeout.current);
+          contactTimeout.current = null;
+        }
+
+        // Remove contact state immediately
+        setIsInContact(false);
       }
     };
 
