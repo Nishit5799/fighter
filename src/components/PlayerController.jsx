@@ -483,7 +483,7 @@ const PlayerController = forwardRef(
         solverIterations={15}
         ccd={true}
         linearDamping={0.3}
-        angularDamping={1.0}
+        angularDamping={0.8}
         sleepAfterStillness={0.2}
         canSleep={true}
       >
