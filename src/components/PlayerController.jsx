@@ -528,7 +528,7 @@ const PlayerController = forwardRef(
               args={[0.4, 0.3]}
               position={[0, 3, 0]}
               restitution={0.1}
-              friction={0.5}
+              // friction={0.5}
             />
             <CapsuleCollider
               args={[0.4, 0.4]}
