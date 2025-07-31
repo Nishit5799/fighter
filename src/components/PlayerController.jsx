@@ -480,9 +480,9 @@ const PlayerController = forwardRef(
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={10}
+        solverIterations={15}
         ccd={true}
-        linearDamping={0.5}
+        linearDamping={0.3}
         angularDamping={1.0}
         sleepAfterStillness={0.2}
         canSleep={true}
