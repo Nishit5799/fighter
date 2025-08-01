@@ -212,17 +212,20 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
+        // iOS workaround - force collision handling
         setIsInContact(true);
-        if (contactTimeout.current) {
-          clearTimeout(contactTimeout.current);
-        }
+        clearTimeout(contactTimeout.current);
 
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
+        // Additional iOS-specific check
+        if (isAttacking && Date.now() - lastAttackTime < 500) {
+          const attackData = {
+            attackerId: socket.id,
+            damage: isPunching ? 10 : 20,
+            attackType: isPunching ? "punch" : "kick",
+            attackTime: Date.now(),
+          };
+          socket.emit("playerHit", attackData);
+        }
       }
     };
 
@@ -473,18 +476,18 @@ const PlayerController = forwardRef(
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={9}
+        gravityScale={8} // Reduced from 9 for better mobile behavior
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={8} // Reduced from 10 for better performance
-        ccd={true} // Keep continuous collision detection for fast movements
-        linearDamping={0.8} // Increased from 0.5 for more stable movement
-        angularDamping={1.2} // Increased from 1.0 to prevent unwanted rotation
-        sleepAfterStillness={1.0} // Increased from 0.2 to prevent premature sleeping
+        solverIterations={6} // Reduced from 8 for mobile
+        ccd={true} // Keep CCD enabled for fast movements
+        linearDamping={1.0} // Increased from 0.5 for stability
+        angularDamping={1.5} // Increased from 1.0 to prevent rotation issues
+        sleepAfterStillness={1.5} // Increased from 0.2 for iOS
         canSleep={true}
       >
         <group ref={container} position={position}>
@@ -525,13 +528,14 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.45]}
+              args={[0.45, 0.35]} // Slightly larger radius for better iOS detection
               position={[0, 3, 0]}
-              restitution={0.1}
-              friction={0.5}
+              restitution={0.2} // Reduced bounce
+              friction={0.7} // Increased friction
             />
+
             <CapsuleCollider
-              args={[0.4, 0.45]}
+              args={[0.45, 0.4]} // Sensor collider slightly larger
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
