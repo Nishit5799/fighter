@@ -466,11 +466,15 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.08}
-            sleepAfterStillness={0.2}
-            substeps={2}
-            solverIterations={8}
-            timeStep="vary"
+            debug
+            contactPairPersistentThreshold={0.1} // Slightly increased from 0.08 for better contact persistence
+            sleepAfterStillness={0.5} // Increased from 0.2 to prevent premature sleeping on laggy connections
+            substeps={1} // Reduced from 2 for better performance (compromise for slower connections)
+            solverIterations={6} // Reduced from 8 for better performance
+            timeStep="vary" // Keep this for automatic frame rate adaptation
+          
+            maxStabilizationIterations={2} // Added for better stability
+            stabilizationThreshold={0.1} // Added for better stability
           >
             <Ring />
             {isGameStarted && (

@@ -480,11 +480,11 @@ const PlayerController = forwardRef(
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={10}
-        ccd={true}
-        linearDamping={0.5}
-        angularDamping={1.0}
-        sleepAfterStillness={0.2}
+        solverIterations={8} // Reduced from 10 for better performance
+        ccd={true} // Keep continuous collision detection for fast movements
+        linearDamping={0.8} // Increased from 0.5 for more stable movement
+        angularDamping={1.2} // Increased from 1.0 to prevent unwanted rotation
+        sleepAfterStillness={1.0} // Increased from 0.2 to prevent premature sleeping
         canSleep={true}
       >
         <group ref={container} position={position}>
@@ -525,13 +525,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.3]}
+              args={[0.4, 0.35]}
               position={[0, 3, 0]}
               restitution={0.1}
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.4, 0.45]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
