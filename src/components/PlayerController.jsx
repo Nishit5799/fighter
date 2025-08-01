@@ -480,11 +480,11 @@ const PlayerController = forwardRef(
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={6} // Reduced from 8 for mobile
+        solverIterations={8} // Reduced from 8 for mobile
         ccd={true} // Keep CCD enabled for fast movements
-        linearDamping={1.0} // Increased from 0.5 for stability
-        angularDamping={1.5} // Increased from 1.0 to prevent rotation issues
-        sleepAfterStillness={1.5} // Increased from 0.2 for iOS
+        linearDamping={0.5} // Increased from 0.5 for stability
+        angularDamping={1} // Increased from 1.0 to prevent rotation issues
+        sleepAfterStillness={0.5} // Increased from 0.2 for iOS
         canSleep={true}
       >
         <group ref={container} position={position}>
