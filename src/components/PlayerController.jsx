@@ -528,14 +528,14 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.45, 0.35]} // Slightly larger radius for better iOS detection
+              args={[0.4, 0.35]} // Slightly larger radius for better iOS detection
               position={[0, 3, 0]}
               restitution={0.2} // Reduced bounce
               friction={0.7} // Increased friction
             />
 
             <CapsuleCollider
-              args={[0.45, 0.4]} // Sensor collider slightly larger
+              args={[0.4, 0.4]} // Sensor collider slightly larger
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
