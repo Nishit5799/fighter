@@ -212,20 +212,17 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        // iOS workaround - force collision handling
         setIsInContact(true);
-        clearTimeout(contactTimeout.current);
-
-        // Additional iOS-specific check
-        if (isAttacking && Date.now() - lastAttackTime < 500) {
-          const attackData = {
-            attackerId: socket.id,
-            damage: isPunching ? 10 : 20,
-            attackType: isPunching ? "punch" : "kick",
-            attackTime: Date.now(),
-          };
-          socket.emit("playerHit", attackData);
+        if (contactTimeout.current) {
+          clearTimeout(contactTimeout.current);
         }
+
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: Date.now(),
+          isLocalPlayer,
+        });
       }
     };
 
