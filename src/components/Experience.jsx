@@ -466,16 +466,14 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            debug
-            contactPairPersistentThreshold={0.25} // Increased for iOS
-            sleepAfterStillness={2.0} // Increased for iOS
-            substeps={2} // Slightly increased for better collision accuracy
-            solverIterations={8} // Increased for iOS
-            timeStep="vary"
-            gravity={[0, -8, 0]} // Reduced gravity
-            maxStabilizationIterations={4}
-            stabilizationThreshold={0.2}
-            colliders={false}
+            contactPairPersistentThreshold={0.15} // Higher for better contact persistence on iOS
+            sleepAfterStillness={1.0} // Increased to prevent premature sleeping on iOS
+            substeps={1} // Reduced for better iOS performance
+            solverIterations={6} // Balanced for mobile performance
+            timeStep="vary" // Crucial for variable frame rates on mobile
+            maxStabilizationIterations={2}
+            stabilizationThreshold={0.15} // Increased for iOS stability
+            colliders={false} // Let individual colliders handle their own settings
           >
             <Ring />
             {isGameStarted && (
