@@ -471,17 +471,11 @@ const Experience = () => {
 
           <Physics
             debug
-            contactPairPersistentThreshold={0.1} // Increased from 0.08 for better collision persistence
-            sleepAfterStillness={0.5} // Increased from 0.2 for better network sync
-            substeps={1} // Reduced from 2 for better performance
-            solverIterations={6} // Reduced from 8 for better performance
-            timeStep="vary" // Keep automatic time stepping
-            gravity={[0, -9, 0]} // Explicit gravity setting (slightly stronger than default)
-            maxStabilizationIterations={4} // Added for mobile optimization
-            defaultContactMaterial={{
-              restitution: 0.1, // Lower restitution for less bounciness
-              friction: 0.8, // Higher friction for more stable movement
-            }}
+            contactPairPersistentThreshold={0.08}
+            sleepAfterStillness={0.2}
+            substeps={2}
+            solverIterations={8}
+            timeStep="vary"
           >
             <Ring />
             {isGameStarted && (
