@@ -7,11 +7,7 @@ import React, {
   useCallback,
 } from "react";
 import { Canvas } from "@react-three/fiber";
-import {
-  Environment,
-  KeyboardControls,
-  OrthographicCamera,
-} from "@react-three/drei";
+import { KeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 
 import Joystick from "./Joystick";
@@ -451,7 +447,7 @@ const Experience = () => {
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
-          <ambientLight intensity={1.5} />
+          <ambientLight intensity={2.3} />
           <Background />
           <directionalLight
             intensity={1.5}
@@ -470,12 +466,16 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.2} // Higher for mobile
-            sleepAfterStillness={0.7} // Increased for mobile
-            substeps={1} // Reduced for mobile
-            solverIterations={4} // Reduced for mobile
-            timeStep="vary"
-            maxStabilizationIterations={2} // Reduced for mobile
+            debug
+            contactPairPersistentThreshold={0.15} // Higher for better contact persistence on iOS
+            sleepAfterStillness={1.0} // Increased to prevent premature sleeping on iOS
+            substeps={1} // Reduced for better iOS performance
+            solverIterations={6} // Balanced for mobile performance
+            timeStep="vary" // Crucial for variable frame rates on mobile
+            gravity={[0, -9, 0]} // Slightly reduced gravity
+            maxStabilizationIterations={2}
+            stabilizationThreshold={0.15} // Increased for iOS stability
+            colliders={false} // Let individual colliders handle their own settings
           >
             <Ring />
             {isGameStarted && (

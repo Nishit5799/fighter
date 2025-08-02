@@ -19,7 +19,7 @@ const SOUNDS = {
   kick: "/kick.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
-  lost: "/lost.mp3", // Add this line
+  lost: "/lost.mp3",
 };
 
 const PlayerController = forwardRef(
@@ -64,7 +64,7 @@ const PlayerController = forwardRef(
     const kickSound = useRef(null);
     const hitSound = useRef(null);
     const victorySound = useRef(null);
-    const lostSound = useRef(null); // Add this ref
+    const lostSound = useRef(null);
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -91,18 +91,17 @@ const PlayerController = forwardRef(
       kickSound.current = new Audio(SOUNDS.kick);
       hitSound.current = new Audio(SOUNDS.hit);
       victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost); // Add this line
+      lostSound.current = new Audio(SOUNDS.lost);
 
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
       hitSound.current.volume = 0.4;
       victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8; // Add this line
+      lostSound.current.volume = 0.8;
 
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (soundRef) => {
-            // Add lostSound here
             if (soundRef.current) {
               soundRef.current.pause();
               soundRef.current.src = "";
@@ -178,6 +177,7 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
+
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -189,11 +189,6 @@ const PlayerController = forwardRef(
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
-      }
-
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play();
       }
 
       setIsHit(true);
@@ -222,7 +217,6 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        // Additional logging for iOS debugging
         console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
@@ -427,7 +421,6 @@ const PlayerController = forwardRef(
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
-        // Add delay for victory sound
         setTimeout(() => {
           if (isLocalPlayerWinner && victorySound.current) {
             victorySound.current.currentTime = 0;
@@ -435,7 +428,7 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Victory sound error:", e));
           }
-        }, 100); // 100ms delay
+        }, 100);
       },
 
       setDefeat: (isLocalPlayerLoser) => {
@@ -443,7 +436,6 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
-        // Add slightly longer delay for lost sound
         setTimeout(() => {
           if (isLocalPlayerLoser && lostSound.current) {
             lostSound.current.currentTime = 0;
@@ -451,13 +443,14 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Lost sound error:", e));
           }
-        }, 200); // 200ms delay
+        }, 200);
       },
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
     }));
+
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -466,7 +459,6 @@ const PlayerController = forwardRef(
 
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (sound) => {
-            // Add lostSound here
             if (sound.current) {
               sound.current.pause();
               sound.current = null;
@@ -475,25 +467,25 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
+
     return (
       <RigidBody
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={9} // Increased for faster falling/more responsive movement
+        gravityScale={8} // Reduced from 9 for better mobile behavior
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={8} // Balanced value for stability
-        ccd={true} // Keep CCD enabled for fast-moving objects
-        linearDamping={0.7} // Increased for more controlled movement
-        angularDamping={1.2} // Increased to prevent unwanted rotation
-        sleepAfterStillness={0.3} // Helps with performance
-        canSleep={true} // Allow sleeping for better performance
-        mass={1.5} // Explicit mass for consistent behavior
+        solverIterations={6} // Reduced from 8 for mobile
+        ccd={true} // Keep CCD enabled for fast movements
+        linearDamping={1.0} // Increased from 0.5 for stability
+        angularDamping={1.5} // Increased from 1.0 to prevent rotation issues
+        sleepAfterStillness={1.5} // Increased from 0.2 for iOS
+        canSleep={true}
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
@@ -533,13 +525,14 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.3]}
+              args={[0.45, 0.35]} // Slightly larger radius for better iOS detection
               position={[0, 3, 0]}
-              restitution={0.1}
-              friction={0.5}
+              restitution={0.2} // Reduced bounce
+              friction={0.7} // Increased friction
             />
+
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.45, 0.4]} // Sensor collider slightly larger
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
