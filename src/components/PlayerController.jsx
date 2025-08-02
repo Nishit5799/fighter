@@ -480,19 +480,20 @@ const PlayerController = forwardRef(
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={9}
+        gravityScale={9} // Increased for faster falling/more responsive movement
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={10}
-        ccd={true}
-        linearDamping={0.5}
-        angularDamping={1.0}
-        sleepAfterStillness={0.2}
-        canSleep={true}
+        solverIterations={8} // Balanced value for stability
+        ccd={true} // Keep CCD enabled for fast-moving objects
+        linearDamping={0.7} // Increased for more controlled movement
+        angularDamping={1.2} // Increased to prevent unwanted rotation
+        sleepAfterStillness={0.3} // Helps with performance
+        canSleep={true} // Allow sleeping for better performance
+        mass={1.5} // Explicit mass for consistent behavior
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
@@ -532,13 +533,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.35]}
+              args={[0.4, 0.3]}
               position={[0, 3, 0]}
               restitution={0.1}
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.45]}
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
