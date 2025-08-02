@@ -532,13 +532,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.3]}
+              args={[0.4, 0.35]}
               position={[0, 3, 0]}
               restitution={0.1}
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.4, 0.45]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}

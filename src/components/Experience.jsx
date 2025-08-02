@@ -451,7 +451,7 @@ const Experience = () => {
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
-          <Environment preset="sunset" />
+          <ambientLight intensity={1.5} />
           <Background />
           <directionalLight
             intensity={1.5}
