@@ -7,7 +7,11 @@ import React, {
   useCallback,
 } from "react";
 import { Canvas } from "@react-three/fiber";
-import { KeyboardControls } from "@react-three/drei";
+import {
+  Environment,
+  KeyboardControls,
+  OrthographicCamera,
+} from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 
 import Joystick from "./Joystick";
@@ -447,7 +451,7 @@ const Experience = () => {
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
-          <ambientLight intensity={2.3} />
+          <Environment preset="sunset" />
           <Background />
           <directionalLight
             intensity={1.5}
@@ -466,14 +470,17 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.15}
-            sleepAfterStillness={1.0}
-            substeps={1}
-            solverIterations={6}
-            timeStep="vary"
-            maxStabilizationIterations={2}
-            stabilizationThreshold={0.15}
-            colliders={false}
+            contactPairPersistentThreshold={0.1} // Increased from 0.08 for better collision persistence
+            sleepAfterStillness={0.5} // Increased from 0.2 for better network sync
+            substeps={1} // Reduced from 2 for better performance
+            solverIterations={6} // Reduced from 8 for better performance
+            timeStep="vary" // Keep automatic time stepping
+            gravity={[0, -9.81, 0]} // Explicit gravity setting (slightly stronger than default)
+            maxStabilizationIterations={4} // Added for mobile optimization
+            defaultContactMaterial={{
+              restitution: 0.2, // Lower restitution for less bounciness
+              friction: 0.8, // Higher friction for more stable movement
+            }}
           >
             <Ring />
             {isGameStarted && (

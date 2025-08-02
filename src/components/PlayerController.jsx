@@ -19,7 +19,7 @@ const SOUNDS = {
   kick: "/kick.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
-  lost: "/lost.mp3",
+  lost: "/lost.mp3", // Add this line
 };
 
 const PlayerController = forwardRef(
@@ -64,7 +64,7 @@ const PlayerController = forwardRef(
     const kickSound = useRef(null);
     const hitSound = useRef(null);
     const victorySound = useRef(null);
-    const lostSound = useRef(null);
+    const lostSound = useRef(null); // Add this ref
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -91,17 +91,18 @@ const PlayerController = forwardRef(
       kickSound.current = new Audio(SOUNDS.kick);
       hitSound.current = new Audio(SOUNDS.hit);
       victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost);
+      lostSound.current = new Audio(SOUNDS.lost); // Add this line
 
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
       hitSound.current.volume = 0.4;
       victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8;
+      lostSound.current.volume = 0.8; // Add this line
 
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (soundRef) => {
+            // Add lostSound here
             if (soundRef.current) {
               soundRef.current.pause();
               soundRef.current.src = "";
@@ -177,11 +178,6 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
-
-      // iOS workaround - force hit animation if collision was recent
-      const collisionRecently = isInContact || Date.now() - attackTime < 500;
-      if (!collisionRecently) return;
-
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -193,6 +189,11 @@ const PlayerController = forwardRef(
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
+      }
+
+      if (hitSound.current) {
+        hitSound.current.currentTime = 0;
+        hitSound.current.play();
       }
 
       setIsHit(true);
@@ -221,16 +222,13 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        // iOS workaround - force attack if collision was recent
-        if (isAttacking && Date.now() - lastAttackTime < 500) {
-          const attackType = isPunching ? "punch" : "kick";
-          socket.emit("playerHit", {
-            attackerId: socket.id,
-            damage: attackType === "kick" ? 20 : 10,
-            attackType,
-            attackTime: Date.now(),
-          });
-        }
+        // Additional logging for iOS debugging
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: Date.now(),
+          isLocalPlayer,
+        });
       }
     };
 
@@ -241,7 +239,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 100); // Increased from 50ms for iOS
+        }, 500);
       }
     };
 
@@ -258,6 +256,12 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
+          console.log(`Emitting defeat - 
+        Winner: ${opponentRef.current.id}, 
+        Loser: ${socket.id},
+        WinnerHealth: ${opponentHealth},
+        LoserHealth: ${health}`);
+
           socket.emit("playerDefeated", {
             winnerId: opponentRef.current.id,
             loserId: socket.id,
@@ -273,6 +277,7 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
+        console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
@@ -422,6 +427,7 @@ const PlayerController = forwardRef(
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
+        // Add delay for victory sound
         setTimeout(() => {
           if (isLocalPlayerWinner && victorySound.current) {
             victorySound.current.currentTime = 0;
@@ -429,7 +435,7 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Victory sound error:", e));
           }
-        }, 100);
+        }, 100); // 100ms delay
       },
 
       setDefeat: (isLocalPlayerLoser) => {
@@ -437,6 +443,7 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
+        // Add slightly longer delay for lost sound
         setTimeout(() => {
           if (isLocalPlayerLoser && lostSound.current) {
             lostSound.current.currentTime = 0;
@@ -444,14 +451,13 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Lost sound error:", e));
           }
-        }, 200);
+        }, 200); // 200ms delay
       },
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
     }));
-
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -460,6 +466,7 @@ const PlayerController = forwardRef(
 
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (sound) => {
+            // Add lostSound here
             if (sound.current) {
               sound.current.pause();
               sound.current = null;
@@ -468,24 +475,23 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
-
     return (
       <RigidBody
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={8} // Reduced from 9 for mobile
+        gravityScale={5} // Reduced from 9 for better mobile handling
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={6} // Reduced from 10 for mobile
-        ccd={true}
-        linearDamping={1.0} // Increased from 0.5
-        angularDamping={1.5} // Increased from 1.0
-        sleepAfterStillness={1.5} // Increased from 0.2
+        solverIterations={8} // Reduced from 10 for performance
+        ccd={true} // Keep continuous collision detection
+        linearDamping={0.8} // Increased from 0.5 for more stable movement
+        angularDamping={1.2} // Increased from 1.0 to prevent unwanted rotation
+        sleepAfterStillness={0.5} // Increased from 0.2 to help with network sync
         canSleep={true}
       >
         <group ref={container} position={position}>
@@ -526,13 +532,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.45, 0.35]} // Increased for better mobile detection
+              args={[0.4, 0.3]}
               position={[0, 3, 0]}
-              restitution={0.2}
-              friction={0.7}
+              restitution={0.1}
+              friction={0.5}
             />
             <CapsuleCollider
-              args={[0.45, 0.4]} // Increased sensor size
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
