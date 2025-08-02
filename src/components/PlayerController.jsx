@@ -178,6 +178,10 @@ const PlayerController = forwardRef(
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
 
+      // iOS workaround - force hit animation if collision was recent
+      const collisionRecently = isInContact || Date.now() - attackTime < 500;
+      if (!collisionRecently) return;
+
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -217,12 +221,16 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
+        // iOS workaround - force attack if collision was recent
+        if (isAttacking && Date.now() - lastAttackTime < 500) {
+          const attackType = isPunching ? "punch" : "kick";
+          socket.emit("playerHit", {
+            attackerId: socket.id,
+            damage: attackType === "kick" ? 20 : 10,
+            attackType,
+            attackTime: Date.now(),
+          });
+        }
       }
     };
 
@@ -233,7 +241,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 50);
+        }, 100); // Increased from 50ms for iOS
       }
     };
 
@@ -250,12 +258,6 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
-
           socket.emit("playerDefeated", {
             winnerId: opponentRef.current.id,
             loserId: socket.id,
@@ -271,7 +273,6 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
@@ -473,18 +474,18 @@ const PlayerController = forwardRef(
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={8} // Reduced from 9 for better mobile behavior
+        gravityScale={8} // Reduced from 9 for mobile
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={8} // Reduced from 8 for mobile
-        ccd={true} // Keep CCD enabled for fast movements
-        linearDamping={0.5} // Increased from 0.5 for stability
-        angularDamping={1} // Increased from 1.0 to prevent rotation issues
-        sleepAfterStillness={0.5} // Increased from 0.2 for iOS
+        solverIterations={6} // Reduced from 10 for mobile
+        ccd={true}
+        linearDamping={1.0} // Increased from 0.5
+        angularDamping={1.5} // Increased from 1.0
+        sleepAfterStillness={1.5} // Increased from 0.2
         canSleep={true}
       >
         <group ref={container} position={position}>
@@ -525,14 +526,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.45, 0.35]} // Slightly larger radius for better iOS detection
+              args={[0.45, 0.35]} // Increased for better mobile detection
               position={[0, 3, 0]}
-              restitution={0.2} // Reduced bounce
-              friction={0.7} // Increased friction
+              restitution={0.2}
+              friction={0.7}
             />
-
             <CapsuleCollider
-              args={[0.45, 0.4]} // Sensor collider slightly larger
+              args={[0.45, 0.4]} // Increased sensor size
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
