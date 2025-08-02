@@ -470,12 +470,12 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.1} // Slightly higher for better collision persistence
-            sleepAfterStillness={0.5} // Increased to help with performance on slower devices
-            substeps={2} // Reduced for better performance on low-end devices
-            solverIterations={6} // Balanced between performance and accuracy
-            timeStep="vary" // Keep this for adaptive performance
-            maxStabilizationIterations={4} // Helps with stability on mobile
+            contactPairPersistentThreshold={0.2} // Higher for mobile
+            sleepAfterStillness={0.7} // Increased for mobile
+            substeps={1} // Reduced for mobile
+            solverIterations={4} // Reduced for mobile
+            timeStep="vary"
+            maxStabilizationIterations={2} // Reduced for mobile
           >
             <Ring />
             {isGameStarted && (
