@@ -239,7 +239,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 500);
+        }, 50);
       }
     };
 
@@ -532,13 +532,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.3]}
+              args={[0.4, 0.38]}
               position={[0, 3, 0]}
               restitution={0.1}
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.4, 0.45]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
