@@ -136,42 +136,62 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
+      // Play sound with iOS fallback
+      const playSound = (soundRef) => {
+        try {
+          soundRef.current.currentTime = 0;
+          soundRef.current.play().catch((e) => {
+            // iOS fallback - try again after user interaction
+            document.body.addEventListener(
+              "touchstart",
+              () => {
+                soundRef.current.play().catch(() => {});
+              },
+              { once: true }
+            );
+          });
+        } catch (e) {}
+      };
+
       if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        playSound(punchSound);
       } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        playSound(kickSound);
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      if (
-        isInContact &&
-        socket &&
-        opponentRef.current &&
-        !opponentRef.current.isDefeated
-      ) {
-        socket.emit("playerHit", {
-          attackerId: socket.id,
-          damage: damage,
-          attackType: type,
-          attackTime: currentTime,
-        });
-      }
-
-      const duration = 1000;
+      // Extended attack window for iOS (1.5s instead of 1s)
+      const duration = 1500;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
         setCurrentAnimation(isDefeated ? "fall" : "idle");
       }, duration);
+
+      // Check for hits multiple times during the attack
+      const checkHit = () => {
+        if (
+          isInContact &&
+          socket &&
+          opponentRef.current &&
+          !opponentRef.current.isDefeated
+        ) {
+          socket.emit("playerHit", {
+            attackerId: socket.id,
+            damage: damage,
+            attackType: type,
+            attackTime: currentTime,
+          });
+        }
+      };
+
+      // Check immediately and several times during the attack
+      checkHit();
+      const hitCheckInterval = setInterval(checkHit, 200);
+      setTimeout(() => clearInterval(hitCheckInterval), duration);
     };
 
     const takeHit = (attackType, attackTime) => {
@@ -212,16 +232,20 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        setIsInContact(true);
+        // Clear any pending timeout to prevent premature exit
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
 
-        console.log("Collision entered with:", {
+        setIsInContact(true);
+
+        // For iOS debugging
+        console.log("Collision ENTERED with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
           time: Date.now(),
           isLocalPlayer,
+          position: rb.current.translation(),
         });
       }
     };
@@ -231,9 +255,19 @@ const PlayerController = forwardRef(
 
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
+        // Use a longer timeout for iOS (300ms instead of 50ms)
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 50);
+
+          // For iOS debugging
+          console.log("Collision EXITED with:", {
+            self: rb.current?.userData?.id,
+            other: otherUserData?.id,
+            time: Date.now(),
+            isLocalPlayer,
+            position: rb.current.translation(),
+          });
+        }, 300); // Increased timeout for iOS
       }
     };
 
@@ -473,19 +507,19 @@ const PlayerController = forwardRef(
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={8} // Reduced from 9 for better mobile behavior
+        gravityScale={7} // Reduced further for iOS
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={6} // Reduced from 8 for mobile
-        ccd={true} // Keep CCD enabled for fast movements
-        linearDamping={1.0} // Increased from 0.5 for stability
-        angularDamping={1.5} // Increased from 1.0 to prevent rotation issues
-        sleepAfterStillness={1.5} // Increased from 0.2 for iOS
-        canSleep={true}
+        solverIterations={8} // Increased for more accurate collisions
+        ccd={true}
+        linearDamping={1.2} // Increased damping
+        angularDamping={1.8}
+        sleepAfterStillness={2.0} // Longer delay before sleeping
+        canSleep={false} // Disable sleeping entirely for iOS
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
