@@ -166,7 +166,7 @@ const PlayerController = forwardRef(
         });
       }
 
-      const duration = 1000;
+      const duration = 1200;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
@@ -174,28 +174,30 @@ const PlayerController = forwardRef(
       }, duration);
     };
 
+    // In PlayerController.jsx
+
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
 
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
-        });
+      // Always proceed with hit animation regardless of audio
+      setIsHit(true);
+      setCurrentAnimation("hit");
+
+      // Try to play sound but don't depend on it
+      try {
+        if (hitSound.current) {
+          hitSound.current.currentTime = 0;
+          hitSound.current.play().catch(() => {});
+        }
+      } catch (e) {
+        console.log("Audio play failed, continuing with animation");
       }
 
       opponentAttackTime.current = attackTime;
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
-      }
-
-      setIsHit(true);
-      setCurrentAnimation("hit");
-
-      if (character.current?.playHitSound) {
-        character.current.playHitSound();
       }
 
       const duration = 1000;
@@ -217,10 +219,10 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
+        // Add additional logging for debugging
+        console.log("Collision entered at:", Date.now(), {
+          selfPosition: rb.current.translation(),
+          otherPosition: event.other.rigidBody.translation(),
           isLocalPlayer,
         });
       }
@@ -233,7 +235,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 500);
+        }, 50);
       }
     };
 

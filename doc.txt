@@ -9,11 +9,7 @@ import React, {
   useCallback,
 } from "react";
 import { Canvas } from "@react-three/fiber";
-import {
-  Environment,
-  KeyboardControls,
-  OrthographicCamera,
-} from "@react-three/drei";
+import { KeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 
 import Joystick from "./Joystick";
@@ -453,7 +449,7 @@ const Experience = () => {
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
-          <Environment preset="sunset" />
+          <ambientLight intensity={2.3} />
           <Background />
           <directionalLight
             intensity={1.5}
@@ -714,6 +710,7 @@ export default Experience;
 
 
 
+
 //playercontroller
 
 import React, {
@@ -737,7 +734,7 @@ const SOUNDS = {
   kick: "/kick.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
-  lost: "/lost.mp3", // Add this line
+  lost: "/lost.mp3",
 };
 
 const PlayerController = forwardRef(
@@ -782,7 +779,7 @@ const PlayerController = forwardRef(
     const kickSound = useRef(null);
     const hitSound = useRef(null);
     const victorySound = useRef(null);
-    const lostSound = useRef(null); // Add this ref
+    const lostSound = useRef(null);
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -809,18 +806,17 @@ const PlayerController = forwardRef(
       kickSound.current = new Audio(SOUNDS.kick);
       hitSound.current = new Audio(SOUNDS.hit);
       victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost); // Add this line
+      lostSound.current = new Audio(SOUNDS.lost);
 
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
       hitSound.current.volume = 0.4;
       victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8; // Add this line
+      lostSound.current.volume = 0.8;
 
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (soundRef) => {
-            // Add lostSound here
             if (soundRef.current) {
               soundRef.current.pause();
               soundRef.current.src = "";
@@ -896,6 +892,7 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
       if (attackTime <= lastAttackTime) return;
+
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -907,11 +904,6 @@ const PlayerController = forwardRef(
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
-      }
-
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play();
       }
 
       setIsHit(true);
@@ -940,7 +932,6 @@ const PlayerController = forwardRef(
           clearTimeout(contactTimeout.current);
         }
 
-        // Additional logging for iOS debugging
         console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
@@ -1145,7 +1136,6 @@ const PlayerController = forwardRef(
         setCurrentAnimation("victory");
         movementEnabled.current = false;
 
-        // Add delay for victory sound
         setTimeout(() => {
           if (isLocalPlayerWinner && victorySound.current) {
             victorySound.current.currentTime = 0;
@@ -1153,7 +1143,7 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Victory sound error:", e));
           }
-        }, 100); // 100ms delay
+        }, 100);
       },
 
       setDefeat: (isLocalPlayerLoser) => {
@@ -1161,7 +1151,6 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
-        // Add slightly longer delay for lost sound
         setTimeout(() => {
           if (isLocalPlayerLoser && lostSound.current) {
             lostSound.current.currentTime = 0;
@@ -1169,13 +1158,14 @@ const PlayerController = forwardRef(
               .play()
               .catch((e) => console.log("Lost sound error:", e));
           }
-        }, 200); // 200ms delay
+        }, 200);
       },
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
     }));
+
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -1184,7 +1174,6 @@ const PlayerController = forwardRef(
 
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (sound) => {
-            // Add lostSound here
             if (sound.current) {
               sound.current.pause();
               sound.current = null;
@@ -1193,6 +1182,7 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
+
     return (
       <RigidBody
         colliders={false}
@@ -1295,7 +1285,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
       setPunchCooldown(true);
       onPunch(true); // Trigger punch state
       setTimeout(() => onPunch(false), 1000); // Reset after 1 second
-      setTimeout(() => setPunchCooldown(false), 1500);
+      setTimeout(() => setPunchCooldown(false), 2500);
       return true;
     } else {
       setKickCooldown(true);
@@ -1428,7 +1418,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
   return (
     <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 sm:hidden select-none user-select-none z-[100]">
-      {renderButton("punch", punchRef, "👊", punchCooldown, 1.5)}
+      {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 
       <style jsx>{`
@@ -1469,5 +1459,279 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
 export default AttackButtons;
 
+
+//server.js
+
+const next = require("next");
+const http = require("http");
+const { Server } = require("socket.io");
+const { createClient } = require("redis");
+const { createAdapter } = require("@socket.io/redis-adapter");
+
+const dev = process.env.NODE_ENV !== "production";
+const app = next({ dev });
+const handle = app.getRequestHandler();
+
+const PORT = process.env.PORT || 3000;
+
+// Initialize Redis clients
+const pubClient = createClient({
+  url: process.env.REDIS_URL || "redis://localhost:6379",
+});
+
+const subClient = pubClient.duplicate();
+
+Promise.all([pubClient.connect(), subClient.connect()])
+  .then(() => {
+    app.prepare().then(() => {
+      const server = http.createServer((req, res) => {
+        handle(req, res);
+      });
+
+      const io = new Server(server, {
+        cors: {
+          origin: "*",
+        },
+        connectionStateRecovery: {
+          maxDisconnectionDuration: 2 * 60 * 1000,
+          skipMiddlewares: true,
+        },
+        pingTimeout: 60000,
+        pingInterval: 10000,
+      });
+
+      io.adapter(createAdapter(pubClient, subClient));
+      const roomStates = new Map();
+
+      const generateRoomId = () => {
+        return `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      };
+
+      const findAvailableRoom = () => {
+        for (const [roomId, state] of roomStates) {
+          if (state.players.size < 2 && !state.gameStarted) {
+            return roomId;
+          }
+        }
+        const newRoomId = generateRoomId();
+        roomStates.set(newRoomId, {
+          players: new Map(),
+          gameStarted: false,
+          createdAt: Date.now(),
+          lastAttacks: {},
+        });
+        return newRoomId;
+      };
+
+      setInterval(() => {
+        const now = Date.now();
+        for (const [roomId, state] of roomStates) {
+          if (state.players.size === 0 && now - state.createdAt > 3600000) {
+            roomStates.delete(roomId);
+            console.log(`Cleaned up empty room: ${roomId}`);
+          }
+
+          // Clear old attack times
+          if (state.lastAttacks) {
+            for (const [playerId, time] of Object.entries(state.lastAttacks)) {
+              if (now - time > 5000) {
+                delete state.lastAttacks[playerId];
+              }
+            }
+          }
+        }
+      }, 60000);
+
+      io.on("connection", (socket) => {
+        console.log(`New connection: ${socket.id}`);
+
+        socket.on("connection_quality", (quality) => {
+          if (quality === "low") {
+            socket._lowQualityMode = true;
+          }
+        });
+
+        const roomId = findAvailableRoom();
+        socket.join(roomId);
+        const roomState = roomStates.get(roomId);
+
+        socket.emit("roomState", {
+          players: Array.from(roomState.players.values()),
+          gameStarted: roomState.gameStarted,
+        });
+
+        socket.on("joinRoom", (playerName) => {
+          if (roomState.players.has(socket.id)) return;
+
+          for (const player of roomState.players.values()) {
+            if (player.name === playerName) {
+              socket.emit("usernameTaken");
+              return;
+            }
+          }
+
+          roomState.players.set(socket.id, {
+            id: socket.id,
+            name: playerName,
+            isReady: false,
+          });
+
+          io.to(roomId).emit(
+            "updatePlayers",
+            Array.from(roomState.players.values())
+          );
+        });
+
+        socket.on("playerReady", () => {
+          const player = roomState.players.get(socket.id);
+          if (player) {
+            player.isReady = true;
+            io.to(roomId).emit(
+              "updatePlayers",
+              Array.from(roomState.players.values())
+            );
+
+            if (
+              roomState.players.size === 2 &&
+              Array.from(roomState.players.values()).every((p) => p.isReady)
+            ) {
+              roomState.gameStarted = true;
+              io.to(roomId).emit("startGame");
+            }
+          }
+        });
+
+        socket.on("carMove", (data) => {
+          socket.to(roomId).emit("carMove", data);
+        });
+
+        socket.on("playerHit", (data) => {
+          const hitData = {
+            ...data,
+            attackTime: data.attackTime || Date.now(),
+          };
+
+          // Get both players in the room
+          const players = Array.from(roomState.players.keys());
+          const otherPlayerId = players.find((id) => id !== socket.id);
+
+          if (otherPlayerId) {
+            // Check if the other player recently attacked
+            const otherPlayerLastAttack =
+              roomState.lastAttacks?.[otherPlayerId] || 0;
+            const HIT_PRIORITY_BUFFER = 100; // ms
+
+            // Only emit to the slower player
+            if (
+              hitData.attackTime >
+              otherPlayerLastAttack + HIT_PRIORITY_BUFFER
+            ) {
+              socket.to(otherPlayerId).emit("playerHit", hitData);
+            }
+          }
+
+          // Store the last attack time for this player
+          roomState.lastAttacks[socket.id] = hitData.attackTime;
+        });
+
+        socket.on("updateHealth", (data) => {
+          socket.broadcast.emit("updateHealth", data);
+        });
+
+        socket.on("playerDefeated", (data) => {
+          if (!roomState.gameStarted || !roomState.players) {
+            console.error("Game not started or room not found");
+            return;
+          }
+
+          if (
+            !data ||
+            typeof data !== "object" ||
+            !data.winnerId ||
+            !data.loserId
+          ) {
+            console.error("Invalid data format", data);
+            return;
+          }
+
+          if (data.winnerId === data.loserId) {
+            console.error(`Duplicate IDs: ${data.winnerId}`);
+            return;
+          }
+
+          const winner = roomState.players.get(data.winnerId);
+          const loser = roomState.players.get(data.loserId);
+
+          if (!winner || !loser) {
+            console.error(
+              "Invalid playerDefeated data - winner or loser not found"
+            );
+            return;
+          }
+
+          if (roomState.matchResult) {
+            console.log(
+              "Match result already processed, ignoring duplicate event"
+            );
+            return;
+          }
+
+          roomState.matchResult = {
+            winnerId: data.winnerId,
+            loserId: data.loserId,
+          };
+
+          const defeatData = {
+            winnerId: data.winnerId,
+            loserId: data.loserId,
+            winnerHealth: Math.max(1, Math.min(100, data.winnerHealth || 100)),
+            loserHealth: 0,
+            winningAttackTime: data.winningAttackTime || Date.now(),
+          };
+
+          io.to(roomId).emit("playerDefeated", defeatData);
+          console.log(`Verified Match Result - 
+    Winner: ${winner.name} (${winner.id}), 
+    Loser: ${loser.name} (${loser.id})`);
+
+          socket.on("restartGame", () => {
+            roomState.matchResult = null;
+            roomState.players.forEach((player) => (player.isReady = false));
+            roomState.gameStarted = false;
+            io.to(roomId).emit("restartGame");
+          });
+        });
+
+        socket.on("restartGame", () => {
+          roomState.players.clear();
+          roomState.gameStarted = false;
+          io.to(roomId).emit("restartGame");
+        });
+
+        socket.on("disconnect", () => {
+          console.log(`Disconnected: ${socket.id}`);
+          if (roomState.players.delete(socket.id)) {
+            io.to(roomId).emit(
+              "updatePlayers",
+              Array.from(roomState.players.values())
+            );
+
+            if (roomState.gameStarted) {
+              io.to(roomId).emit("playerDisconnected", socket.id);
+            }
+          }
+        });
+      });
+
+      server.listen(PORT, (err) => {
+        if (err) throw err;
+        console.log(`> Ready on http://localhost:${PORT}`);
+      });
+    });
+  })
+  .catch((err) => {
+    console.error("Redis connection failed:", err);
+    process.exit(1);
+  });
 
 

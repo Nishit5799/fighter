@@ -75,6 +75,19 @@ const Experience = () => {
   }, []);
 
   useEffect(() => {
+    if (!socket) return;
+
+    const checkConnection = setInterval(() => {
+      if (socket.disconnected) {
+        console.log("Socket disconnected, attempting reconnect");
+        socket.connect();
+      }
+    }, 5000);
+
+    return () => clearInterval(checkConnection);
+  }, [socket]);
+
+  useEffect(() => {
     const unlockAudio = () => {
       const sounds = [
         "/punch.mp3",
