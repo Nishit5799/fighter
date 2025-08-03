@@ -36,10 +36,14 @@ Promise.all([pubClient.connect(), subClient.connect()])
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
         },
-        pingTimeout: 60000,
-        pingInterval: 10000,
+        pingTimeout: 10000, // Reduced from 60000
+        pingInterval: 5000, // Reduced from 10000
+        transports: ["websocket", "polling"], // Explicitly enable polling
+        allowUpgrades: true,
+        perMessageDeflate: {
+          threshold: 1024, // Adjust compression threshold
+        },
       });
-
       io.adapter(createAdapter(pubClient, subClient));
       const roomStates = new Map();
 

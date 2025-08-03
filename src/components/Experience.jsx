@@ -29,14 +29,6 @@ const keyboardMap = [
   { name: "kick", keys: ["KeyK"] },
 ];
 
-const isIOS = () => {
-  return (
-    typeof window !== "undefined" &&
-    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
-  );
-};
-
 const Experience = () => {
   const socket = useSocket();
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
@@ -60,7 +52,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [connectionQuality, setConnectionQuality] = useState("good");
   const beginSoundRef = useRef(null);
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
@@ -111,43 +102,6 @@ const Experience = () => {
     window.addEventListener("touchstart", unlockAudio, { once: true });
     window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !socket.connected) {
-        console.log("Reconnecting socket...");
-        socket.connect();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [socket]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const checkConnection = () => {
-      const start = Date.now();
-      socket.emit("ping", () => {
-        const latency = Date.now() - start;
-        if (latency > 300) {
-          setConnectionQuality("low");
-          socket.emit("connection_quality", "low");
-        } else {
-          setConnectionQuality("good");
-        }
-      });
-    };
-
-    const interval = setInterval(checkConnection, 5000);
-    return () => clearInterval(interval);
-  }, [socket]);
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -375,6 +329,7 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
+    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -387,6 +342,7 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
+      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -538,7 +494,6 @@ const Experience = () => {
                   isLocalPlayer={players[0]?.id === socket?.id}
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
-                  connectionQuality={connectionQuality}
                 />
                 <PlayerController
                   ref={carControllerRef2}
@@ -559,7 +514,6 @@ const Experience = () => {
                   isLocalPlayer={players[1]?.id === socket?.id}
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
-                  connectionQuality={connectionQuality}
                 />
               </>
             )}
