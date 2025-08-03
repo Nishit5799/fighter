@@ -233,7 +233,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 50);
+        }, 500);
       }
     };
 
@@ -473,18 +473,18 @@ const PlayerController = forwardRef(
         colliders={false}
         lockRotations
         ref={rb}
-        gravityScale={8} // Reduced from 9 for better mobile behavior
+        gravityScale={9}
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
         }}
-        solverIterations={6} // Reduced from 8 for mobile
-        ccd={true} // Keep CCD enabled for fast movements
-        linearDamping={1.0} // Increased from 0.5 for stability
-        angularDamping={1.5} // Increased from 1.0 to prevent rotation issues
-        sleepAfterStillness={1.5} // Increased from 0.2 for iOS
+        solverIterations={10}
+        ccd={true}
+        linearDamping={0.5}
+        angularDamping={1.0}
+        sleepAfterStillness={0.2}
         canSleep={true}
       >
         <group ref={container} position={position}>
@@ -525,14 +525,13 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.45, 0.35]} // Slightly larger radius for better iOS detection
+              args={[0.4, 0.3]}
               position={[0, 3, 0]}
-              restitution={0.2} // Reduced bounce
-              friction={0.7} // Increased friction
+              restitution={0.1}
+              friction={0.5}
             />
-
             <CapsuleCollider
-              args={[0.45, 0.4]} // Sensor collider slightly larger
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
