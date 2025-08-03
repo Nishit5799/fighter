@@ -21,6 +21,10 @@ Promise.all([pubClient.connect(), subClient.connect()])
   .then(() => {
     app.prepare().then(() => {
       const server = http.createServer((req, res) => {
+        // Disable caching for dynamic content
+        if (req.url.includes("/_next/static") || req.url.includes("/api/")) {
+          res.setHeader("Cache-Control", "no-store, max-age=0");
+        }
         handle(req, res);
       });
 
@@ -85,6 +89,10 @@ Promise.all([pubClient.connect(), subClient.connect()])
           if (quality === "low") {
             socket._lowQualityMode = true;
           }
+        });
+
+        socket.on("ping", (callback) => {
+          callback();
         });
 
         const roomId = findAvailableRoom();
@@ -152,22 +160,12 @@ Promise.all([pubClient.connect(), subClient.connect()])
           const otherPlayerId = players.find((id) => id !== socket.id);
 
           if (otherPlayerId) {
-            // Check if the other player recently attacked
-            const otherPlayerLastAttack =
-              roomState.lastAttacks?.[otherPlayerId] || 0;
-            const HIT_PRIORITY_BUFFER = 100; // ms
+            // Always emit the hit, but track timing for damage calculation
+            socket.to(otherPlayerId).emit("playerHit", hitData);
 
-            // Only emit to the slower player
-            if (
-              hitData.attackTime >
-              otherPlayerLastAttack + HIT_PRIORITY_BUFFER
-            ) {
-              socket.to(otherPlayerId).emit("playerHit", hitData);
-            }
+            // Store the last attack time for this player
+            roomState.lastAttacks[socket.id] = hitData.attackTime;
           }
-
-          // Store the last attack time for this player
-          roomState.lastAttacks[socket.id] = hitData.attackTime;
         });
 
         socket.on("updateHealth", (data) => {
