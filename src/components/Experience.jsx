@@ -486,11 +486,12 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
+            gravity={[0, -9.81, 0]} // Add gravity configuration
+            timeStep={1 / 60} // Add timeStep
             contactPairPersistentThreshold={0.08}
             sleepAfterStillness={0.2}
             substeps={2}
             solverIterations={8}
-            timeStep="vary"
           >
             <Ring />
             {isGameStarted && (

@@ -491,7 +491,6 @@ const PlayerController = forwardRef(
         ccd={true}
         linearDamping={0.5}
         angularDamping={1.0}
-        sleepAfterStillness={0.2}
         canSleep={true}
       >
         <group ref={container} position={position}>
