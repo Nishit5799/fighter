@@ -62,9 +62,35 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
+  const verifyAndCreateAudio = (src) => {
+    try {
+      const audio = new Audio(src);
+      audio.preload = "auto";
+      return audio;
+    } catch (error) {
+      console.error(`Failed to load audio: ${src}`, error);
+      return null;
+    }
+  };
+
+  const playAudio = (audioRef) => {
+    if (!audioRef.current) return;
+
+    try {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch((e) => {
+        console.error("Audio play failed:", e);
+      });
+    } catch (error) {
+      console.error("Audio playback error:", error);
+    }
+  };
+
   useEffect(() => {
-    beginSoundRef.current = new Audio("/begin.mp3");
-    beginSoundRef.current.volume = 0.7;
+    beginSoundRef.current = verifyAndCreateAudio("/begin.mp3");
+    if (beginSoundRef.current) {
+      beginSoundRef.current.volume = 0.7;
+    }
 
     return () => {
       if (beginSoundRef.current) {
@@ -206,7 +232,6 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id
@@ -329,7 +354,6 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
-    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -342,7 +366,6 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
-      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -379,10 +402,7 @@ const Experience = () => {
           setIsGameStarted(true);
 
           if (!hasPlayedStartSound.current && beginSoundRef.current) {
-            beginSoundRef.current.currentTime = 0;
-            beginSoundRef.current
-              .play()
-              .catch((e) => console.log("Audio play failed:", e));
+            playAudio(beginSoundRef);
             hasPlayedStartSound.current = true;
           }
         }
@@ -617,7 +637,6 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
-          {/* Player 1 - Always left */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -631,7 +650,6 @@ const Experience = () => {
             </div>
           </div>
 
-          {/* Player 2 - Always right */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
