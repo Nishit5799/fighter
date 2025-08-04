@@ -53,7 +53,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     const touchPunchHandler = (e) => {
       const success = handlePunchStart(e);
-      if (success) {
+      if (success && e.cancelable) {
         e.preventDefault();
         e.stopPropagation();
         return false;
@@ -63,13 +63,14 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     const touchKickHandler = (e) => {
       const success = handleKickStart(e);
-      if (success) {
+      if (success && e.cancelable) {
         e.preventDefault();
         e.stopPropagation();
         return false;
       }
       return true;
     };
+
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
 
@@ -138,7 +139,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
-          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
         }}
