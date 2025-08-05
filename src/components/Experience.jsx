@@ -95,12 +95,14 @@ const Experience = () => {
           .catch(() => {});
       });
 
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
+      ["touchstart", "mousedown", "pointerdown"].forEach((event) => {
+        window.removeEventListener(event, unlockAudio);
+      });
     };
 
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
+    ["touchstart", "mousedown", "pointerdown"].forEach((event) => {
+      window.addEventListener(event, unlockAudio, { once: true });
+    });
   }, []);
 
   const isUsernameUnique = (name) => {

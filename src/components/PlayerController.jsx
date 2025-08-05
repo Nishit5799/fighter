@@ -174,11 +174,13 @@ const PlayerController = forwardRef(
     };
 
     const takeHit = (attackType, attackTime) => {
-      if (isHit || isDefeated || attackTime <= lastAttackTime) return;
+      if (isDefeated || attackTime <= opponentAttackTime.current) return;
 
       opponentAttackTime.current = attackTime;
 
-      // ✅ Always animate, even if audio fails
+      setIsHit(true);
+      setCurrentAnimation("hit");
+
       try {
         if (hitSound.current) {
           hitSound.current.currentTime = 0;
