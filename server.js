@@ -144,29 +144,18 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("playerHit", (data) => {
           const hitData = {
             ...data,
-            attackTime: data.attackTime || Date.now(),
+            attackTime: data.attackTime || Date.now(), // fallback for safety
           };
 
-          // Get both players in the room
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
 
           if (otherPlayerId) {
-            // Check if the other player recently attacked
-            const otherPlayerLastAttack =
-              roomState.lastAttacks?.[otherPlayerId] || 0;
-            const HIT_PRIORITY_BUFFER = 100; // ms
-
-            // Only emit to the slower player
-            if (
-              hitData.attackTime >
-              otherPlayerLastAttack + HIT_PRIORITY_BUFFER
-            ) {
-              socket.to(otherPlayerId).emit("playerHit", hitData);
-            }
+            // ✅ Always send hit to other player
+            socket.to(otherPlayerId).emit("playerHit", hitData);
           }
 
-          // Store the last attack time for this player
+          // Store last attack time for analytics (optional)
           roomState.lastAttacks[socket.id] = hitData.attackTime;
         });
 

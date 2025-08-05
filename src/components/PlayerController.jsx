@@ -129,29 +129,29 @@ const PlayerController = forwardRef(
       if (isAttacking || isDefeated) return;
 
       const damage = type === "kick" ? 20 : 10;
-      const currentTime = Date.now();
+      const currentTime = performance.now(); // ✅ more stable than Date.now()
       setLastAttackTime(currentTime);
 
-      if (attackTimer.current) {
-        clearTimeout(attackTimer.current);
-      }
+      if (attackTimer.current) clearTimeout(attackTimer.current);
 
-      if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+      // ✅ Play sound but don’t block animation if it fails
+      try {
+        if (type === "punch" && punchSound.current) {
+          punchSound.current.currentTime = 0;
+          punchSound.current.play();
+        } else if (type === "kick" && kickSound.current) {
+          kickSound.current.currentTime = 0;
+          kickSound.current.play();
+        }
+      } catch (e) {
+        console.log("Audio blocked, but animation continues");
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
+      // ✅ Emit hit regardless of timing, rely on client-side dedupe
       if (
         isInContact &&
         socket &&
@@ -160,51 +160,44 @@ const PlayerController = forwardRef(
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage,
+          damage,
           attackType: type,
           attackTime: currentTime,
         });
       }
 
-      const duration = 1000;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
         setCurrentAnimation(isDefeated ? "fall" : "idle");
-      }, duration);
+      }, 1000);
     };
 
     const takeHit = (attackType, attackTime) => {
-      if (isHit || isDefeated) return;
-      if (attackTime <= lastAttackTime) return;
-
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
-        });
-      }
+      if (isHit || isDefeated || attackTime <= lastAttackTime) return;
 
       opponentAttackTime.current = attackTime;
 
-      if (hitTimer.current) {
-        clearTimeout(hitTimer.current);
+      // ✅ Always animate, even if audio fails
+      try {
+        if (hitSound.current) {
+          hitSound.current.currentTime = 0;
+          hitSound.current.play();
+        }
+      } catch (e) {
+        console.log("iOS blocked hit sound");
       }
 
       setIsHit(true);
       setCurrentAnimation("hit");
 
-      if (character.current?.playHitSound) {
-        character.current.playHitSound();
-      }
-
-      const duration = 1000;
+      if (hitTimer.current) clearTimeout(hitTimer.current);
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
         if (!isAttacking) {
           setCurrentAnimation(isDefeated ? "fall" : "idle");
         }
-      }, duration);
+      }, 1000);
     };
 
     const handleCollisionEnter = (event) => {
@@ -233,7 +226,7 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 50);
+        }, 500);
       }
     };
 
@@ -269,21 +262,14 @@ const PlayerController = forwardRef(
 
     useEffect(() => {
       if (!socket) return;
-
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.attackerId !== socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
       };
-
       socket.on("playerHit", onPlayerHit);
-
-      return () => {
-        socket.off("playerHit", onPlayerHit);
-      };
+      return () => socket.off("playerHit", onPlayerHit);
     }, [socket]);
-
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
