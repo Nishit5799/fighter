@@ -208,6 +208,19 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
+      if (players[0]?.id !== data.attackerId && carControllerRef1.current) {
+        carControllerRef1.current.forceTakeHit?.(
+          data.attackType,
+          data.attackTime
+        );
+      }
+      if (players[1]?.id !== data.attackerId && carControllerRef2.current) {
+        carControllerRef2.current.forceTakeHit?.(
+          data.attackType,
+          data.attackTime
+        );
+      }
+
       // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:

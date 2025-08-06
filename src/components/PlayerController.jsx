@@ -175,27 +175,27 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType, attackTime) => {
       if (isDefeated) return;
-      if (attackTime && attackTime <= opponentAttackTime.current) return;
 
       if (!attackTime || isNaN(attackTime)) {
-        attackTime = Date.now(); // fallback
+        attackTime = Date.now();
       }
+
+      if (attackTime <= opponentAttackTime.current) return;
+
       opponentAttackTime.current = attackTime;
 
       setIsHit(true);
       setCurrentAnimation("hit");
 
+      // Only sound as a bonus
       try {
         if (hitSound.current) {
           hitSound.current.currentTime = 0;
           hitSound.current.play();
         }
       } catch (e) {
-        console.log("iOS blocked hit sound");
+        console.log("Hit sound blocked, proceeding anyway");
       }
-
-      setIsHit(true);
-      setCurrentAnimation("hit");
 
       if (hitTimer.current) clearTimeout(hitTimer.current);
       hitTimer.current = setTimeout(() => {
@@ -270,6 +270,7 @@ const PlayerController = forwardRef(
       if (!socket) return;
       const onPlayerHit = (data) => {
         if (data.attackerId !== socket.id) {
+          console.log("Received playerHit", data);
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -395,9 +396,18 @@ const PlayerController = forwardRef(
         if (data.isPlayer1 !== isPlayer1) {
           rb.current.setTranslation(data.position);
           container.current.rotation.y = data.rotation;
-          setCurrentAnimation(data.animation || "idle");
+
+          // Prevent remote state override if currently hit
+          if (!isHit && !isAttacking && !isDefeated) {
+            setCurrentAnimation(data.animation || "idle");
+          }
+
           setIsAttacking(data.isAttacking || false);
-          setIsHit(data.isHit || false);
+
+          // Only update hit state if not already hit
+          if (!isHit) {
+            setIsHit(data.isHit || false);
+          }
         }
       };
 
@@ -407,7 +417,9 @@ const PlayerController = forwardRef(
 
     useImperativeHandle(ref, () => ({
       setOpponentRef,
-
+      forceTakeHit: (type, time) => {
+        takeHit(type, time);
+      },
       setVictory: (isLocalPlayerWinner) => {
         setMatchResult("won");
         setCurrentAnimation("victory");

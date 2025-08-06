@@ -144,7 +144,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("playerHit", (data) => {
           const hitData = {
             ...data,
-            attackTime: Date.now(),
+            attackTime: Date.now(), // ✅ always use server-side time
           };
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
