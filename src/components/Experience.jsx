@@ -75,33 +75,21 @@ const Experience = () => {
   }, []);
 
   useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
+    const sounds = [
+      "/punch.mp3",
+      "/kick.mp3",
+      "/hit.mp3",
+      "/victory.mp3",
+      "/lost.mp3",
+    ];
 
-      ["touchstart", "mousedown", "pointerdown"].forEach((event) => {
-        window.removeEventListener(event, unlockAudio);
-      });
-    };
-
-    ["touchstart", "mousedown", "pointerdown"].forEach((event) => {
-      window.addEventListener(event, unlockAudio, { once: true });
+    sounds.forEach((src) => {
+      const audio = new Audio(src);
+      audio.load();
+      audio.muted = true;
+      audio.play().catch(() => {});
+      audio.pause();
+      audio.muted = false;
     });
   }, []);
 

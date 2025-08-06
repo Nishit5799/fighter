@@ -53,6 +53,7 @@ const PlayerController = forwardRef(
     const opponentAttackTime = useRef(0);
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
+    const prevHealthRef = useRef(health);
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
@@ -112,6 +113,14 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
+
+    useEffect(() => {
+      if (health < prevHealthRef.current) {
+        console.log("Detected health drop. Triggering hit animation.");
+        takeHit("unknown", Date.now()); // fallback
+      }
+      prevHealthRef.current = health;
+    }, [health]);
 
     useEffect(() => {
       const handleResize = () => {
@@ -176,25 +185,19 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isDefeated) return;
 
-      if (!attackTime || isNaN(attackTime)) {
-        attackTime = Date.now();
-      }
-
-      if (attackTime <= opponentAttackTime.current) return;
-
-      opponentAttackTime.current = attackTime;
+      // Accept all hits, regardless of timing (you already dedupe health)
+      opponentAttackTime.current = attackTime || Date.now();
 
       setIsHit(true);
-      setCurrentAnimation("hit");
+      setCurrentAnimation((prev) => `hit-${Date.now()}`);
 
-      // Only sound as a bonus
       try {
         if (hitSound.current) {
           hitSound.current.currentTime = 0;
           hitSound.current.play();
         }
       } catch (e) {
-        console.log("Hit sound blocked, proceeding anyway");
+        console.log("iOS blocked hit sound");
       }
 
       if (hitTimer.current) clearTimeout(hitTimer.current);
@@ -203,7 +206,7 @@ const PlayerController = forwardRef(
         if (!isAttacking) {
           setCurrentAnimation(isDefeated ? "fall" : "idle");
         }
-      }, 1000);
+      }, 700); // reduce timeout for responsiveness
     };
 
     const handleCollisionEnter = (event) => {
@@ -269,10 +272,8 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!socket) return;
       const onPlayerHit = (data) => {
-        if (data.attackerId !== socket.id) {
-          console.log("Received playerHit", data);
-          takeHit(data.attackType, data.attackTime);
-        }
+        // no checks! just trigger hit
+        takeHit(data.attackType, data.attackTime);
       };
       socket.on("playerHit", onPlayerHit);
       return () => socket.off("playerHit", onPlayerHit);
@@ -397,14 +398,13 @@ const PlayerController = forwardRef(
           rb.current.setTranslation(data.position);
           container.current.rotation.y = data.rotation;
 
-          // Prevent remote state override if currently hit
+          // Prevent override during local animation
           if (!isHit && !isAttacking && !isDefeated) {
             setCurrentAnimation(data.animation || "idle");
           }
 
+          // Still set health and movement
           setIsAttacking(data.isAttacking || false);
-
-          // Only update hit state if not already hit
           if (!isHit) {
             setIsHit(data.isHit || false);
           }
@@ -506,7 +506,7 @@ const PlayerController = forwardRef(
                     ? "victory"
                     : matchResult === "lost"
                     ? "fall"
-                    : isHit
+                    : currentAnimation.startsWith("hit")
                     ? "hit"
                     : currentAnimation
                 }
@@ -522,12 +522,13 @@ const PlayerController = forwardRef(
                     ? "victory"
                     : matchResult === "lost"
                     ? "fall"
-                    : isHit
+                    : currentAnimation.startsWith("hit")
                     ? "hit"
                     : currentAnimation
                 }
               />
             )}
+
             <CapsuleCollider
               args={[0.4, 0.3]}
               position={[0, 3, 0]}
