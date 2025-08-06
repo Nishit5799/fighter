@@ -63,15 +63,6 @@ const Experience = () => {
   const welcomeTextRef = useRef();
 
   useEffect(() => {
-    if (socket && navigator?.connection?.effectiveType) {
-      socket.emit(
-        "connection_quality",
-        navigator.connection.effectiveType === "2g" ? "low" : "high"
-      );
-    }
-  }, [socket]);
-
-  useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
 

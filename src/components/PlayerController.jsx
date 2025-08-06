@@ -185,7 +185,7 @@ const PlayerController = forwardRef(
       opponentAttackTime.current = attackTime;
 
       setIsHit(true);
-      setCurrentAnimation((prev) => `hit-${Date.now()}`);
+      setCurrentAnimation("hit");
 
       // Only sound as a bonus
       try {
@@ -507,7 +507,7 @@ const PlayerController = forwardRef(
                     : matchResult === "lost"
                     ? "fall"
                     : isHit
-                    ? `hit-${Date.now()}`
+                    ? "hit"
                     : currentAnimation
                 }
               />
@@ -523,7 +523,7 @@ const PlayerController = forwardRef(
                     : matchResult === "lost"
                     ? "fall"
                     : isHit
-                    ? `hit-${Date.now()}`
+                    ? "hit"
                     : currentAnimation
                 }
               />
