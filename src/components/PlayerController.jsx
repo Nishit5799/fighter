@@ -174,8 +174,12 @@ const PlayerController = forwardRef(
     };
 
     const takeHit = (attackType, attackTime) => {
-      if (isDefeated || attackTime <= opponentAttackTime.current) return;
+      if (isDefeated) return;
+      if (attackTime && attackTime <= opponentAttackTime.current) return;
 
+      if (!attackTime || isNaN(attackTime)) {
+        attackTime = Date.now(); // fallback
+      }
       opponentAttackTime.current = attackTime;
 
       setIsHit(true);

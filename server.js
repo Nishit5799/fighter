@@ -144,9 +144,8 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("playerHit", (data) => {
           const hitData = {
             ...data,
-            attackTime: data.attackTime || Date.now(), // fallback for safety
+            attackTime: Date.now(),
           };
-
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
 
