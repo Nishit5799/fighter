@@ -240,31 +240,6 @@ const PlayerController = forwardRef(
     }, [isPunching, isKicking]);
 
     useEffect(() => {
-      if (health <= 0 && !isDefeated && socket && opponentRef.current) {
-        setIsDefeated(true);
-        setCurrentAnimation("fall");
-        movementEnabled.current = false;
-
-        if (!hasEmittedDefeat.current) {
-          hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
-
-          socket.emit("playerDefeated", {
-            winnerId: opponentRef.current.id,
-            loserId: socket.id,
-            winnerHealth: opponentHealth,
-            loserHealth: health,
-            winningAttackTime: opponentAttackTime.current,
-          });
-        }
-      }
-    }, [health, isDefeated, opponentHealth, socket]);
-
-    useEffect(() => {
       if (!socket) return;
 
       const onPlayerHit = (data) => {
