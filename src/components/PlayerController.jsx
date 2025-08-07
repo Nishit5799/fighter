@@ -183,6 +183,7 @@ const PlayerController = forwardRef(
       socket.emit("playerHit", {
         attackType: type,
         attackTime: time,
+        attackerId: socket.id, // ✅ REQUIRED
       });
 
       setIsAttacking(true);
@@ -235,9 +236,11 @@ const PlayerController = forwardRef(
     };
 
     useEffect(() => {
-      if (isPunching && !isHit) startAttack("punch");
-      if (isKicking && !isHit) startAttack("kick");
-    }, [isPunching, isKicking]);
+      if (isDefeated || isHit || isAttacking) return;
+
+      if (isPunching) startAttack("punch");
+      else if (isKicking) startAttack("kick");
+    }, [isPunching, isKicking, isHit, isDefeated, isAttacking]);
 
     useEffect(() => {
       if (!socket) return;
