@@ -66,7 +66,8 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
-    const [lastAttackTime, setLastAttackTime] = useState(0);
+    const lastSentAttackTime = useRef(0); // for attacks this player sends
+    const lastReceivedAttackTime = useRef(0); // for hits this player receives
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
     const opponentAttackTime = useRef(0);
@@ -144,94 +145,65 @@ const PlayerController = forwardRef(
       opponentRef.current = ref;
     };
 
-    const startAttack = (type) => {
-      if (isAttacking || isDefeated) return;
-
-      const damage = type === "kick" ? 20 : 10;
-      const currentTime = Date.now();
-      setLastAttackTime(currentTime);
-
-      if (attackTimer.current) {
-        clearTimeout(attackTimer.current);
-      }
-
-      if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      }
-
-      setIsAttacking(true);
-      movementEnabled.current = false;
-      setCurrentAnimation(type);
-
-      if (
-        isInContact &&
-        socket &&
-        opponentRef.current &&
-        !opponentRef.current.isDefeated
-      ) {
-        socket.emit("playerHit", {
-          attackerId: socket.id,
-          damage: damage,
-          attackType: type,
-          attackTime: currentTime,
-        });
-      }
-
-      const duration = 1000;
-      attackTimer.current = setTimeout(() => {
-        setIsAttacking(false);
-        movementEnabled.current = !isDefeated;
-        setCurrentAnimation(isDefeated ? "fall" : "idle");
-      }, duration);
-    };
-
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      if (attackTime && attackTime <= lastAttackTime) return;
 
-      opponentAttackTime.current = attackTime;
+      // ✅ Fix: prevent duplicate or late hits
+      if (attackTime && attackTime <= lastReceivedAttackTime.current) return;
+      lastReceivedAttackTime.current = attackTime;
 
-      if (hitTimer.current) {
-        clearTimeout(hitTimer.current);
-      }
+      if (hitTimer.current) clearTimeout(hitTimer.current);
 
-      // Set animation regardless of audio success
       setIsHit(true);
       setCurrentAnimation("hit");
 
-      // Attempt to play audio, but don't block animation if it fails
       if (hitSound.current) {
         try {
           hitSound.current.currentTime = 0;
-          hitSound.current.play().catch((e) => {
-            console.warn("iOS blocked hit sound:", e);
-          });
-        } catch (e) {
-          console.warn("Audio play error:", e);
-        }
+          hitSound.current.play().catch(() => {});
+        } catch {}
       }
 
       if (character.current?.playHitSound) {
         character.current.playHitSound();
       }
 
-      const duration = 1000;
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
         if (!isAttacking) {
           setCurrentAnimation(isDefeated ? "fall" : "idle");
         }
-      }, duration);
+      }, 1000);
     };
 
+    const startAttack = (type) => {
+      const time = Date.now();
+      lastSentAttackTime.current = time;
+
+      socket.emit("playerHit", {
+        attackType: type,
+        attackTime: time,
+      });
+
+      setIsAttacking(true);
+      setCurrentAnimation(type);
+
+      if (type === "punch" && punchSound.current) {
+        punchSound.current.currentTime = 0;
+        punchSound.current.play().catch(() => {});
+      } else if (type === "kick" && kickSound.current) {
+        kickSound.current.currentTime = 0;
+        kickSound.current.play().catch(() => {});
+      }
+
+      if (attackTimer.current) clearTimeout(attackTimer.current);
+      attackTimer.current = setTimeout(() => {
+        setIsAttacking(false);
+        if (!isHit) {
+          setCurrentAnimation("idle");
+        }
+      }, 1000);
+    };
     const handleCollisionEnter = (event) => {
       if (!opponentRef.current || !rb.current) return;
 
@@ -440,6 +412,7 @@ const PlayerController = forwardRef(
 
     useImperativeHandle(ref, () => ({
       setOpponentRef,
+      takeHit,
 
       setVictory: (isLocalPlayerWinner) => {
         setMatchResult("won");

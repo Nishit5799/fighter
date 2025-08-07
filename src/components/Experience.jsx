@@ -74,17 +74,16 @@ const Experience = () => {
     };
   }, []);
 
-useEffect(() => {
-  const unlockAudioHandler = () => {
-    unlockPlayerAudio(); // Preload and unlock sounds
-    window.removeEventListener("touchstart", unlockAudioHandler);
-    window.removeEventListener("mousedown", unlockAudioHandler);
-  };
+  useEffect(() => {
+    const unlockAudioHandler = () => {
+      unlockPlayerAudio(); // 🔓 preload & unlock sounds
+      window.removeEventListener("touchstart", unlockAudioHandler);
+      window.removeEventListener("mousedown", unlockAudioHandler);
+    };
 
-  window.addEventListener("touchstart", unlockAudioHandler, { once: true });
-  window.addEventListener("mousedown", unlockAudioHandler, { once: true });
-}, []);
-
+    window.addEventListener("touchstart", unlockAudioHandler, { once: true });
+    window.addEventListener("mousedown", unlockAudioHandler, { once: true });
+  }, []);
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
   };
