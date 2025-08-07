@@ -237,10 +237,14 @@ const PlayerController = forwardRef(
 
     useEffect(() => {
       if (isDefeated || isHit || isAttacking) return;
+      if (!isLocalPlayer) return;
 
-      if (isPunching) startAttack("punch");
-      else if (isKicking) startAttack("kick");
-    }, [isPunching, isKicking, isHit, isDefeated, isAttacking]);
+      if (isPunching) {
+        startAttack("punch");
+      } else if (isKicking) {
+        startAttack("kick");
+      }
+    }, [isPunching, isKicking]); // ✅ remove isAttacking from dependencies
 
     useEffect(() => {
       if (!socket) return;
