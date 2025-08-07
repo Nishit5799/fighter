@@ -236,15 +236,16 @@ const PlayerController = forwardRef(
     };
 
     useEffect(() => {
-      if (isDefeated || isHit || isAttacking) return;
+      // ✅ Only local player should trigger their own attack
       if (!isLocalPlayer) return;
+      if (isDefeated || isHit || isAttacking) return;
 
       if (isPunching) {
         startAttack("punch");
       } else if (isKicking) {
         startAttack("kick");
       }
-    }, [isPunching, isKicking]); // ✅ remove isAttacking from dependencies
+    }, [isPunching, isKicking]); // ✅ intentionally exclude isAttacking to allow retriggering
 
     useEffect(() => {
       if (!socket) return;
