@@ -15,7 +15,7 @@ import AttackButtons from "./AttackButtons";
 import gsap from "gsap";
 import { useSocket } from "../context/SocketContext";
 import Info from "./Info";
-import PlayerController from "./PlayerController";
+import PlayerController, { unlockPlayerAudio } from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 
@@ -74,36 +74,16 @@ const Experience = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
+useEffect(() => {
+  const unlockAudioHandler = () => {
+    unlockPlayerAudio(); // Preload and unlock sounds
+    window.removeEventListener("touchstart", unlockAudioHandler);
+    window.removeEventListener("mousedown", unlockAudioHandler);
+  };
 
-      ["touchstart", "mousedown", "pointerdown"].forEach((event) => {
-        window.removeEventListener(event, unlockAudio);
-      });
-    };
-
-    ["touchstart", "mousedown", "pointerdown"].forEach((event) => {
-      window.addEventListener(event, unlockAudio, { once: true });
-    });
-  }, []);
+  window.addEventListener("touchstart", unlockAudioHandler, { once: true });
+  window.addEventListener("mousedown", unlockAudioHandler, { once: true });
+}, []);
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -207,19 +187,6 @@ const Experience = () => {
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
-
-      if (players[0]?.id !== data.attackerId && carControllerRef1.current) {
-        carControllerRef1.current.forceTakeHit?.(
-          data.attackType,
-          data.attackTime
-        );
-      }
-      if (players[1]?.id !== data.attackerId && carControllerRef2.current) {
-        carControllerRef2.current.forceTakeHit?.(
-          data.attackType,
-          data.attackTime
-        );
-      }
 
       // Emit health update to opponent
       socket.emit("updateHealth", {
