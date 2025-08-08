@@ -152,21 +152,24 @@ Promise.all([pubClient.connect(), subClient.connect()])
           const otherPlayerId = players.find((id) => id !== socket.id);
 
           if (otherPlayerId) {
-            // Check if the other player recently attacked
             const otherPlayerLastAttack =
               roomState.lastAttacks?.[otherPlayerId] || 0;
             const HIT_PRIORITY_BUFFER = 100; // ms
 
-            // Only emit to the slower player
+            // iOS user agent detection
+            const isIOS = (ua) => /iPhone|iPad|iPod/i.test(ua || "");
+            const userAgent = socket.handshake.headers["user-agent"] || "";
+
+            // Only emit to the slower player, unless iOS
             if (
-              hitData.attackTime >
-              otherPlayerLastAttack + HIT_PRIORITY_BUFFER
+              !isIOS(userAgent) ||
+              hitData.attackTime > otherPlayerLastAttack + HIT_PRIORITY_BUFFER
             ) {
               socket.to(otherPlayerId).emit("playerHit", hitData);
             }
           }
 
-          // Store the last attack time for this player
+          // Store last attack time
           roomState.lastAttacks[socket.id] = hitData.attackTime;
         });
 

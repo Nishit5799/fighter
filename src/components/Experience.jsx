@@ -15,7 +15,7 @@ import AttackButtons from "./AttackButtons";
 import gsap from "gsap";
 import { useSocket } from "../context/SocketContext";
 import Info from "./Info";
-import PlayerController, { unlockPlayerAudio } from "./PlayerController";
+import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 
@@ -75,15 +75,46 @@ const Experience = () => {
   }, []);
 
   useEffect(() => {
-    const unlockAudioHandler = () => {
-      unlockPlayerAudio(); // 🔓 preload & unlock sounds
-      window.removeEventListener("touchstart", unlockAudioHandler);
-      window.removeEventListener("mousedown", unlockAudioHandler);
+    const unlockAudio = () => {
+      const sounds = [
+        "/punch.mp3",
+        "/kick.mp3",
+        "/hit.mp3",
+        "/victory.mp3",
+        "/lost.mp3",
+      ];
+
+      sounds.forEach((src) => {
+        const audio = new Audio(src);
+        audio.muted = true;
+        audio
+          .play()
+          .then(() => {
+            audio.pause();
+            audio.muted = false;
+          })
+          .catch(() => {});
+      });
+
+      // Dummy attack to unlock interaction
+      setIsPunching(true);
+      setTimeout(() => setIsPunching(false), 300);
+
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("mousedown", unlockAudio);
     };
 
-    window.addEventListener("touchstart", unlockAudioHandler, { once: true });
-    window.addEventListener("mousedown", unlockAudioHandler, { once: true });
+    // Attach the event once
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("mousedown", unlockAudio, { once: true });
+
+    // Cleanup just in case
+    return () => {
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("mousedown", unlockAudio);
+    };
   }, []);
+
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
   };
@@ -183,45 +214,58 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
-  useEffect(() => {
-    if (!socket) return;
+  const onPlayerHit = useCallback(
+    (data) => {
+      if (winner || loser) return;
 
-    const onPlayerHit = (data) => {
-      console.log("onPlayerHit received:", data);
-      const damage = data.attackType === "punch" ? 10 : 20;
+      // Emit health update to opponent
+      socket.emit("updateHealth", {
+        health1:
+          data.attackerId === players[0]?.id
+            ? health1
+            : Math.max(0, health1 - data.damage),
+        health2:
+          data.attackerId === players[1]?.id
+            ? health2
+            : Math.max(0, health2 - data.damage),
+      });
 
-      // ✅ Make sure players are available
-      if (!players || players.length < 2) return;
-
-      if (data.attackerId === players[0]?.id) {
-        // Player 1 attacked Player 2
+      if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
-          const updated = Math.max(0, prev - damage);
-          socket.emit("updateHealth", {
-            playerId: players[1]?.id,
-            newHealth: updated,
-          });
-          return updated;
+          const newHealth = Math.max(0, prev - data.damage);
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[0].id,
+                loserId: players[1]?.id,
+                winnerHealth: health1,
+                loserHealth: newHealth,
+                winningAttackTime: data.attackTime,
+              });
+            }, 50);
+          }
+          return newHealth;
         });
-      } else if (data.attackerId === players[1]?.id) {
-        // Player 2 attacked Player 1
+      } else if (players[1]?.id === data.attackerId) {
         setHealth1((prev) => {
-          const updated = Math.max(0, prev - damage);
-          socket.emit("updateHealth", {
-            playerId: players[0]?.id,
-            newHealth: updated,
-          });
-          return updated;
+          const newHealth = Math.max(0, prev - data.damage);
+          if (newHealth <= 0) {
+            setTimeout(() => {
+              socket.emit("playerDefeated", {
+                winnerId: players[1].id,
+                loserId: players[0]?.id,
+                winnerHealth: health2,
+                loserHealth: newHealth,
+                winningAttackTime: data.attackTime,
+              });
+            }, 50);
+          }
+          return newHealth;
         });
       }
-    };
-
-    socket.on("playerHit", onPlayerHit);
-
-    return () => {
-      socket.off("playerHit", onPlayerHit);
-    };
-  }, [socket, players]);
+    },
+    [socket, players, winner, loser, health1, health2]
+  );
 
   const onPlayerDefeated = useCallback(
     (data) => {
