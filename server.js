@@ -147,30 +147,27 @@ Promise.all([pubClient.connect(), subClient.connect()])
             attackTime: data.attackTime || Date.now(),
           };
 
-          // Get both players in the room
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
+          const HIT_PRIORITY_BUFFER = 75; // ms
 
           if (otherPlayerId) {
-            const otherPlayerLastAttack =
-              roomState.lastAttacks?.[otherPlayerId] || 0;
-            const HIT_PRIORITY_BUFFER = 100; // ms
+            const now = hitData.attackTime;
+            const otherLast = roomState.lastAttacks?.[otherPlayerId] || 0;
+            const selfLast = roomState.lastAttacks?.[socket.id] || 0;
 
-            // iOS user agent detection
-            const isIOS = (ua) => /iPhone|iPad|iPod/i.test(ua || "");
-            const userAgent = socket.handshake.headers["user-agent"] || "";
+            const timeDiff = Math.abs(now - otherLast);
 
-            // Only emit to the slower player, unless iOS
-            const emitHit = () =>
+            // 🔄 Emit to both if nearly simultaneous attacks
+            if (timeDiff <= HIT_PRIORITY_BUFFER) {
+              io.to(roomId).emit("playerHit", hitData); // Both players get the hit
+            } else {
+              // Normal case: only the defender gets the hit
               socket.to(otherPlayerId).emit("playerHit", hitData);
-
-            // Emit once normally
-            emitHit();
-
-            // iOS: emit twice with delay to ensure delivery
+            }
           }
 
-          // Store last attack time
+          // Store attack time
           roomState.lastAttacks[socket.id] = hitData.attackTime;
         });
 

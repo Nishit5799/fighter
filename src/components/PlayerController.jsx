@@ -47,7 +47,7 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
-
+    const [lastAttackTime, setLastAttackTime] = useState(0);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
     const opponentAttackTime = useRef(0);
@@ -156,7 +156,6 @@ const PlayerController = forwardRef(
         isInContact &&
         socket &&
         opponentRef.current &&
-        typeof opponentRef.current.id === "string" && // <-- prevents null/undefined ID
         !opponentRef.current.isDefeated
       ) {
         socket.emit("playerHit", {
@@ -177,7 +176,8 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      if (attackTime <= opponentAttackTime.current - 50) return;
+      if (attackTime <= lastAttackTime) return;
+
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -272,12 +272,8 @@ const PlayerController = forwardRef(
 
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
-
         if (data.attackerId !== socket.id) {
-          const attackStarted = Date.now();
           takeHit(data.attackType, data.attackTime);
-
-          // If animation didn't start within 200ms, try again
         }
       };
 
@@ -535,8 +531,8 @@ const PlayerController = forwardRef(
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.6, 0.6]} // Wider detection
-              position={[0, 2.5, 0]} // Slightly lower height
+              args={[0.4, 0.4]}
+              position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
               onIntersectionExit={handleCollisionExit}

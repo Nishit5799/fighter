@@ -6,28 +6,26 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
   const [punchCooldown, setPunchCooldown] = useState(false);
   const [kickCooldown, setKickCooldown] = useState(false);
-
   const handleAttackStart = (type) => {
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
 
-    if (type === "punch") {
-      setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
-      setTimeout(() => setPunchCooldown(false), 2500);
-      return true;
-    } else {
-      setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
-      setTimeout(() => setKickCooldown(false), 3000);
-      return true;
-    }
+    const isPunch = type === "punch";
+    const setCooldown = isPunch ? setPunchCooldown : setKickCooldown;
+    const triggerState = isPunch ? onPunch : onKick;
+    const cooldownDuration = isPunch ? 2500 : 3000;
+
+    setCooldown(true);
+    triggerState(true);
+
+    // Delay state reset until the server confirms hit
+    setTimeout(() => triggerState(false), 800);
+    setTimeout(() => setCooldown(false), cooldownDuration);
+    return true;
   };
 
   // Event handlers that return whether attack was successful

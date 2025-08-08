@@ -83,7 +83,6 @@ const Experience = () => {
         "/victory.mp3",
         "/lost.mp3",
       ];
-
       sounds.forEach((src) => {
         const audio = new Audio(src);
         audio.muted = true;
@@ -96,23 +95,10 @@ const Experience = () => {
           .catch(() => {});
       });
 
-      // Dummy attack to unlock interaction
-      setIsPunching(true);
-      setTimeout(() => setIsPunching(false), 300);
-
       window.removeEventListener("touchstart", unlockAudio);
       window.removeEventListener("mousedown", unlockAudio);
     };
-
-    // Attach the event once
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
-
-    // Cleanup just in case
-    return () => {
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
-    };
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {
