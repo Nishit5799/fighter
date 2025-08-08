@@ -32,15 +32,15 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
   // Event handlers that return whether attack was successful
   const handlePunchStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("punch");
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("kick");
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    handleAttackStart("kick");
   };
 
   useEffect(() => {
@@ -51,25 +51,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     const options = { passive: false, capture: true };
 
-    const touchPunchHandler = (e) => {
-      const success = handlePunchStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      return true;
-    };
+    const touchPunchHandler = (e) => handlePunchStart(e);
+    const touchKickHandler = (e) => handleKickStart(e);
 
-    const touchKickHandler = (e) => {
-      const success = handleKickStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      return true;
-    };
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);
 
@@ -132,7 +116,9 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => !isCooldown && handleAttackStart(type)}
+        onMouseDown={(e) => {
+          if (!isCooldown) handleAttackStart(type);
+        }}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
