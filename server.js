@@ -55,7 +55,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
           gameStarted: false,
           createdAt: Date.now(),
           lastAttacks: {},
-          readyForHits: {}, // ✅ New
         });
         return newRoomId;
       };
@@ -138,11 +137,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
           }
         });
 
-        socket.on("playerReadyForHits", () => {
-          if (roomState && roomState.readyForHits) {
-            roomState.readyForHits[socket.id] = true;
-          }
-        });
         socket.on("carMove", (data) => {
           socket.to(roomId).emit("carMove", data);
         });
@@ -153,31 +147,26 @@ Promise.all([pubClient.connect(), subClient.connect()])
             attackTime: data.attackTime || Date.now(),
           };
 
+          // Get both players in the room
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
-          const HIT_PRIORITY_BUFFER = 75; // ms
 
           if (otherPlayerId) {
-            // ✅ Wait until other player is ready
-            if (!roomState.readyForHits?.[otherPlayerId]) {
-              console.warn(
-                `Opponent (${otherPlayerId}) not ready for hits. Dropping or retrying later.`
-              );
-              return;
-            }
+            // Check if the other player recently attacked
+            const otherPlayerLastAttack =
+              roomState.lastAttacks?.[otherPlayerId] || 0;
+            const HIT_PRIORITY_BUFFER = 100; // ms
 
-            const now = hitData.attackTime;
-            const otherLast = roomState.lastAttacks?.[otherPlayerId] || 0;
-
-            const timeDiff = Math.abs(now - otherLast);
-
-            if (timeDiff <= HIT_PRIORITY_BUFFER) {
-              io.to(roomId).emit("playerHit", hitData); // Both players see it
-            } else {
-              socket.to(otherPlayerId).emit("playerHit", hitData); // Normal hit
+            // Only emit to the slower player
+            if (
+              hitData.attackTime >
+              otherPlayerLastAttack + HIT_PRIORITY_BUFFER
+            ) {
+              socket.to(otherPlayerId).emit("playerHit", hitData);
             }
           }
 
+          // Store the last attack time for this player
           roomState.lastAttacks[socket.id] = hitData.attackTime;
         });
 
@@ -257,9 +246,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         socket.on("disconnect", () => {
           console.log(`Disconnected: ${socket.id}`);
-          if (roomState.readyForHits) {
-            delete roomState.readyForHits[socket.id];
-          }
           if (roomState.players.delete(socket.id)) {
             io.to(roomId).emit(
               "updatePlayers",

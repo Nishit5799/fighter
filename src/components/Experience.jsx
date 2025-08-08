@@ -98,7 +98,9 @@ const Experience = () => {
       window.removeEventListener("touchstart", unlockAudio);
       window.removeEventListener("mousedown", unlockAudio);
     };
-    window.addEventListener("pointerdown", unlockAudio, { once: true });
+
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("mousedown", unlockAudio, { once: true });
   }, []);
 
   const isUsernameUnique = (name) => {

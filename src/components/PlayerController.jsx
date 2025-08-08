@@ -279,9 +279,6 @@ const PlayerController = forwardRef(
 
       socket.on("playerHit", onPlayerHit);
 
-      // ✅ Tell server we're ready to receive hits
-      socket.emit("playerReadyForHits");
-
       return () => {
         socket.off("playerHit", onPlayerHit);
       };
