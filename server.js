@@ -55,6 +55,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
           gameStarted: false,
           createdAt: Date.now(),
           lastAttacks: {},
+          readyForHits: {}, // ✅ New
         });
         return newRoomId;
       };
@@ -137,6 +138,11 @@ Promise.all([pubClient.connect(), subClient.connect()])
           }
         });
 
+        socket.on("playerReadyForHits", () => {
+          if (roomState && roomState.readyForHits) {
+            roomState.readyForHits[socket.id] = true;
+          }
+        });
         socket.on("carMove", (data) => {
           socket.to(roomId).emit("carMove", data);
         });
@@ -152,22 +158,26 @@ Promise.all([pubClient.connect(), subClient.connect()])
           const HIT_PRIORITY_BUFFER = 75; // ms
 
           if (otherPlayerId) {
+            // ✅ Wait until other player is ready
+            if (!roomState.readyForHits?.[otherPlayerId]) {
+              console.warn(
+                `Opponent (${otherPlayerId}) not ready for hits. Dropping or retrying later.`
+              );
+              return;
+            }
+
             const now = hitData.attackTime;
             const otherLast = roomState.lastAttacks?.[otherPlayerId] || 0;
-            const selfLast = roomState.lastAttacks?.[socket.id] || 0;
 
             const timeDiff = Math.abs(now - otherLast);
 
-            // 🔄 Emit to both if nearly simultaneous attacks
             if (timeDiff <= HIT_PRIORITY_BUFFER) {
-              io.to(roomId).emit("playerHit", hitData); // Both players get the hit
+              io.to(roomId).emit("playerHit", hitData); // Both players see it
             } else {
-              // Normal case: only the defender gets the hit
-              socket.to(otherPlayerId).emit("playerHit", hitData);
+              socket.to(otherPlayerId).emit("playerHit", hitData); // Normal hit
             }
           }
 
-          // Store attack time
           roomState.lastAttacks[socket.id] = hitData.attackTime;
         });
 
@@ -247,6 +257,9 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         socket.on("disconnect", () => {
           console.log(`Disconnected: ${socket.id}`);
+          if (roomState.readyForHits) {
+            delete roomState.readyForHits[socket.id];
+          }
           if (roomState.players.delete(socket.id)) {
             io.to(roomId).emit(
               "updatePlayers",
