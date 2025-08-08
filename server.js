@@ -161,11 +161,15 @@ Promise.all([pubClient.connect(), subClient.connect()])
             const userAgent = socket.handshake.headers["user-agent"] || "";
 
             // Only emit to the slower player, unless iOS
-            if (
-              !isIOS(userAgent) ||
-              hitData.attackTime > otherPlayerLastAttack + HIT_PRIORITY_BUFFER
-            ) {
+            const emitHit = () =>
               socket.to(otherPlayerId).emit("playerHit", hitData);
+
+            // Emit once normally
+            emitHit();
+
+            // iOS: emit twice with delay to ensure delivery
+            if (isIOS(userAgent)) {
+              setTimeout(emitHit, 50); // retry after 50ms
             }
           }
 

@@ -176,7 +176,7 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      if (attackTime <= lastAttackTime) return;
+      if (attackTime <= lastAttackTime - 50) return;
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
@@ -272,8 +272,18 @@ const PlayerController = forwardRef(
 
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
+
         if (data.attackerId !== socket.id) {
+          const attackStarted = Date.now();
           takeHit(data.attackType, data.attackTime);
+
+          // If animation didn't start within 200ms, try again
+          setTimeout(() => {
+            if (!isHit && Date.now() - attackStarted > 190) {
+              console.warn("⚠ Retrying hit animation (iOS fail-safe)");
+              takeHit(data.attackType, data.attackTime + 1); // bump time to pass guard
+            }
+          }, 200);
         }
       };
 
