@@ -12,19 +12,19 @@ const AttackButtons = ({ onPunch, onKick }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
+      onPunch?.(true);
+      setTimeout(() => onPunch?.(false), 1000);
       setTimeout(() => setPunchCooldown(false), 2500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
+      onKick?.(true);
+      setTimeout(() => onKick?.(false), 1000);
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
@@ -47,6 +47,14 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const kickBtn = kickRef.current;
 
     if (!punchBtn || !kickBtn) return;
+
+    if (
+      typeof handlePunchStart !== "function" ||
+      typeof handleKickStart !== "function"
+    ) {
+      console.warn("Handlers are not ready");
+      return;
+    }
 
     const options = { passive: false, capture: true };
 
@@ -116,6 +124,8 @@ const AttackButtons = ({ onPunch, onKick }) => {
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={(e) => {
+          e.preventDefault?.();
+          e.stopPropagation?.();
           if (!isCooldown) handleAttackStart(type);
         }}
         style={{

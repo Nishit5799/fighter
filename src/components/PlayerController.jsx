@@ -47,7 +47,6 @@ const PlayerController = forwardRef(
     const [isHit, setIsHit] = useState(false);
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
-    
 
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
