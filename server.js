@@ -168,9 +168,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
             emitHit();
 
             // iOS: emit twice with delay to ensure delivery
-            if (isIOS(userAgent)) {
-              setTimeout(emitHit, 50); // retry after 50ms
-            }
           }
 
           // Store last attack time
