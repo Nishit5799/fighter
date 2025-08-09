@@ -685,12 +685,14 @@ const Experience = () => {
         disabled={!isGameStarted || players.length !== 2}
       />
 
-      {isGameStarted && (
-        <AttackButtons
-          onPunch={(punching) => setIsPunching(punching)}
-          onKick={(kicking) => setIsKicking(kicking)}
-        />
-      )}
+      {isGameStarted &&
+        carControllerRef1.current &&
+        carControllerRef2.current && (
+          <AttackButtons
+            onPunch={(punching) => setIsPunching(punching)}
+            onKick={(kicking) => setIsKicking(kicking)}
+          />
+        )}
 
       <Info
         onReset={handleReset}

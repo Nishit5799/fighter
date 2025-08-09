@@ -1,27 +1,3 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  forwardRef,
-  useImperativeHandle,
-} from "react";
-import { CapsuleCollider, RigidBody } from "@react-three/rapier";
-import { Vector3 } from "three";
-import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls } from "@react-three/drei";
-import { MathUtils } from "three/src/math/MathUtils";
-import { useSocket } from "../context/SocketContext";
-import Stone from "./Stone";
-import Cenaa from "./Cenaa";
-
-const SOUNDS = {
-  punch: "/punch.mp3",
-  kick: "/kick.mp3",
-  hit: "/hit.mp3",
-  victory: "/victory.mp3",
-  lost: "/lost.mp3",
-};
-
 const PlayerController = forwardRef(
   (
     {
@@ -65,6 +41,19 @@ const PlayerController = forwardRef(
     const hitSound = useRef(null);
     const victorySound = useRef(null);
     const lostSound = useRef(null);
+    const withinMeleeRange = () => {
+      try {
+        const p1 = rb.current?.translation?.();
+        const p2 = opponentRef.current?.translation?.();
+        if (!p1 || !p2) return false;
+        const dx = p1.x - p2.x,
+          dz = p1.z - p2.z;
+        // ~1.3 meters (tweak if needed)
+        return dx * dx + dz * dz <= 1.3 * 1.3;
+      } catch {
+        return false;
+      }
+    };
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -153,7 +142,7 @@ const PlayerController = forwardRef(
       setCurrentAnimation(type);
 
       if (
-        isInContact &&
+        (isInContact || withinMeleeRange()) &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
@@ -176,7 +165,7 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      if (attackTime <= lastAttackTime) return;
+      if (attackTime <= opponentAttackTime.current) return;
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
