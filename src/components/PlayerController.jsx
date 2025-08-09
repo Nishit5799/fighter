@@ -5,7 +5,11 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { CapsuleCollider, RigidBody } from "@react-three/rapier";
+import {
+  CapsuleCollider,
+  interactionGroups,
+  RigidBody,
+} from "@react-three/rapier";
 import { Vector3 } from "three";
 import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
@@ -53,22 +57,12 @@ const PlayerController = forwardRef(
     const opponentAttackTime = useRef(0);
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
-    const withinMeleeRange = () => {
-      try {
-        const p1 = rb.current?.translation?.();
-        const p2 = opponentRef.current?.translation?.();
-        if (!p1 || !p2) return false;
-        const dx = p1.x - p2.x,
-          dz = p1.z - p2.z;
-        // ~1.3 meters (tweak if needed)
-        return dx * dx + dz * dz <= 1.3 * 1.3;
-      } catch {
-        return false;
-      }
-    };
+    const GROUP_BODY = 0x0002; // body ↔ body
+    const GROUP_SENSOR = 0x0004; // sensor ↔ sensor
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
+    const intersectingWithOpponent = useRef(false);
     const contactTimeout = useRef(null);
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
@@ -166,7 +160,7 @@ const PlayerController = forwardRef(
       setCurrentAnimation(type);
 
       if (
-        (isInContact || withinMeleeRange()) &&
+        isInContact &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
@@ -220,36 +214,32 @@ const PlayerController = forwardRef(
       }, duration);
     };
 
-    const handleCollisionEnter = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-
-      const otherUserData = event.other.rigidBody?.userData;
-      if (otherUserData?.isPlayer) {
+    const handleSensorEnter = (e) => {
+      const otherRB = e.other?.rigidBody;
+      const otherCol = e.other?.collider;
+      const otherData = otherRB?.userData;
+      // ✅ Only count if our sensor touches their sensor, and it’s the opponent
+      if (
+        otherCol?.isSensor &&
+        otherData?.isPlayer &&
+        otherData.id !== socket?.id
+      ) {
         setIsInContact(true);
-        if (contactTimeout.current) {
-          clearTimeout(contactTimeout.current);
-        }
-
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
       }
     };
 
-    const handleCollisionExit = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-
-      const otherUserData = event.other.rigidBody?.userData;
-      if (otherUserData?.isPlayer) {
-        contactTimeout.current = setTimeout(() => {
-          setIsInContact(false);
-        }, 500);
+    const handleSensorExit = (e) => {
+      const otherRB = e.other?.rigidBody;
+      const otherCol = e.other?.collider;
+      const otherData = otherRB?.userData;
+      if (
+        otherCol?.isSensor &&
+        otherData?.isPlayer &&
+        otherData.id !== socket?.id
+      ) {
+        setIsInContact(false); // no linger: moving apart cancels immediately
       }
     };
-
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
@@ -484,11 +474,11 @@ const PlayerController = forwardRef(
     return (
       <RigidBody
         colliders={false}
-        lockRotations
+        mass={1}
+        enabledRotations={[false, true, false]}
         ref={rb}
+        type="dynamic"
         gravityScale={9}
-        onCollisionEnter={handleCollisionEnter}
-        onCollisionExit={handleCollisionExit}
         userData={{
           id: socket?.id,
           isPlayer: true,
@@ -538,17 +528,19 @@ const PlayerController = forwardRef(
               />
             )}
             <CapsuleCollider
-              args={[0.4, 0.3]}
-              position={[0, 3, 0]}
+              args={[0.48, 0.3]}
+              position={[0, 1.0, 0]}
               restitution={0.1}
               friction={0.5}
+              collisionGroups={interactionGroups(GROUP_BODY, GROUP_BODY)}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
-              position={[0, 3, 0]}
+              args={[0.6, 0.5]} // use YOUR current sensor size
+              position={[0, 1.0, 0.25]} // and YOUR current sensor offset
+              collisionGroups={interactionGroups(GROUP_SENSOR, GROUP_SENSOR)}
               sensor
-              onIntersectionEnter={handleCollisionEnter}
-              onIntersectionExit={handleCollisionExit}
+              onIntersectionEnter={handleSensorEnter}
+              onIntersectionExit={handleSensorExit}
             />
           </group>
         </group>
