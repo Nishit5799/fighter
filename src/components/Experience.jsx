@@ -466,7 +466,6 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            debug
             contactPairPersistentThreshold={0.08}
             sleepAfterStillness={0.2}
             substeps={2}
@@ -686,14 +685,12 @@ const Experience = () => {
         disabled={!isGameStarted || players.length !== 2}
       />
 
-      {isGameStarted &&
-        carControllerRef1.current &&
-        carControllerRef2.current && (
-          <AttackButtons
-            onPunch={(punching) => setIsPunching(punching)}
-            onKick={(kicking) => setIsKicking(kicking)}
-          />
-        )}
+      {isGameStarted && (
+        <AttackButtons
+          onPunch={(punching) => setIsPunching(punching)}
+          onKick={(kicking) => setIsKicking(kicking)}
+        />
+      )}
 
       <Info
         onReset={handleReset}
