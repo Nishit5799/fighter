@@ -1,3 +1,27 @@
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { CapsuleCollider, RigidBody } from "@react-three/rapier";
+import { Vector3 } from "three";
+import { useFrame } from "@react-three/fiber";
+import { useKeyboardControls } from "@react-three/drei";
+import { MathUtils } from "three/src/math/MathUtils";
+import { useSocket } from "../context/SocketContext";
+import Stone from "./Stone";
+import Cenaa from "./Cenaa";
+
+const SOUNDS = {
+  punch: "/punch.mp3",
+  kick: "/kick.mp3",
+  hit: "/hit.mp3",
+  victory: "/victory.mp3",
+  lost: "/lost.mp3",
+};
+
 const PlayerController = forwardRef(
   (
     {
@@ -29,18 +53,6 @@ const PlayerController = forwardRef(
     const opponentAttackTime = useRef(0);
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
-
-    const opponentRef = useRef();
-    const [isInContact, setIsInContact] = useState(false);
-    const contactTimeout = useRef(null);
-    const lastJoystickMagnitude = useRef(0);
-    const joystickChangeThreshold = 0.05;
-
-    const punchSound = useRef(null);
-    const kickSound = useRef(null);
-    const hitSound = useRef(null);
-    const victorySound = useRef(null);
-    const lostSound = useRef(null);
     const withinMeleeRange = () => {
       try {
         const p1 = rb.current?.translation?.();
@@ -54,6 +66,18 @@ const PlayerController = forwardRef(
         return false;
       }
     };
+
+    const opponentRef = useRef();
+    const [isInContact, setIsInContact] = useState(false);
+    const contactTimeout = useRef(null);
+    const lastJoystickMagnitude = useRef(0);
+    const joystickChangeThreshold = 0.05;
+
+    const punchSound = useRef(null);
+    const kickSound = useRef(null);
+    const hitSound = useRef(null);
+    const victorySound = useRef(null);
+    const lostSound = useRef(null);
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
