@@ -37,7 +37,6 @@ const PlayerController = forwardRef(
       playerName,
       opponentName,
       isLocalPlayer,
-      playerId,
     },
     ref
   ) => {
@@ -51,7 +50,10 @@ const PlayerController = forwardRef(
     const [lastAttackTime, setLastAttackTime] = useState(0);
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
+
+    // Keep for defeat attribution only; don't use it to reject hits
     const opponentAttackTime = useRef(0);
+
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
 
@@ -163,7 +165,7 @@ const PlayerController = forwardRef(
           attackerId: socket.id,
           damage: damage,
           attackType: type,
-          attackTime: currentTime,
+          attackTime: currentTime, // informational only; not used to reject hits
         });
       }
 
@@ -177,7 +179,10 @@ const PlayerController = forwardRef(
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      if (attackTime <= lastAttackTime) return;
+
+      // ❗️Do NOT compare foreign timestamps to local ones.
+      // We accept the hit and only use the timestamp for attribution/logging.
+      opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
@@ -185,8 +190,6 @@ const PlayerController = forwardRef(
           console.log("iOS blocked audio, still animating hit");
         });
       }
-
-      opponentAttackTime.current = attackTime;
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
@@ -223,7 +226,6 @@ const PlayerController = forwardRef(
           other: otherUserData?.id,
           time: Date.now(),
           isLocalPlayer,
-          playerId,
         });
       }
     };
@@ -448,7 +450,7 @@ const PlayerController = forwardRef(
         }, 200);
       },
       translation: () => rb.current?.translation(),
-      id: playerId,
+      id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
     }));
@@ -479,7 +481,7 @@ const PlayerController = forwardRef(
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
-          id: playerId,
+          id: socket?.id,
           isPlayer: true,
         }}
         solverIterations={10}

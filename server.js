@@ -38,7 +38,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
       io.adapter(createAdapter(pubClient, subClient));
       const roomStates = new Map();
-      const playerPositions = new Map();
 
       const generateRoomId = () => {
         return `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -55,6 +54,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
           players: new Map(),
           gameStarted: false,
           createdAt: Date.now(),
+          // kept for potential future use, but no longer used to filter hits
           lastAttacks: {},
         });
         return newRoomId;
@@ -68,7 +68,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             console.log(`Cleaned up empty room: ${roomId}`);
           }
 
-          // Clear old attack times
+          // Clear old attack times (legacy; harmless to keep)
           if (state.lastAttacks) {
             for (const [playerId, time] of Object.entries(state.lastAttacks)) {
               if (now - time > 5000) {
@@ -139,72 +139,31 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("carMove", (data) => {
-          // Save latest position for server-side validation
-          try {
-            if (data && data.position && typeof data.position.x === "number") {
-              playerPositions.set(socket.id, {
-                x: data.position.x,
-                y: data.position.y,
-                z: data.position.z,
-                t: Date.now(),
-              });
-            }
-          } catch {}
-          socket
-            .to(roomId)
-            .emit("carMove", { ...data, serverTime: Date.now() });
+          socket.to(roomId).emit("carMove", data);
         });
 
+        // 🔧 Always forward hits; don't filter by client clocks
         socket.on("playerHit", (data) => {
-          const now = Date.now();
-          // Get both players in the room
-          const players = Array.from(roomState.players.keys());
-          const otherPlayerId = players.find((id) => id !== socket.id);
-
-          if (!otherPlayerId) return;
-
-          // Validate distance between attacker and defender using last known positions
-          const attackerPos = playerPositions.get(socket.id);
-          const defenderPos = playerPositions.get(otherPlayerId);
-
-          // Default: if we don't have positions yet (first frames), allow a "soft" hit
-          let isInRange = true;
-          if (attackerPos && defenderPos) {
-            const dx = attackerPos.x - defenderPos.x;
-            const dy = attackerPos.y - defenderPos.y;
-            const dz = attackerPos.z - defenderPos.z;
-            const dist2 = dx * dx + dy * dy + dz * dz;
-            const HIT_RANGE = 2.5; // tweak as needed based on your scale
-            isInRange = dist2 <= HIT_RANGE * HIT_RANGE;
-          }
-
-          if (!isInRange) {
-            return; // ignore out-of-range hits
-          }
-
+          const serverTime = Date.now();
           const hitData = {
-            attackType: data?.attackType || "punch",
-            damage:
-              typeof data?.damage === "number"
-                ? data.damage
-                : data?.attackType === "kick"
-                ? 20
-                : 10,
-            attackerId: socket.id,
-            attackTime: now, // server-trusted timestamp
+            ...data,
+            // keep client-sent timestamp for telemetry only
+            attackTime: data.attackTime ?? serverTime,
+            serverTime,
           };
 
-          // Emit to the other player only
-          socket.to(otherPlayerId).emit("playerHit", hitData);
+          const players = Array.from(roomState.players.keys());
+          const otherPlayerId = players.find((id) => id !== socket.id);
+          if (otherPlayerId) {
+            socket.to(otherPlayerId).emit("playerHit", hitData);
+          }
 
-          // Store the last attack time for this player (server clock)
-          roomState.lastAttacks[socket.id] = now;
+          // If you later want simultaneous-hit resolution, compare using serverTime only.
+          roomState.lastAttacks[socket.id] = serverTime;
         });
 
         socket.on("updateHealth", (data) => {
-          (data) => {
-            socket.roadcast.emit("updateHealth", data);
-          };
+          socket.broadcast.emit("updateHealth", data);
         });
 
         socket.on("playerDefeated", (data) => {
@@ -274,10 +233,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("restartGame", () => {
           roomState.players.clear();
           roomState.gameStarted = false;
-          // Clean positions so next match starts clean
-          for (const id of playerPositions.keys()) {
-            playerPositions.delete(id);
-          }
           io.to(roomId).emit("restartGame");
         });
 

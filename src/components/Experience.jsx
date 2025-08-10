@@ -477,7 +477,6 @@ const Experience = () => {
               <>
                 <PlayerController
                   ref={carControllerRef1}
-                  playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -498,7 +497,6 @@ const Experience = () => {
                 />
                 <PlayerController
                   ref={carControllerRef2}
-                  playerId={players[1]?.id}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
