@@ -52,7 +52,14 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+
+  // ---- Audio unlock: refs & state ----
   const beginSoundRef = useRef(null);
+  const audioUnlockedRef = useRef(false); // single-source of truth
+  const audioContextRef = useRef(null);
+  const nameInputRef = useRef(null);
+  const joinBtnRef = useRef(null);
+
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
 
@@ -62,6 +69,7 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
+  // Precreate start sound (actual game start sfx)
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
@@ -74,34 +82,105 @@ const Experience = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
+  // ---- iOS-friendly Audio Unlock (on tapping name input or JOIN ROOM) ----
+  const unlockAllAudio = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+
+    try {
+      // 1) Ensure/resume a WebAudio context (helps iOS Safari)
+      const AC =
+        window.AudioContext ||
+        // @ts-ignore
+        window.webkitAudioContext;
+      if (AC) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AC();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          audioContextRef.current.resume().catch(() => {});
+        }
+      }
+
+      // 2) Prime all HTMLAudio elements we will use in the app
+      const sources = [
         "/punch.mp3",
         "/kick.mp3",
         "/hit.mp3",
         "/victory.mp3",
         "/lost.mp3",
+        "/begin.mp3",
       ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
+
+      const warmups = sources.map((src) => {
+        const a = new Audio(src);
+        a.preload = "auto";
+        // Important for iOS:
+        // @ts-ignore
+        a.playsInline = true;
+        a.muted = true;
+        return a
           .play()
           .then(() => {
-            audio.pause();
-            audio.muted = false;
+            a.pause();
+            a.currentTime = 0;
+            a.muted = false;
+            return true;
           })
-          .catch(() => {});
+          .catch(() => false);
       });
 
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
+      Promise.all(warmups).finally(() => {
+        audioUnlockedRef.current = true;
+        // console.log("Audio unlocked via user gesture.");
+      });
+    } catch {
+      // even if something fails, mark as attempted to avoid repeat work
+      audioUnlockedRef.current = true;
+    }
+  }, []);
+
+  // Attach gesture unlock to the *specific* elements: input + JOIN ROOM
+  useEffect(() => {
+    const inputEl = nameInputRef.current;
+    const joinEl = joinBtnRef.current;
+
+    if (!inputEl && !joinEl) return;
+
+    const handler = (e) => {
+      // Only unlock on explicit user gestures
+      unlockAllAudio();
     };
 
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
-  }, []);
+    const opts = { passive: true };
+    if (inputEl) {
+      inputEl.addEventListener("pointerdown", handler, opts);
+      inputEl.addEventListener("touchstart", handler, opts);
+      inputEl.addEventListener("mousedown", handler, opts);
+      inputEl.addEventListener("focus", handler, opts); // typing also counts
+    }
+    if (joinEl) {
+      joinEl.addEventListener("pointerdown", handler, opts);
+      joinEl.addEventListener("touchstart", handler, opts);
+      joinEl.addEventListener("mousedown", handler, opts);
+      joinEl.addEventListener("click", handler, opts);
+    }
+
+    return () => {
+      if (inputEl) {
+        inputEl.removeEventListener("pointerdown", handler, opts);
+        inputEl.removeEventListener("touchstart", handler, opts);
+        inputEl.removeEventListener("mousedown", handler, opts);
+        inputEl.removeEventListener("focus", handler, opts);
+      }
+      if (joinEl) {
+        joinEl.removeEventListener("pointerdown", handler, opts);
+        joinEl.removeEventListener("touchstart", handler, opts);
+        joinEl.removeEventListener("mousedown", handler, opts);
+        joinEl.removeEventListener("click", handler, opts);
+      }
+    };
+  }, [showWelcomeScreen, unlockAllAudio]);
+  // ^ when the welcome screen re-appears after game end, refs change -> reattach
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -114,6 +193,9 @@ const Experience = () => {
       setShowPopup(true);
       return;
     }
+
+    // Extra safety: make sure audio is unlocked on tap
+    unlockAllAudio();
 
     const trimmedName = playerName.trim();
     if (trimmedName !== "" && !hasJoinedRoom) {
@@ -179,6 +261,7 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
+      // When the welcome screen comes back, the listeners re-attach via useEffect above.
     }, 2000);
   }, [socket]);
 
@@ -329,7 +412,6 @@ const Experience = () => {
   useEffect(() => {
     if (!socket) return;
 
-    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -342,7 +424,6 @@ const Experience = () => {
 
     return () => {
       socket.off("updateHealth", updateHealthHandler);
-      // ... keep your other cleanup code
     };
   }, [socket]);
 
@@ -379,6 +460,7 @@ const Experience = () => {
           setIsGameStarted(true);
 
           if (!hasPlayedStartSound.current && beginSoundRef.current) {
+            // By now audio should be unlocked by user gesture.
             beginSoundRef.current.currentTime = 0;
             beginSoundRef.current
               .play()
@@ -552,16 +634,20 @@ const Experience = () => {
             </div>
             <div>
               <input
+                ref={nameInputRef}
                 type="text"
                 placeholder="Enter your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
+                onPointerDown={unlockAllAudio} // extra safety on iOS
                 className="px-4 py-2 mb-4 rounded-lg"
               />
             </div>
             <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
               <button
+                ref={joinBtnRef}
                 onClick={handleJoinRoom}
+                onPointerDown={unlockAllAudio} // extra safety on iOS
                 disabled={
                   hasJoinedRoom ||
                   !isUsernameValid ||
