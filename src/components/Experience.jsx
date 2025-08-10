@@ -74,26 +74,34 @@ const Experience = () => {
     };
   }, []);
 
-  const unlockAudioForiOS = () => {
-    const sounds = [
-      "/punch.mp3",
-      "/kick.mp3",
-      "/hit.mp3",
-      "/victory.mp3",
-      "/lost.mp3",
-    ];
-    sounds.forEach((src) => {
-      const audio = new Audio(src);
-      audio.muted = true; // Keep silent
-      audio
-        .play()
-        .then(() => {
-          audio.pause();
-          audio.muted = false;
-        })
-        .catch(() => {});
-    });
-  };
+  useEffect(() => {
+    const unlockAudio = () => {
+      const sounds = [
+        "/punch.mp3",
+        "/kick.mp3",
+        "/hit.mp3",
+        "/victory.mp3",
+        "/lost.mp3",
+      ];
+      sounds.forEach((src) => {
+        const audio = new Audio(src);
+        audio.muted = true;
+        audio
+          .play()
+          .then(() => {
+            audio.pause();
+            audio.muted = false;
+          })
+          .catch(() => {});
+      });
+
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("mousedown", unlockAudio);
+    };
+
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("mousedown", unlockAudio, { once: true });
+  }, []);
 
   const isUsernameUnique = (name) => {
     return !players.some((player) => player.name === name);
@@ -469,6 +477,7 @@ const Experience = () => {
               <>
                 <PlayerController
                   ref={carControllerRef1}
+                  playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -489,6 +498,7 @@ const Experience = () => {
                 />
                 <PlayerController
                   ref={carControllerRef2}
+                  playerId={players[1]?.id}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
@@ -548,16 +558,12 @@ const Experience = () => {
                 placeholder="Enter your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                onFocus={unlockAudioForiOS} // 🔹 Unlock on focus
                 className="px-4 py-2 mb-4 rounded-lg"
               />
             </div>
             <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
               <button
-                onClick={() => {
-                  unlockAudioForiOS(); // 🔹 Unlock before joining
-                  handleJoinRoom();
-                }}
+                onClick={handleJoinRoom}
                 disabled={
                   hasJoinedRoom ||
                   !isUsernameValid ||

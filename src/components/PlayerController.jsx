@@ -37,6 +37,7 @@ const PlayerController = forwardRef(
       playerName,
       opponentName,
       isLocalPlayer,
+      playerId,
     },
     ref
   ) => {
@@ -222,6 +223,7 @@ const PlayerController = forwardRef(
           other: otherUserData?.id,
           time: Date.now(),
           isLocalPlayer,
+          playerId,
         });
       }
     };
@@ -446,7 +448,7 @@ const PlayerController = forwardRef(
         }, 200);
       },
       translation: () => rb.current?.translation(),
-      id: socket?.id,
+      id: playerId,
       rigidBody: rb.current,
       isDefeated,
     }));
@@ -477,7 +479,7 @@ const PlayerController = forwardRef(
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
-          id: socket?.id,
+          id: playerId,
           isPlayer: true,
         }}
         solverIterations={10}
