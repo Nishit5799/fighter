@@ -428,8 +428,10 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
+      unlockAllAudio(); // ✅ ensure iOS AudioContext is resumed
       let count = 3;
       setCountdown(count);
+
       const interval = setInterval(() => {
         count -= 1;
         setCountdown(count);
@@ -486,6 +488,14 @@ const Experience = () => {
     }
   }, [isGameStarted, players, socket?.id]);
 
+  // ✅ ADD: Re-link after reset or restart
+  useEffect(() => {
+    if (carControllerRef1.current && carControllerRef2.current) {
+      carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+      carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+    }
+  }, [players]);
+
   // Restart countdown -> trigger reset
   useEffect(() => {
     if (restartCountdown !== null && restartCountdown > 0) {
@@ -533,6 +543,7 @@ const Experience = () => {
               <>
                 <PlayerController
                   ref={carControllerRef1}
+                  playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -553,6 +564,7 @@ const Experience = () => {
                 />
                 <PlayerController
                   ref={carControllerRef2}
+                  playerId={players[1]?.id}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null

@@ -25,6 +25,7 @@ const SOUNDS = {
 const PlayerController = forwardRef(
   (
     {
+      playerId,
       joystickInput,
       position,
       isPlayer1,
@@ -162,56 +163,18 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      // --- New distance + facing helpers ---
-      const distToOpponent = () => {
-        try {
-          const me = rb.current?.translation?.();
-          const other = opponentRef.current?.translation?.();
-          if (!me || !other) return Infinity;
-          const dx = me.x - other.x,
-            dy = me.y - other.y,
-            dz = me.z - other.z;
-          return Math.sqrt(dx * dx + dy * dy + dz * dz);
-        } catch {
-          return Infinity;
-        }
-      };
-
-      const isFacingOpponent = () => {
-        if (!container.current || !opponentRef.current?.translation)
-          return true;
-        const me = rb.current?.translation?.();
-        const other = opponentRef.current?.translation?.();
-        if (!me || !other) return true;
-
-        const toOppX = other.x - me.x;
-        const toOppZ = other.z - me.z;
-        const toOppLen = Math.hypot(toOppX, toOppZ) || 1;
-        const toOppNX = toOppX / toOppLen;
-        const toOppNZ = toOppZ / toOppLen;
-
-        const yaw = container.current.rotation.y;
-        const fwdX = Math.sin(yaw);
-        const fwdZ = Math.cos(yaw);
-
-        const dot = fwdX * toOppNX + fwdZ * toOppNZ;
-        return dot > 0.2;
-      };
-
-      const HIT_RANGE = 1.6;
-
-      // --- Emit hit if close enough and facing ---
-      if (socket && opponentRef.current && !opponentRef.current.isDefeated) {
-        const closeEnough = distToOpponent() <= HIT_RANGE;
-        const facingOK = isFacingOpponent();
-        if (closeEnough && facingOK) {
-          socket.emit("playerHit", {
-            attackerId: socket.id,
-            damage: damage,
-            attackType: type,
-            attackTime: currentTime,
-          });
-        }
+      if (
+        isInContact &&
+        socket &&
+        opponentRef.current &&
+        !opponentRef.current.isDefeated
+      ) {
+        socket.emit("playerHit", {
+          attackerId: socket.id,
+          damage: damage,
+          attackType: type,
+          attackTime: currentTime, // informational only; not used to reject hits
+        });
       }
 
       const duration = 1000;
@@ -322,7 +285,8 @@ const PlayerController = forwardRef(
 
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
-        if (data.attackerId !== socket.id) {
+        if (data.victimId === playerId) {
+          // ✅ precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -535,7 +499,7 @@ const PlayerController = forwardRef(
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
-          id: socket?.id,
+          id: playerId, // instead of socket?.id
           isPlayer: true,
         }}
         solverIterations={10}

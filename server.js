@@ -145,20 +145,20 @@ Promise.all([pubClient.connect(), subClient.connect()])
         // 🔧 Always forward hits; don't filter by client clocks
         socket.on("playerHit", (data) => {
           const serverTime = Date.now();
+          const players = Array.from(roomState.players.keys());
+          const otherPlayerId = players.find((id) => id !== socket.id);
+
           const hitData = {
             ...data,
-            // keep client-sent timestamp for telemetry only
+            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
             attackTime: data.attackTime ?? serverTime,
             serverTime,
           };
 
-          const players = Array.from(roomState.players.keys());
-          const otherPlayerId = players.find((id) => id !== socket.id);
           if (otherPlayerId) {
             socket.to(otherPlayerId).emit("playerHit", hitData);
           }
 
-          // If you later want simultaneous-hit resolution, compare using serverTime only.
           roomState.lastAttacks[socket.id] = serverTime;
         });
 
