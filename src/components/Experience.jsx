@@ -533,7 +533,7 @@ const Experience = () => {
 
           <Physics
             contactPairPersistentThreshold={0.08}
-            sleepAfterStillness={0.2}
+  
             substeps={2}
             solverIterations={8}
             timeStep="vary"

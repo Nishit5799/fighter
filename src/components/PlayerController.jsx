@@ -506,8 +506,8 @@ const PlayerController = forwardRef(
         ccd={true}
         linearDamping={0.5}
         angularDamping={1.0}
-        sleepAfterStillness={0.2}
-        canSleep={true}
+        sleepAfterStillness={0}
+        canSleep={false}
       >
         <group ref={container} position={position}>
           <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
