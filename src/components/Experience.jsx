@@ -30,7 +30,10 @@ const keyboardMap = [
 ];
 
 const Experience = () => {
+  // --- Context ---
   const socket = useSocket();
+
+  // --- State ---
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
   const [isPunching, setIsPunching] = useState(false);
   const [isKicking, setIsKicking] = useState(false);
@@ -53,9 +56,9 @@ const Experience = () => {
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
 
-  // ---- Audio unlock: refs & state ----
+  // --- Refs ---
   const beginSoundRef = useRef(null);
-  const audioUnlockedRef = useRef(false); // single-source of truth
+  const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
   const nameInputRef = useRef(null);
   const joinBtnRef = useRef(null);
@@ -69,11 +72,13 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
-  // Precreate start sound (actual game start sfx)
+  // --- Memo ---
+  const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+
+  // --- Audio: create start sound early ---
   useEffect(() => {
     beginSoundRef.current = new Audio("/begin.mp3");
     beginSoundRef.current.volume = 0.7;
-
     return () => {
       if (beginSoundRef.current) {
         beginSoundRef.current.pause();
@@ -82,12 +87,10 @@ const Experience = () => {
     };
   }, []);
 
-  // ---- iOS-friendly Audio Unlock (on tapping name input or JOIN ROOM) ----
+  // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
-
     try {
-      // 1) Ensure/resume a WebAudio context (helps iOS Safari)
       const AC =
         window.AudioContext ||
         // @ts-ignore
@@ -101,7 +104,6 @@ const Experience = () => {
         }
       }
 
-      // 2) Prime all HTMLAudio elements we will use in the app
       const sources = [
         "/punch.mp3",
         "/kick.mp3",
@@ -114,7 +116,6 @@ const Experience = () => {
       const warmups = sources.map((src) => {
         const a = new Audio(src);
         a.preload = "auto";
-        // Important for iOS:
         // @ts-ignore
         a.playsInline = true;
         a.muted = true;
@@ -131,62 +132,19 @@ const Experience = () => {
 
       Promise.all(warmups).finally(() => {
         audioUnlockedRef.current = true;
-        // console.log("Audio unlocked via user gesture.");
       });
     } catch {
-      // even if something fails, mark as attempted to avoid repeat work
       audioUnlockedRef.current = true;
     }
   }, []);
 
-  // Attach gesture unlock to the *specific* elements: input + JOIN ROOM
-  useEffect(() => {
-    const inputEl = nameInputRef.current;
-    const joinEl = joinBtnRef.current;
+  const isUsernameUnique = useCallback(
+    (name) => !players.some((player) => player.name === name),
+    [players]
+  );
 
-    if (!inputEl && !joinEl) return;
-
-    const handler = (e) => {
-      // Only unlock on explicit user gestures
-      unlockAllAudio();
-    };
-
-    const opts = { passive: true };
-    if (inputEl) {
-      inputEl.addEventListener("pointerdown", handler, opts);
-      inputEl.addEventListener("touchstart", handler, opts);
-      inputEl.addEventListener("mousedown", handler, opts);
-      inputEl.addEventListener("focus", handler, opts); // typing also counts
-    }
-    if (joinEl) {
-      joinEl.addEventListener("pointerdown", handler, opts);
-      joinEl.addEventListener("touchstart", handler, opts);
-      joinEl.addEventListener("mousedown", handler, opts);
-      joinEl.addEventListener("click", handler, opts);
-    }
-
-    return () => {
-      if (inputEl) {
-        inputEl.removeEventListener("pointerdown", handler, opts);
-        inputEl.removeEventListener("touchstart", handler, opts);
-        inputEl.removeEventListener("mousedown", handler, opts);
-        inputEl.removeEventListener("focus", handler, opts);
-      }
-      if (joinEl) {
-        joinEl.removeEventListener("pointerdown", handler, opts);
-        joinEl.removeEventListener("touchstart", handler, opts);
-        joinEl.removeEventListener("mousedown", handler, opts);
-        joinEl.removeEventListener("click", handler, opts);
-      }
-    };
-  }, [showWelcomeScreen, unlockAllAudio]);
-  // ^ when the welcome screen re-appears after game end, refs change -> reattach
-
-  const isUsernameUnique = (name) => {
-    return !players.some((player) => player.name === name);
-  };
-
-  const handleJoinRoom = () => {
+  // --- Handlers (callbacks used by effects must be defined before those effects) ---
+  const handleJoinRoom = useCallback(() => {
     if (!socket) {
       console.error("Socket is not available");
       setPopupMessage("Connection error. Please refresh the page.");
@@ -194,7 +152,6 @@ const Experience = () => {
       return;
     }
 
-    // Extra safety: make sure audio is unlocked on tap
     unlockAllAudio();
 
     const trimmedName = playerName.trim();
@@ -214,32 +171,14 @@ const Experience = () => {
         setIsUsernameValid(false);
       }
     }
-  };
-
-  useEffect(() => {
-    if (playerName.trim() !== "") {
-      setIsUsernameValid(isUsernameUnique(playerName.trim()));
-    }
-  }, [playerName, players]);
-
-  useEffect(() => {
-    if (showWelcomeScreen) {
-      const letters = Array.from(welcomeTextRef.current.children);
-      gsap.fromTo(
-        letters,
-        { y: -10 },
-        {
-          y: 0,
-          duration: 0.5,
-          stagger: 0.1,
-          ease: "ease.in",
-          repeat: -1,
-          repeatDelay: 0.5,
-          yoyo: true,
-        }
-      );
-    }
-  }, [showWelcomeScreen]);
+  }, [
+    socket,
+    unlockAllAudio,
+    playerName,
+    hasJoinedRoom,
+    players.length,
+    isUsernameUnique,
+  ]);
 
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
@@ -261,7 +200,6 @@ const Experience = () => {
       setHealth1(100);
       setHealth2(100);
       if (socket) socket.emit("restartGame");
-      // When the welcome screen comes back, the listeners re-attach via useEffect above.
     }, 2000);
   }, [socket]);
 
@@ -269,27 +207,17 @@ const Experience = () => {
     setShowInfoPopup(true);
   }, []);
 
-  const handleReady = () => {
+  const handleReady = useCallback(() => {
     if (socket) {
       socket.emit("playerReady", playerName);
       setIsReady(true);
     }
-  };
-
-  useEffect(() => {
-    if (shouldReload) {
-      const timer = setTimeout(() => {
-        window.location.reload();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [shouldReload]);
+  }, [socket, playerName]);
 
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id
@@ -341,32 +269,12 @@ const Experience = () => {
   const onPlayerDefeated = useCallback(
     (data) => {
       if (!hasLoggedResult.current) {
-        console.log("Received defeat data:", data);
-
-        if (!data || typeof data !== "object") {
-          console.error("Invalid data format");
-          return;
-        }
-
-        if (data.winnerId === data.loserId) {
-          console.error(
-            "Server sent invalid data - winner and loser are the same"
-          );
-          return;
-        }
+        if (!data || typeof data !== "object") return;
+        if (data.winnerId === data.loserId) return;
 
         const winnerPlayer = players.find((p) => p.id === data.winnerId);
         const loserPlayer = players.find((p) => p.id === data.loserId);
-
-        if (!winnerPlayer || !loserPlayer) {
-          console.error("Couldn't find winner or loser in players array");
-          return;
-        }
-
-        console.log("All players:", players);
-        console.log(
-          `Validating - Winner: ${winnerPlayer?.name} (${data.winnerId}), Loser: ${loserPlayer?.name} (${data.loserId})`
-        );
+        if (!winnerPlayer || !loserPlayer) return;
 
         if (players[0]?.id === data.winnerId) {
           setHealth1(data.winnerHealth);
@@ -378,13 +286,6 @@ const Experience = () => {
 
         setWinner(winnerPlayer);
         setLoser(loserPlayer);
-
-        console.log(
-          `Validated Winner: ${winnerPlayer.name} (ID: ${winnerPlayer.id})`
-        );
-        console.log(
-          `Validated Loser: ${loserPlayer.name} (ID: ${loserPlayer.id})`
-        );
 
         hasLoggedResult.current = true;
 
@@ -409,9 +310,86 @@ const Experience = () => {
     [players, socket?.id]
   );
 
+  // --- Effects (that rely on the helpers/handlers above) ---
+  // Attach gesture unlock to input + JOIN button
+  useEffect(() => {
+    const inputEl = nameInputRef.current;
+    const joinEl = joinBtnRef.current;
+    if (!inputEl && !joinEl) return;
+
+    const handler = () => {
+      unlockAllAudio();
+    };
+
+    const opts = { passive: true };
+    if (inputEl) {
+      inputEl.addEventListener("pointerdown", handler, opts);
+      inputEl.addEventListener("touchstart", handler, opts);
+      inputEl.addEventListener("mousedown", handler, opts);
+      inputEl.addEventListener("focus", handler, opts);
+    }
+    if (joinEl) {
+      joinEl.addEventListener("pointerdown", handler, opts);
+      joinEl.addEventListener("touchstart", handler, opts);
+      joinEl.addEventListener("mousedown", handler, opts);
+      joinEl.addEventListener("click", handler, opts);
+    }
+    return () => {
+      if (inputEl) {
+        inputEl.removeEventListener("pointerdown", handler, opts);
+        inputEl.removeEventListener("touchstart", handler, opts);
+        inputEl.removeEventListener("mousedown", handler, opts);
+        inputEl.removeEventListener("focus", handler, opts);
+      }
+      if (joinEl) {
+        joinEl.removeEventListener("pointerdown", handler, opts);
+        joinEl.removeEventListener("touchstart", handler, opts);
+        joinEl.removeEventListener("mousedown", handler, opts);
+        joinEl.removeEventListener("click", handler, opts);
+      }
+    };
+  }, [showWelcomeScreen, unlockAllAudio]);
+
+  // Validate username as user types
+  useEffect(() => {
+    if (playerName.trim() !== "") {
+      setIsUsernameValid(isUsernameUnique(playerName.trim()));
+    }
+  }, [playerName, isUsernameUnique]);
+
+  // Welcome text animation
+  useEffect(() => {
+    if (showWelcomeScreen) {
+      const letters = Array.from(welcomeTextRef.current.children);
+      gsap.fromTo(
+        letters,
+        { y: -10 },
+        {
+          y: 0,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "ease.in",
+          repeat: -1,
+          repeatDelay: 0.5,
+          yoyo: true,
+        }
+      );
+    }
+  }, [showWelcomeScreen]);
+
+  // Hard reload if server says you’re a 3rd player
+  useEffect(() => {
+    if (shouldReload) {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldReload]);
+
+  // Health sync (incoming)
   useEffect(() => {
     if (!socket) return;
-
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -419,28 +397,29 @@ const Experience = () => {
       setHealth1(newHealth1);
       setHealth2(newHealth2);
     };
-
     socket.on("updateHealth", updateHealthHandler);
-
     return () => {
       socket.off("updateHealth", updateHealthHandler);
     };
   }, [socket]);
 
+  // Socket events: players, start, restart, username taken, combat
   useEffect(() => {
     if (!socket) return;
 
-    const updatePlayersHandler = (players) => {
-      if (players.length > 2) {
-        const currentPlayerIndex = players.findIndex((p) => p.id === socket.id);
+    const updatePlayersHandler = (playersList) => {
+      if (playersList.length > 2) {
+        const currentPlayerIndex = playersList.findIndex(
+          (p) => p.id === socket.id
+        );
         if (currentPlayerIndex >= 2) {
           setShouldReload(true);
           return;
         }
       }
-      setPlayers(players);
+      setPlayers(playersList);
 
-      if (isGameStarted && players.length === 1) {
+      if (isGameStarted && playersList.length === 1) {
         setPlayerLeft(true);
         setPopupMessage("The other player has left the game.");
         setShowPopup(true);
@@ -460,7 +439,6 @@ const Experience = () => {
           setIsGameStarted(true);
 
           if (!hasPlayedStartSound.current && beginSoundRef.current) {
-            // By now audio should be unlocked by user gesture.
             beginSoundRef.current.currentTime = 0;
             beginSoundRef.current
               .play()
@@ -496,24 +474,19 @@ const Experience = () => {
     };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
+  // Cross-link player controllers when game starts
   useEffect(() => {
     if (
       isGameStarted &&
       carControllerRef1.current &&
       carControllerRef2.current
     ) {
-      if (players[0]?.id === socket?.id) {
-        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
-        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
-      } else if (players[1]?.id === socket?.id) {
-        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
-        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
-      }
+      carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+      carControllerRef2.current.setOpponentRef(carControllerRef1.current);
     }
   }, [isGameStarted, players, socket?.id]);
 
-  const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
-
+  // Restart countdown -> trigger reset
   useEffect(() => {
     if (restartCountdown !== null && restartCountdown > 0) {
       const interval = setInterval(() => {
@@ -525,6 +498,7 @@ const Experience = () => {
     }
   }, [restartCountdown, handleReset]);
 
+  // --- Render ---
   return (
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
@@ -639,7 +613,7 @@ const Experience = () => {
                 placeholder="Enter your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                onPointerDown={unlockAllAudio} // extra safety on iOS
+                onPointerDown={unlockAllAudio}
                 className="px-4 py-2 mb-4 rounded-lg"
               />
             </div>
@@ -647,7 +621,7 @@ const Experience = () => {
               <button
                 ref={joinBtnRef}
                 onClick={handleJoinRoom}
-                onPointerDown={unlockAllAudio} // extra safety on iOS
+                onPointerDown={unlockAllAudio}
                 disabled={
                   hasJoinedRoom ||
                   !isUsernameValid ||
@@ -703,7 +677,7 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
-          {/* Player 1 - Always left */}
+          {/* Player 1 */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -717,7 +691,7 @@ const Experience = () => {
             </div>
           </div>
 
-          {/* Player 2 - Always right */}
+          {/* Player 2 */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -732,6 +706,7 @@ const Experience = () => {
           </div>
         </div>
       )}
+
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">

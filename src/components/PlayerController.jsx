@@ -40,6 +40,7 @@ const PlayerController = forwardRef(
     },
     ref
   ) => {
+    // --- Context / state ---
     const socket = useSocket();
     const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
     const [currentAnimation, setCurrentAnimation] = useState("idle");
@@ -48,6 +49,8 @@ const PlayerController = forwardRef(
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
+
+    // --- Refs ---
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
 
@@ -85,10 +88,12 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
+    // Track opponent id (for logging)
     useEffect(() => {
       opponentIdRef.current = opponentRef.current?.id;
     }, [opponentRef.current?.id]);
 
+    // Init / teardown sounds
     useEffect(() => {
       punchSound.current = new Audio(SOUNDS.punch);
       kickSound.current = new Audio(SOUNDS.kick);
@@ -116,6 +121,7 @@ const PlayerController = forwardRef(
       };
     }, []);
 
+    // Responsive screen check
     useEffect(() => {
       const handleResize = () => {
         setIsSmallScreen(window.innerWidth < 640);
@@ -124,6 +130,7 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
+    // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
     };
@@ -241,6 +248,7 @@ const PlayerController = forwardRef(
       }
     };
 
+    // --- Effects depending on helpers ---
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
@@ -288,6 +296,7 @@ const PlayerController = forwardRef(
       };
     }, [socket]);
 
+    // --- Frame loop ---
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
@@ -400,6 +409,7 @@ const PlayerController = forwardRef(
       }
     });
 
+    // --- Socket move sync (remote) ---
     useEffect(() => {
       if (!socket) return;
 
@@ -417,7 +427,11 @@ const PlayerController = forwardRef(
       return () => socket.off("carMove", onCarMove);
     }, [socket, isPlayer1]);
 
-    useImperativeHandle(ref, () => ({
+    // --- Imperative API ---
+    useImperativeHandle(ref, () => wrapper);
+
+    // Keep the object literal separate so we don’t capture stale refs above
+    const wrapper = {
       setOpponentRef,
 
       setVictory: (isLocalPlayerWinner) => {
@@ -453,8 +467,9 @@ const PlayerController = forwardRef(
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
-    }));
+    };
 
+    // Cleanup timeouts and audio refs on unmount
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -472,6 +487,7 @@ const PlayerController = forwardRef(
       };
     }, []);
 
+    // --- Render ---
     return (
       <RigidBody
         colliders={false}
@@ -535,7 +551,7 @@ const PlayerController = forwardRef(
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.55, 0.45]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}
