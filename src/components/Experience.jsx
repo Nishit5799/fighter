@@ -118,13 +118,12 @@ const Experience = () => {
         a.preload = "auto";
         // @ts-ignore
         a.playsInline = true;
-        a.muted = true;
+        a.muted = true; // stays muted permanently
         return a
           .play()
           .then(() => {
             a.pause();
             a.currentTime = 0;
-            a.muted = false;
             return true;
           })
           .catch(() => false);
@@ -533,7 +532,6 @@ const Experience = () => {
 
           <Physics
             contactPairPersistentThreshold={0.08}
-  
             substeps={2}
             solverIterations={8}
             timeStep="vary"
