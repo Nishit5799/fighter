@@ -12,25 +12,19 @@ const AttackButtons = ({ onPunch, onKick }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false;
+      return false; // Return false if attack is blocked by cooldown
     }
-
-    // Force a layout update to ensure smooth animation
-    document.body.style.overflow = "hidden";
-    setTimeout(() => {
-      document.body.style.overflow = "";
-    }, 100);
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true);
-      setTimeout(() => onPunch(false), 1000);
+      onPunch(true); // Trigger punch state
+      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
       setTimeout(() => setPunchCooldown(false), 2500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true);
-      setTimeout(() => onKick(false), 1000);
+      onKick(true); // Trigger kick state
+      setTimeout(() => onKick(false), 1000); // Reset after 1 second
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
@@ -58,17 +52,23 @@ const AttackButtons = ({ onPunch, onKick }) => {
     const options = { passive: false, capture: true };
 
     const touchPunchHandler = (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
       const success = handlePunchStart(e);
-      return !success; // return false if we handled it
+      if (success) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      return true;
     };
 
     const touchKickHandler = (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
       const success = handleKickStart(e);
-      return !success;
+      if (success) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      return true;
     };
     punchBtn.addEventListener("touchstart", touchPunchHandler, options);
     punchBtn.addEventListener("mousedown", handlePunchStart);

@@ -4,7 +4,6 @@ import React, {
   useState,
   forwardRef,
   useImperativeHandle,
-  useCallback,
 } from "react";
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
 import { Vector3 } from "three";
@@ -22,6 +21,9 @@ const SOUNDS = {
   victory: "/victory.mp3",
   lost: "/lost.mp3",
 };
+
+// ✅ NEW: distance leniency to smooth out iOS contact flakiness
+const HIT_DISTANCE = 1.35;
 
 const PlayerController = forwardRef(
   (
@@ -109,6 +111,19 @@ const PlayerController = forwardRef(
       victorySound.current.volume = 0.8;
       lostSound.current.volume = 0.8;
 
+      // ✅ iOS audio nicety: avoid autoplay policy blocking side‑effects
+      [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
+        (snd) => {
+          if (snd.current) {
+            // These hints help Safari/iOS treat them as inline media
+            // (attribute or property both work; property is fine here)
+            // @ts-ignore
+            snd.current.playsInline = true;
+            snd.current.preload = "auto";
+          }
+        }
+      );
+
       return () => {
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
           (soundRef) => {
@@ -164,15 +179,32 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
+      // ✅ NEW: proximity-based fallback in addition to contact flag
+      let inRange = false;
+      if (opponentRef.current && rb.current) {
+        try {
+          const a = rb.current.translation();
+          const b = opponentRef.current.translation?.();
+          if (a && b) {
+            const dx = a.x - b.x;
+            const dz = a.z - b.z;
+            const dist = Math.hypot(dx, dz);
+            inRange = dist <= HIT_DISTANCE;
+          }
+        } catch {
+          inRange = false;
+        }
+      }
+
       if (
-        isInContact &&
+        (isInContact || inRange) &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage,
+          damage,
           attackType: type,
           attackTime: currentTime, // informational only; not used to reject hits
         });
@@ -189,8 +221,7 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
 
-      // ❗️Do NOT compare foreign timestamps to local ones.
-      // We accept the hit and only use the timestamp for attribution/logging.
+      // Do NOT compare foreign timestamps to local ones.
       opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
@@ -220,50 +251,35 @@ const PlayerController = forwardRef(
       }, duration);
     };
 
-    const handleCollisionEnter = useCallback(
-      (event) => {
-        if (!opponentRef.current || !rb.current) return;
+    const handleCollisionEnter = (event) => {
+      if (!opponentRef.current || !rb.current) return;
 
-        const otherUserData = event.other.rigidBody?.userData;
-        if (otherUserData?.isPlayer) {
-          setIsInContact(true);
-          if (contactTimeout.current) {
-            clearTimeout(contactTimeout.current);
-          }
-
-          // Add a small delay to ensure state is updated
-          setTimeout(() => {
-            if (
-              isAttacking &&
-              socket &&
-              opponentRef.current &&
-              !opponentRef.current.isDefeated
-            ) {
-              const currentTime = Date.now();
-              socket.emit("playerHit", {
-                attackerId: socket.id,
-                damage: isPunching ? 10 : 20,
-                attackType: isPunching ? "punch" : "kick",
-                attackTime: currentTime,
-              });
-            }
-          }, 50);
-        }
-      },
-      [isAttacking, isPunching, socket]
-    );
-
-    const handleCollisionExit = useCallback((event) => {
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
+        setIsInContact(true);
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
+
+        console.log("Collision entered with:", {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: Date.now(),
+          isLocalPlayer,
+        });
+      }
+    };
+
+    const handleCollisionExit = (event) => {
+      if (!opponentRef.current || !rb.current) return;
+
+      const otherUserData = event.other.rigidBody?.userData;
+      if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
         }, 500);
       }
-    }, []);
+    };
 
     // --- Effects depending on helpers ---
     useEffect(() => {
@@ -302,7 +318,7 @@ const PlayerController = forwardRef(
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
-          // ✅ precise match
+          // precise match from server
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -312,7 +328,7 @@ const PlayerController = forwardRef(
       return () => {
         socket.off("playerHit", onPlayerHit);
       };
-    }, [socket]);
+    }, [socket, playerId]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
