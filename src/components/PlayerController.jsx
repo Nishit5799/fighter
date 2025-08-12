@@ -27,8 +27,8 @@ const IS_IOS =
   typeof navigator !== "undefined" &&
   /iPad|iPhone|iPod/.test(navigator.userAgent);
 const HIT_DISTANCE = 1.35; // normal proximity
-const START_GRACE_MS = 2000; // widen a bit for first 2s on iOS
-const GRACE_MULTIPLIER = 1.25; // ~25% more leniency at start on iOS
+const START_GRACE_MS = 2500;
+const GRACE_MULTIPLIER = 1.35;
 
 const PlayerController = forwardRef(
   (
