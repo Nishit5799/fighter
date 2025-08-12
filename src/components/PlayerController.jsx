@@ -64,6 +64,9 @@ const PlayerController = forwardRef(
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
     const contactTimeout = useRef(null);
+    // Warm-up window: treat as "in contact" at round start (iOS safety)
+    const contactWarmupUntil = useRef(0);
+
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
 
@@ -131,6 +134,12 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
+    // Set warm-up when this controller mounts (round start)
+    useEffect(() => {
+      // Tweakable: 1000–1500ms works well on iOS
+      contactWarmupUntil.current = Date.now() + 1200;
+    }, []);
+
     // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
@@ -163,12 +172,21 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      if (socket && opponentRef.current && !opponentRef.current.isDefeated) {
+      // Warm-up: consider as in contact while sensors spin up on iOS
+      const inRangeOrWarm =
+        isInContact || Date.now() < contactWarmupUntil.current;
+
+      if (
+        inRangeOrWarm &&
+        socket &&
+        opponentRef.current &&
+        !opponentRef.current.isDefeated
+      ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage,
+          damage: damage,
           attackType: type,
-          attackTime: currentTime,
+          attackTime: currentTime, // informational only; not used to reject hits
         });
       }
 
@@ -183,8 +201,7 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
 
-      // ❗️Do NOT compare foreign timestamps to local ones.
-      // We accept the hit and only use the timestamp for attribution/logging.
+      // Accept the hit and keep timestamp only for attribution/logging
       opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
@@ -223,9 +240,7 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
-        if (socket) {
-          socket.emit("contactState", { inContact: true, at: Date.now() });
-        }
+
         console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
@@ -242,9 +257,6 @@ const PlayerController = forwardRef(
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-          if (socket) {
-            socket.emit("contactState", { inContact: false, at: Date.now() });
-          }
         }, 500);
       }
     };
@@ -286,7 +298,7 @@ const PlayerController = forwardRef(
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
-          // ✅ precise match
+          // precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -390,7 +402,6 @@ const PlayerController = forwardRef(
           isAttacking,
           isHit,
           health,
-          isInContact,
         });
       }
 
@@ -554,7 +565,7 @@ const PlayerController = forwardRef(
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.4, 0.4]}
+              args={[0.5, 0.5]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}

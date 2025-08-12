@@ -39,9 +39,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
       io.adapter(createAdapter(pubClient, subClient));
       const roomStates = new Map();
 
-      const HIT_RANGE = 1.15; // world units; tune 1.3–1.7 to match your models
-      const CONTACT_GRACE_MS = 180; // allow very recent contact to count
-
       const generateRoomId = () => {
         return `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       };
@@ -114,8 +111,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
             id: socket.id,
             name: playerName,
             isReady: false,
-            lastPos: null, // { x, y, z }
-            lastContactAt: 0, // ms timestamp
           });
 
           io.to(roomId).emit(
@@ -144,64 +139,26 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("carMove", (data) => {
-          // Store attacker’s last position/contact for validation
-          const player = roomState.players.get(socket.id);
-          if (player) {
-            if (data?.position) player.lastPos = data.position;
-            if (typeof data?.isInContact === "boolean") {
-              if (data.isInContact) player.lastContactAt = Date.now();
-            }
-          }
           socket.to(roomId).emit("carMove", data);
-        });
-
-        socket.on("contactState", ({ inContact, at }) => {
-          const player = roomState.players.get(socket.id);
-          if (!player) return;
-          if (inContact) {
-            player.lastContactAt = at || Date.now();
-          }
         });
 
         // 🔧 Always forward hits; don't filter by client clocks
         socket.on("playerHit", (data) => {
           const serverTime = Date.now();
           const players = Array.from(roomState.players.keys());
-          const victimId = players.find((id) => id !== socket.id);
-          if (!victimId) return;
-
-          const attacker = roomState.players.get(socket.id);
-          const victim = roomState.players.get(victimId);
-
-          // Require positional info to exist
-          let inRange = false;
-          if (attacker?.lastPos && victim?.lastPos) {
-            const dx = attacker.lastPos.x - victim.lastPos.x;
-            const dy = attacker.lastPos.y - victim.lastPos.y;
-            const dz = attacker.lastPos.z - victim.lastPos.z;
-            const distSq = dx * dx + dy * dy + dz * dz;
-            inRange = distSq <= HIT_RANGE * HIT_RANGE;
-          }
-
-          // Grace period: very recent sensor contact on either player
-          const recentContact =
-            (attacker &&
-              serverTime - attacker.lastContactAt <= CONTACT_GRACE_MS) ||
-            (victim && serverTime - victim.lastContactAt <= CONTACT_GRACE_MS);
-
-          // 🚫 Block out-of-range + no recent contact
-          if (!inRange && !recentContact) {
-            return;
-          }
+          const otherPlayerId = players.find((id) => id !== socket.id);
 
           const hitData = {
             ...data,
-            victimId,
+            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
             attackTime: data.attackTime ?? serverTime,
             serverTime,
           };
 
-          socket.to(victimId).emit("playerHit", hitData);
+          if (otherPlayerId) {
+            socket.to(otherPlayerId).emit("playerHit", hitData);
+          }
+
           roomState.lastAttacks[socket.id] = serverTime;
         });
 
@@ -276,8 +233,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("restartGame", () => {
           roomState.players.clear();
           roomState.gameStarted = false;
-          roomState.matchResult = null;
-          roomState.lastAttacks = {};
           io.to(roomId).emit("restartGame");
         });
 
