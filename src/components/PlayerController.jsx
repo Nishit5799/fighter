@@ -22,8 +22,13 @@ const SOUNDS = {
   lost: "/lost.mp3",
 };
 
-// ✅ NEW: distance leniency to smooth out iOS contact flakiness
-const HIT_DISTANCE = 1.35;
+// ---- iOS + proximity helpers ----
+const IS_IOS =
+  typeof navigator !== "undefined" &&
+  /iPad|iPhone|iPod/.test(navigator.userAgent);
+const HIT_DISTANCE = 1.35; // normal proximity
+const START_GRACE_MS = 2000; // widen a bit for first 2s on iOS
+const GRACE_MULTIPLIER = 1.25; // ~25% more leniency at start on iOS
 
 const PlayerController = forwardRef(
   (
@@ -46,29 +51,25 @@ const PlayerController = forwardRef(
   ) => {
     // --- Context / state ---
     const socket = useSocket();
-    const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
+    const [isSmallScreen, setIsSmallScreen] = useState(
+      typeof window !== "undefined" ? window.innerWidth < 640 : false
+    );
     const [currentAnimation, setCurrentAnimation] = useState("idle");
     const [isAttacking, setIsAttacking] = useState(false);
     const [isHit, setIsHit] = useState(false);
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
-    const [lastAttackTime, setLastAttackTime] = useState(0);
 
     // --- Refs ---
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
-
-    // Keep for defeat attribution only; don't use it to reject hits
     const opponentAttackTime = useRef(0);
 
     const hasEmittedDefeat = useRef(false);
-    const opponentIdRef = useRef(null);
-
     const opponentRef = useRef();
+
     const [isInContact, setIsInContact] = useState(false);
     const contactTimeout = useRef(null);
-    const lastJoystickMagnitude = useRef(0);
-    const joystickChangeThreshold = 0.05;
 
     const punchSound = useRef(null);
     const kickSound = useRef(null);
@@ -92,12 +93,11 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
-    // Track opponent id (for logging)
-    useEffect(() => {
-      opponentIdRef.current = opponentRef.current?.id;
-    }, [opponentRef.current?.id]);
+    // Track match start (for iOS grace)
+    const mountedAtRef = useRef(Date.now());
+    const iosFirstGraceHitUsed = useRef(false);
 
-    // Init / teardown sounds
+    // Init / teardown sounds + iOS media hints
     useEffect(() => {
       punchSound.current = new Audio(SOUNDS.punch);
       kickSound.current = new Audio(SOUNDS.kick);
@@ -111,12 +111,10 @@ const PlayerController = forwardRef(
       victorySound.current.volume = 0.8;
       lostSound.current.volume = 0.8;
 
-      // ✅ iOS audio nicety: avoid autoplay policy blocking side‑effects
+      // iOS: keep audio inline & preloaded so playback failures don’t block logic
       [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
         (snd) => {
           if (snd.current) {
-            // These hints help Safari/iOS treat them as inline media
-            // (attribute or property both work; property is fine here)
             // @ts-ignore
             snd.current.playsInline = true;
             snd.current.preload = "auto";
@@ -130,7 +128,9 @@ const PlayerController = forwardRef(
             if (soundRef.current) {
               soundRef.current.pause();
               soundRef.current.src = "";
-              soundRef.current.remove();
+              try {
+                soundRef.current.remove?.();
+              } catch {}
               soundRef.current = null;
             }
           }
@@ -147,40 +147,36 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // --- Helpers / Handlers ---
-    const setOpponentRef = (ref) => {
-      opponentRef.current = ref;
+    // --- API exposed to parent ---
+    const setOpponentRef = (r) => {
+      opponentRef.current = r;
     };
 
+    // --- Attack path ---
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
       const damage = type === "kick" ? 20 : 10;
-      const currentTime = Date.now();
-      setLastAttackTime(currentTime);
+      const now = Date.now();
 
-      if (attackTimer.current) {
-        clearTimeout(attackTimer.current);
-      }
+      if (attackTimer.current) clearTimeout(attackTimer.current);
 
-      if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+      // fire local SFX (don’t care if it fails on iOS)
+      const snd = type === "punch" ? punchSound.current : kickSound.current;
+      if (snd) {
+        snd.currentTime = 0;
+        snd.play().catch(() => {});
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      // ✅ NEW: proximity-based fallback in addition to contact flag
-      let inRange = false;
+      // 1) contact flag
+      let canHit = isInContact;
+
+      // 2) proximity fallback
+      let measuredDistance = Infinity;
       if (opponentRef.current && rb.current) {
         try {
           const a = rb.current.translation();
@@ -188,16 +184,31 @@ const PlayerController = forwardRef(
           if (a && b) {
             const dx = a.x - b.x;
             const dz = a.z - b.z;
-            const dist = Math.hypot(dx, dz);
-            inRange = dist <= HIT_DISTANCE;
+            measuredDistance = Math.hypot(dx, dz);
+
+            const grace =
+              IS_IOS && now - mountedAtRef.current < START_GRACE_MS
+                ? HIT_DISTANCE * GRACE_MULTIPLIER
+                : HIT_DISTANCE;
+
+            if (measuredDistance <= grace) canHit = true;
           }
         } catch {
-          inRange = false;
+          // ignore
+        }
+      }
+
+      // 3) last‑ditch iOS-only start grace if we can’t even sample opponent yet
+      if (!canHit && IS_IOS && !iosFirstGraceHitUsed.current) {
+        const withinStart = now - mountedAtRef.current < 600; // ~first tap
+        if (withinStart) {
+          canHit = true;
+          iosFirstGraceHitUsed.current = true;
         }
       }
 
       if (
-        (isInContact || inRange) &&
+        canHit &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
@@ -206,87 +217,72 @@ const PlayerController = forwardRef(
           attackerId: socket.id,
           damage,
           attackType: type,
-          attackTime: currentTime, // informational only; not used to reject hits
+          attackTime: now,
         });
       }
 
-      const duration = 1000;
+      // recover from attack anim
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
         setCurrentAnimation(isDefeated ? "fall" : "idle");
-      }, duration);
+      }, 1000);
     };
 
+    // Hit reaction (victim side)
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
 
-      // Do NOT compare foreign timestamps to local ones.
       opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
-        });
+        hitSound.current.play().catch(() => {});
       }
 
-      if (hitTimer.current) {
-        clearTimeout(hitTimer.current);
-      }
+      if (hitTimer.current) clearTimeout(hitTimer.current);
 
       setIsHit(true);
       setCurrentAnimation("hit");
 
       if (character.current?.playHitSound) {
-        character.current.playHitSound();
+        try {
+          character.current.playHitSound();
+        } catch {}
       }
 
-      const duration = 1000;
       hitTimer.current = setTimeout(() => {
         setIsHit(false);
-        if (!isAttacking) {
-          setCurrentAnimation(isDefeated ? "fall" : "idle");
-        }
-      }, duration);
+        if (!isAttacking) setCurrentAnimation(isDefeated ? "fall" : "idle");
+      }, 1000);
     };
 
+    // --- Collisions (for contact flag) ---
     const handleCollisionEnter = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
         setIsInContact(true);
-        if (contactTimeout.current) {
-          clearTimeout(contactTimeout.current);
-        }
-
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
+        if (contactTimeout.current) clearTimeout(contactTimeout.current);
       }
     };
 
     const handleCollisionExit = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
-        }, 500);
+        }, 350);
       }
     };
 
-    // --- Effects depending on helpers ---
+    // --- Triggers from UI/props ---
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isPunching, isKicking]);
 
+    // --- Death & match result ---
     useEffect(() => {
       if (health <= 0 && !isDefeated && socket && opponentRef.current) {
         setIsDefeated(true);
@@ -295,12 +291,6 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
-
           socket.emit("playerDefeated", {
             winnerId: opponentRef.current.id,
             loserId: socket.id,
@@ -312,25 +302,21 @@ const PlayerController = forwardRef(
       }
     }, [health, isDefeated, opponentHealth, socket]);
 
+    // --- Socket: receive hits for this player ---
     useEffect(() => {
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
-          // precise match from server
           takeHit(data.attackType, data.attackTime);
         }
       };
 
       socket.on("playerHit", onPlayerHit);
-
-      return () => {
-        socket.off("playerHit", onPlayerHit);
-      };
+      return () => socket.off("playerHit", onPlayerHit);
     }, [socket, playerId]);
 
-    // --- Frame loop ---
+    // --- Frame loop: movement & sync ---
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
@@ -352,35 +338,20 @@ const PlayerController = forwardRef(
           movement.z = 0;
           if (!isAttacking) setCurrentAnimation("idle");
         } else {
-          if (!isAttacking && !isHit) setCurrentAnimation("idle");
+          if (!isAttacking) setCurrentAnimation("idle");
         }
 
-        if (joystickInput) {
-          const joystickMagnitude = Math.sqrt(
-            joystickInput.x * joystickInput.x +
-              joystickInput.y * joystickInput.y
-          );
-
-          if (
-            Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
-            joystickChangeThreshold
-          ) {
-            lastJoystickMagnitude.current = joystickMagnitude;
+        if (isUsingJoystick) {
+          if (Math.abs(joystickInput.x) > 0.1) {
+            rotationTarget.current += ROTATION_SPEED * joystickInput.x;
           }
-
-          if (joystickMagnitude > 0.1) {
-            if (Math.abs(joystickInput.x) > 0.1) {
-              rotationTarget.current += ROTATION_SPEED * joystickInput.x;
-            }
-
-            if (joystickInput.y < 0) {
-              movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
-              if (!isAttacking)
-                setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
-            } else if (joystickInput.y > 0) {
-              movement.z = 0;
-              if (!isAttacking) setCurrentAnimation("idle");
-            }
+          if (joystickInput.y < 0) {
+            movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
+            if (!isAttacking)
+              setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
+          } else if (joystickInput.y > 0) {
+            movement.z = 0;
+            if (!isAttacking) setCurrentAnimation("idle");
           }
         }
 
@@ -443,7 +414,7 @@ const PlayerController = forwardRef(
       }
     });
 
-    // --- Socket move sync (remote) ---
+    // --- Remote move sync ---
     useEffect(() => {
       if (!socket) return;
 
@@ -463,37 +434,27 @@ const PlayerController = forwardRef(
 
     // --- Imperative API ---
     useImperativeHandle(ref, () => wrapper);
-
-    // Keep the object literal separate so we don’t capture stale refs above
     const wrapper = {
       setOpponentRef,
-
       setVictory: (isLocalPlayerWinner) => {
         setMatchResult("won");
         setCurrentAnimation("victory");
         movementEnabled.current = false;
-
         setTimeout(() => {
           if (isLocalPlayerWinner && victorySound.current) {
             victorySound.current.currentTime = 0;
-            victorySound.current
-              .play()
-              .catch((e) => console.log("Victory sound error:", e));
+            victorySound.current.play().catch(() => {});
           }
         }, 100);
       },
-
       setDefeat: (isLocalPlayerLoser) => {
         setMatchResult("lost");
         setCurrentAnimation("fall");
         movementEnabled.current = false;
-
         setTimeout(() => {
           if (isLocalPlayerLoser && lostSound.current) {
             lostSound.current.currentTime = 0;
-            lostSound.current
-              .play()
-              .catch((e) => console.log("Lost sound error:", e));
+            lostSound.current.play().catch(() => {});
           }
         }, 200);
       },
@@ -503,18 +464,17 @@ const PlayerController = forwardRef(
       isDefeated,
     };
 
-    // Cleanup timeouts and audio refs on unmount
+    // Cleanup
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
         if (hitTimer.current) clearTimeout(hitTimer.current);
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
-
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (sound) => {
-            if (sound.current) {
-              sound.current.pause();
-              sound.current = null;
+          (s) => {
+            if (s.current) {
+              s.current.pause();
+              s.current = null;
             }
           }
         );
@@ -530,10 +490,7 @@ const PlayerController = forwardRef(
         gravityScale={9}
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
-        userData={{
-          id: playerId, // instead of socket?.id
-          isPlayer: true,
-        }}
+        userData={{ id: playerId, isPlayer: true }}
         solverIterations={10}
         ccd={true}
         linearDamping={0.5}
@@ -578,12 +535,14 @@ const PlayerController = forwardRef(
                 }
               />
             )}
+            {/* main dynamic collider */}
             <CapsuleCollider
               args={[0.4, 0.3]}
               position={[0, 3, 0]}
               restitution={0.1}
               friction={0.5}
             />
+            {/* sensor for soft contact detection */}
             <CapsuleCollider
               args={[0.4, 0.4]}
               position={[0, 3, 0]}
