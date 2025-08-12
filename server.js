@@ -14,20 +14,15 @@ const PORT = process.env.PORT || 3000;
 const pubClient = createClient({
   url: process.env.REDIS_URL || "redis://localhost:6379",
 });
-
 const subClient = pubClient.duplicate();
 
 Promise.all([pubClient.connect(), subClient.connect()])
   .then(() => {
     app.prepare().then(() => {
-      const server = http.createServer((req, res) => {
-        handle(req, res);
-      });
+      const server = http.createServer((req, res) => handle(req, res));
 
       const io = new Server(server, {
-        cors: {
-          origin: "*",
-        },
+        cors: { origin: "*" },
         connectionStateRecovery: {
           maxDisconnectionDuration: 2 * 60 * 1000,
           skipMiddlewares: true,
@@ -37,29 +32,28 @@ Promise.all([pubClient.connect(), subClient.connect()])
       });
 
       io.adapter(createAdapter(pubClient, subClient));
+
+      // ---- In-memory room state ----
       const roomStates = new Map();
 
-      const generateRoomId = () => {
-        return `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      };
+      const generateRoomId = () =>
+        `room-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
       const findAvailableRoom = () => {
         for (const [roomId, state] of roomStates) {
-          if (state.players.size < 2 && !state.gameStarted) {
-            return roomId;
-          }
+          if (state.players.size < 2 && !state.gameStarted) return roomId;
         }
         const newRoomId = generateRoomId();
         roomStates.set(newRoomId, {
-          players: new Map(),
+          players: new Map(), // socketId -> { id, name, isReady, pose }
           gameStarted: false,
           createdAt: Date.now(),
-          // kept for potential future use, but no longer used to filter hits
           lastAttacks: {},
         });
         return newRoomId;
       };
 
+      // Clean up stale rooms
       setInterval(() => {
         const now = Date.now();
         for (const [roomId, state] of roomStates) {
@@ -67,41 +61,64 @@ Promise.all([pubClient.connect(), subClient.connect()])
             roomStates.delete(roomId);
             console.log(`Cleaned up empty room: ${roomId}`);
           }
-
-          // Clear old attack times (legacy; harmless to keep)
           if (state.lastAttacks) {
-            for (const [playerId, time] of Object.entries(state.lastAttacks)) {
-              if (now - time > 5000) {
-                delete state.lastAttacks[playerId];
-              }
+            for (const [pid, t] of Object.entries(state.lastAttacks)) {
+              if (now - t > 5000) delete state.lastAttacks[pid];
             }
           }
         }
       }, 60000);
 
+      // ---- Authoritative snapshots (20 ticks/sec) ----
+      const TICK_MS = 50;
+      setInterval(() => {
+        for (const [roomId, state] of roomStates) {
+          if (state.players.size === 0) continue;
+          const snapshot = {
+            t: Date.now(),
+            players: Array.from(state.players.values()).map((p) => ({
+              id: p.id,
+              name: p.name,
+              isReady: !!p.isReady,
+              pose: p.pose || {
+                position: { x: 0, y: 0, z: 0 },
+                rotationY: 0,
+                animation: "idle",
+                isAttacking: false,
+                isHit: false,
+                health: 100,
+              },
+            })),
+          };
+          io.to(roomId).emit("stateUpdate", snapshot);
+        }
+      }, TICK_MS);
+
       io.on("connection", (socket) => {
         console.log(`New connection: ${socket.id}`);
 
         socket.on("connection_quality", (quality) => {
-          if (quality === "low") {
-            socket._lowQualityMode = true;
-          }
+          socket._lowQualityMode = quality === "low";
         });
 
+        // Join/create room
         const roomId = findAvailableRoom();
         socket.join(roomId);
         const roomState = roomStates.get(roomId);
 
+        // Send initial state
         socket.emit("roomState", {
           players: Array.from(roomState.players.values()),
           gameStarted: roomState.gameStarted,
         });
 
+        // Lobby & start
         socket.on("joinRoom", (playerName) => {
           if (roomState.players.has(socket.id)) return;
 
-          for (const player of roomState.players.values()) {
-            if (player.name === playerName) {
+          // Unique name per room
+          for (const p of roomState.players.values()) {
+            if (p.name === playerName) {
               socket.emit("usernameTaken");
               return;
             }
@@ -111,6 +128,14 @@ Promise.all([pubClient.connect(), subClient.connect()])
             id: socket.id,
             name: playerName,
             isReady: false,
+            pose: {
+              position: { x: 0, y: 0, z: 0 },
+              rotationY: 0,
+              animation: "idle",
+              isAttacking: false,
+              isHit: false,
+              health: 100,
+            },
           });
 
           io.to(roomId).emit(
@@ -120,57 +145,88 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerReady", () => {
-          const player = roomState.players.get(socket.id);
-          if (player) {
-            player.isReady = true;
-            io.to(roomId).emit(
-              "updatePlayers",
-              Array.from(roomState.players.values())
-            );
+          const p = roomState.players.get(socket.id);
+          if (!p) return;
+          p.isReady = true;
 
-            if (
-              roomState.players.size === 2 &&
-              Array.from(roomState.players.values()).every((p) => p.isReady)
-            ) {
-              roomState.gameStarted = true;
-              io.to(roomId).emit("startGame");
-            }
+          io.to(roomId).emit(
+            "updatePlayers",
+            Array.from(roomState.players.values())
+          );
+
+          const allReady =
+            roomState.players.size === 2 &&
+            Array.from(roomState.players.values()).every((x) => x.isReady);
+
+          if (allReady && !roomState.gameStarted) {
+            roomState.gameStarted = true;
+            io.to(roomId).emit("startGame");
           }
         });
 
+        // ---- Client movement -> server state (authoritative broadcast) ----
+        // Clients can send frequently; server stores latest & broadcasts on tick
         socket.on("carMove", (data) => {
-          socket.to(roomId).emit("carMove", data);
+          const p = roomState.players.get(socket.id);
+          if (!p) return;
+
+          // Minimal validation/sanitization to avoid crazy values
+          const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+          const pos = data?.position || { x: 0, y: 0, z: 0 };
+
+          p.pose = {
+            position: {
+              x: clamp(pos.x ?? 0, -50, 50),
+              y: clamp(pos.y ?? 0, -1, 10),
+              z: clamp(pos.z ?? 0, -50, 50),
+            },
+            rotationY: Number.isFinite(data?.rotation) ? data.rotation : 0,
+            animation: data?.animation || "idle",
+            isAttacking: !!data?.isAttacking,
+            isHit: !!data?.isHit,
+            health: Number.isFinite(data?.health) ? data.health : 100,
+          };
+
+          // Optional: acknowledge latest input sequence for reconciliation
+          if (Number.isFinite(data?.seq)) {
+            socket.emit("inputAck", { seq: data.seq });
+          }
         });
 
-        // 🔧 Always forward hits; don't filter by client clocks
+        // ---- Combat: always forward; server is arbiter of result message ----
         socket.on("playerHit", (data) => {
           const serverTime = Date.now();
-          const players = Array.from(roomState.players.keys());
-          const otherPlayerId = players.find((id) => id !== socket.id);
+          const ids = Array.from(roomState.players.keys());
+          const otherId = ids.find((id) => id !== socket.id);
 
           const hitData = {
             ...data,
-            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
+            victimId: otherId,
             attackTime: data.attackTime ?? serverTime,
             serverTime,
           };
 
-          if (otherPlayerId) {
-            socket.to(otherPlayerId).emit("playerHit", hitData);
+          if (otherId) {
+            socket.to(otherId).emit("playerHit", hitData);
           }
-
           roomState.lastAttacks[socket.id] = serverTime;
         });
 
         socket.on("updateHealth", (data) => {
-          socket.broadcast.emit("updateHealth", data);
+          // Mirror to room; clients still display via snapshots
+          socket.broadcast.to(roomId).emit("updateHealth", data);
+          // Also stamp into server pose if available
+          for (const p of roomState.players.values()) {
+            if (p.id === Array.from(roomState.players.keys())[0]) {
+              p.pose.health = data.health1;
+            } else {
+              p.pose.health = data.health2;
+            }
+          }
         });
 
         socket.on("playerDefeated", (data) => {
-          if (!roomState.gameStarted || !roomState.players) {
-            console.error("Game not started or room not found");
-            return;
-          }
+          if (!roomState.gameStarted || !roomState.players) return;
 
           if (
             !data ||
@@ -181,28 +237,13 @@ Promise.all([pubClient.connect(), subClient.connect()])
             console.error("Invalid data format", data);
             return;
           }
-
-          if (data.winnerId === data.loserId) {
-            console.error(`Duplicate IDs: ${data.winnerId}`);
-            return;
-          }
+          if (data.winnerId === data.loserId) return;
 
           const winner = roomState.players.get(data.winnerId);
           const loser = roomState.players.get(data.loserId);
+          if (!winner || !loser) return;
 
-          if (!winner || !loser) {
-            console.error(
-              "Invalid playerDefeated data - winner or loser not found"
-            );
-            return;
-          }
-
-          if (roomState.matchResult) {
-            console.log(
-              "Match result already processed, ignoring duplicate event"
-            );
-            return;
-          }
+          if (roomState.matchResult) return;
 
           roomState.matchResult = {
             winnerId: data.winnerId,
@@ -217,14 +258,15 @@ Promise.all([pubClient.connect(), subClient.connect()])
             winningAttackTime: data.winningAttackTime || Date.now(),
           };
 
+          // Update poses for snapshot consistency
+          winner.pose.health = defeatData.winnerHealth;
+          loser.pose.health = 0;
+
           io.to(roomId).emit("playerDefeated", defeatData);
-          console.log(`Verified Match Result - 
-    Winner: ${winner.name} (${winner.id}), 
-    Loser: ${loser.name} (${loser.id})`);
 
           socket.on("restartGame", () => {
             roomState.matchResult = null;
-            roomState.players.forEach((player) => (player.isReady = false));
+            roomState.players.forEach((pl) => (pl.isReady = false));
             roomState.gameStarted = false;
             io.to(roomId).emit("restartGame");
           });
@@ -243,7 +285,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
               "updatePlayers",
               Array.from(roomState.players.values())
             );
-
             if (roomState.gameStarted) {
               io.to(roomId).emit("playerDisconnected", socket.id);
             }
