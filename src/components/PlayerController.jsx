@@ -4,6 +4,7 @@ import React, {
   useState,
   forwardRef,
   useImperativeHandle,
+  useCallback,
 } from "react";
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
 import { Vector3 } from "three";
@@ -64,9 +65,6 @@ const PlayerController = forwardRef(
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
     const contactTimeout = useRef(null);
-    // Warm-up window: treat as "in contact" at round start (iOS safety)
-    const contactWarmupUntil = useRef(0);
-
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
 
@@ -134,12 +132,6 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // Set warm-up when this controller mounts (round start)
-    useEffect(() => {
-      // Tweakable: 1000–1500ms works well on iOS
-      contactWarmupUntil.current = Date.now() + 1200;
-    }, []);
-
     // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
@@ -172,12 +164,8 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      // Warm-up: consider as in contact while sensors spin up on iOS
-      const inRangeOrWarm =
-        isInContact || Date.now() < contactWarmupUntil.current;
-
       if (
-        inRangeOrWarm &&
+        isInContact &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
@@ -201,7 +189,8 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
 
-      // Accept the hit and keep timestamp only for attribution/logging
+      // ❗️Do NOT compare foreign timestamps to local ones.
+      // We accept the hit and only use the timestamp for attribution/logging.
       opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
@@ -231,35 +220,50 @@ const PlayerController = forwardRef(
       }, duration);
     };
 
-    const handleCollisionEnter = (event) => {
-      if (!opponentRef.current || !rb.current) return;
+    const handleCollisionEnter = useCallback(
+      (event) => {
+        if (!opponentRef.current || !rb.current) return;
 
+        const otherUserData = event.other.rigidBody?.userData;
+        if (otherUserData?.isPlayer) {
+          setIsInContact(true);
+          if (contactTimeout.current) {
+            clearTimeout(contactTimeout.current);
+          }
+
+          // Add a small delay to ensure state is updated
+          setTimeout(() => {
+            if (
+              isAttacking &&
+              socket &&
+              opponentRef.current &&
+              !opponentRef.current.isDefeated
+            ) {
+              const currentTime = Date.now();
+              socket.emit("playerHit", {
+                attackerId: socket.id,
+                damage: isPunching ? 10 : 20,
+                attackType: isPunching ? "punch" : "kick",
+                attackTime: currentTime,
+              });
+            }
+          }, 50);
+        }
+      },
+      [isAttacking, isPunching, socket]
+    );
+
+    const handleCollisionExit = useCallback((event) => {
       const otherUserData = event.other.rigidBody?.userData;
       if (otherUserData?.isPlayer) {
-        setIsInContact(true);
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
-
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
-      }
-    };
-
-    const handleCollisionExit = (event) => {
-      if (!opponentRef.current || !rb.current) return;
-
-      const otherUserData = event.other.rigidBody?.userData;
-      if (otherUserData?.isPlayer) {
         contactTimeout.current = setTimeout(() => {
           setIsInContact(false);
         }, 500);
       }
-    };
+    }, []);
 
     // --- Effects depending on helpers ---
     useEffect(() => {
@@ -298,7 +302,7 @@ const PlayerController = forwardRef(
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
-          // precise match
+          // ✅ precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -565,7 +569,7 @@ const PlayerController = forwardRef(
               friction={0.5}
             />
             <CapsuleCollider
-              args={[0.5, 0.5]}
+              args={[0.4, 0.4]}
               position={[0, 3, 0]}
               sensor
               onIntersectionEnter={handleCollisionEnter}

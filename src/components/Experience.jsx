@@ -55,6 +55,7 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const [audioReady, setAudioReady] = useState(false);
 
   // --- Refs ---
   const beginSoundRef = useRef(null);
@@ -87,54 +88,63 @@ const Experience = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    // Detect network quality
+    const checkNetworkQuality = () => {
+      const startTime = Date.now();
+      socket.emit("ping", () => {
+        const latency = Date.now() - startTime;
+        socket.emit("connection_quality", latency > 300 ? "low" : "high");
+      });
+    };
+
+    const interval = setInterval(checkNetworkQuality, 5000);
+    return () => clearInterval(interval);
+  }, [socket]);
+
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
-    try {
-      const AC =
-        window.AudioContext ||
-        // @ts-ignore
-        window.webkitAudioContext;
-      if (AC) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AC();
-        }
-        if (audioContextRef.current.state === "suspended") {
-          audioContextRef.current.resume().catch(() => {});
-        }
+
+    // Create a silent audio buffer and play it to unlock audio
+    const unlockAudio = () => {
+      try {
+        const context = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const buffer = context.createBuffer(1, 1, 22050);
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        source.start(0);
+        setTimeout(() => {
+          if (context.state !== "closed") context.close();
+        }, 1000);
+      } catch (e) {
+        console.log("Audio unlock failed:", e);
       }
+    };
 
-      const sources = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-        "/begin.mp3",
-      ];
-
-      const warmups = sources.map((src) => {
-        const a = new Audio(src);
-        a.preload = "auto";
-        // @ts-ignore
-        a.playsInline = true;
-        a.muted = true; // stays muted permanently
-        return a
-          .play()
-          .then(() => {
-            a.pause();
-            a.currentTime = 0;
-            return true;
-          })
-          .catch(() => false);
-      });
-
-      Promise.all(warmups).finally(() => {
-        audioUnlockedRef.current = true;
-      });
-    } catch {
+    // Try both methods
+    Promise.all([
+      new Promise((resolve) => {
+        beginSoundRef.current = new Audio("/begin.mp3");
+        beginSoundRef.current.volume = 0;
+        beginSoundRef.current.play().then(resolve).catch(resolve);
+      }),
+      new Promise((resolve) => {
+        try {
+          unlockAudio();
+          resolve();
+        } catch (e) {
+          resolve();
+        }
+      }),
+    ]).then(() => {
       audioUnlockedRef.current = true;
-    }
+      setAudioReady(true);
+    });
   }, []);
 
   const isUsernameUnique = useCallback(

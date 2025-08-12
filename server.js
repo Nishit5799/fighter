@@ -148,18 +148,23 @@ Promise.all([pubClient.connect(), subClient.connect()])
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
 
-          const hitData = {
-            ...data,
-            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
-            attackTime: data.attackTime ?? serverTime,
-            serverTime,
-          };
+          if (!otherPlayerId) return;
 
-          if (otherPlayerId) {
+          // Add a small buffer time (300ms) to account for network delays
+          const isValidHit =
+            !data.attackTime || serverTime - data.attackTime < 300;
+
+          if (isValidHit) {
+            const hitData = {
+              ...data,
+              victimId: otherPlayerId,
+              attackTime: data.attackTime ?? serverTime,
+              serverTime,
+            };
+
             socket.to(otherPlayerId).emit("playerHit", hitData);
+            roomState.lastAttacks[socket.id] = serverTime;
           }
-
-          roomState.lastAttacks[socket.id] = serverTime;
         });
 
         socket.on("updateHealth", (data) => {
