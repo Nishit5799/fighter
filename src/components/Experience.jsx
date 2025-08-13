@@ -72,42 +72,6 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
-  // --- iOS + race hardening ---
-  const pendingHitsRef = useRef([]);
-  const refsReady = useCallback(
-    () => Boolean(carControllerRef1.current && carControllerRef2.current),
-    []
-  );
-
-  // Force-animate the correct victim, then reuse your existing onPlayerHit to handle health/KO
-  const deliverHit = useCallback(
-    (data) => {
-      if (data?.victimId && refsReady()) {
-        if (data.victimId === players[0]?.id) {
-          carControllerRef1.current?.takeRemoteHit?.(
-            data.attackType,
-            data.attackTime
-          );
-        } else if (data.victimId === players[1]?.id) {
-          carControllerRef2.current?.takeRemoteHit?.(
-            data.attackType,
-            data.attackTime
-          );
-        }
-      }
-      onPlayerHit(data);
-    },
-    [players, onPlayerHit, refsReady]
-  );
-
-  const drainPendingHits = useCallback(() => {
-    if (!refsReady()) return;
-    const q = pendingHitsRef.current;
-    if (!q.length) return;
-    pendingHitsRef.current = [];
-    for (const evt of q) deliverHit(evt);
-  }, [deliverHit, refsReady]);
-
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
 
@@ -318,6 +282,42 @@ const Experience = () => {
     },
     [socket, players, winner, loser, health1, health2]
   );
+
+  // --- iOS + race hardening ---
+  const pendingHitsRef = useRef([]);
+  const refsReady = useCallback(
+    () => Boolean(carControllerRef1.current && carControllerRef2.current),
+    []
+  );
+
+  // Force-animate the correct victim, then reuse your existing onPlayerHit to handle health/KO
+  const deliverHit = useCallback(
+    (data) => {
+      if (data?.victimId && refsReady()) {
+        if (data.victimId === players[0]?.id) {
+          carControllerRef1.current?.takeRemoteHit?.(
+            data.attackType,
+            data.attackTime
+          );
+        } else if (data.victimId === players[1]?.id) {
+          carControllerRef2.current?.takeRemoteHit?.(
+            data.attackType,
+            data.attackTime
+          );
+        }
+      }
+      onPlayerHit(data);
+    },
+    [players, onPlayerHit, refsReady]
+  );
+
+  const drainPendingHits = useCallback(() => {
+    if (!refsReady()) return;
+    const q = pendingHitsRef.current;
+    if (!q.length) return;
+    pendingHitsRef.current = [];
+    for (const evt of q) deliverHit(evt);
+  }, [deliverHit, refsReady]);
 
   const onPlayerDefeated = useCallback(
     (data) => {
