@@ -134,33 +134,10 @@ const PlayerController = forwardRef(
     const tryPlay = (ref) => {
       const a = ref?.current;
       if (!a) return;
-      try {
-        // Reset the element cleanly
-        a.muted = false;
-        a.pause(); // ← some browsers need a pause before replay
-        a.currentTime = 0;
-        const p = a.play();
-        if (p && typeof p.then === "function") {
-          p.catch(() => {
-            // Fallback: fire a one-shot clone
-            const clone = a.cloneNode(true);
-            clone.muted = false;
-            clone.volume = a.volume;
-            // @ts-ignore
-            clone.playsInline = true;
-            clone.play().catch(() => {});
-          });
-        }
-      } catch {
-        // Last resort
-        try {
-          const clone = new Audio(a.src || "");
-          // @ts-ignore
-          clone.playsInline = true;
-          clone.volume = a.volume;
-          clone.play().catch(() => {});
-        } catch {}
-      }
+      a.currentTime = 0;
+      a.play().catch(() => {
+        /* iOS might still reject; animation continues */
+      });
     };
 
     // Called once from parent after a user gesture (JOIN button / first touch)

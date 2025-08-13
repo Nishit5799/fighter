@@ -12,18 +12,19 @@ const AttackButtons = ({ onPunch, onKick, onUserGesture }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false;
+      return false; // Return false if attack is blocked by cooldown
     }
+
     if (type === "punch") {
       setPunchCooldown(true);
-      onUserGesture?.();
-      onPunch(); // 🔊 fire once
+      onPunch(true); // Trigger punch state
+      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
       setTimeout(() => setPunchCooldown(false), 2500);
       return true;
     } else {
       setKickCooldown(true);
-      onUserGesture?.();
-      onKick(); // 🔊 fire once
+      onKick(true); // Trigger kick state
+      setTimeout(() => onKick(false), 1000); // Reset after 1 second
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
