@@ -462,6 +462,10 @@ const PlayerController = forwardRef(
       setOpponentRef,
       primeAudio,
 
+      startAttackPublic: (type) => {
+        startAttack(type);
+      },
+
       takeRemoteHit: (attackType, attackTime) => {
         takeHit(attackType, attackTime);
       },

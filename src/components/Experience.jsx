@@ -557,6 +557,18 @@ const Experience = () => {
     }
   }, [isGameStarted, players, socket?.id, drainPendingHits]);
 
+  // NEW: once both refs exist, prime the *actual* audio tags inside controllers
+  useEffect(() => {
+    if (
+      isGameStarted &&
+      carControllerRef1.current &&
+      carControllerRef2.current
+    ) {
+      carControllerRef1.current.primeAudio?.();
+      carControllerRef2.current.primeAudio?.();
+    }
+  }, [isGameStarted, players]); // players changes when the second mounts / reconnects
+
   // ✅ ADD: Re-link after reset or restart
   useEffect(() => {
     if (carControllerRef1.current && carControllerRef2.current) {
@@ -828,16 +840,29 @@ const Experience = () => {
 
       {isGameStarted && (
         <AttackButtons
-          onPunch={(punching) => setIsPunching(punching)}
-          onKick={(kicking) => setIsKicking(kicking)}
+          // 👇 Ignore the boolean "punching"/"kicking" arg (we don't need re-renders)
+          onPunch={() => {
+            // Start attack on whichever controller is *local*
+            if (players[0]?.id === socket?.id) {
+              carControllerRef1.current?.startAttackPublic?.("punch");
+            } else if (players[1]?.id === socket?.id) {
+              carControllerRef2.current?.startAttackPublic?.("punch");
+            }
+          }}
+          onKick={() => {
+            if (players[0]?.id === socket?.id) {
+              carControllerRef1.current?.startAttackPublic?.("kick");
+            } else if (players[1]?.id === socket?.id) {
+              carControllerRef2.current?.startAttackPublic?.("kick");
+            }
+          }}
           onUserGesture={() => {
-            // Redundant but harmless if already primed:
+            // Extra-safe: prime again on *every* user tap
             carControllerRef1.current?.primeAudio?.();
             carControllerRef2.current?.primeAudio?.();
           }}
         />
       )}
-
       <Info
         onReset={handleReset}
         showPopup={showPopup}
