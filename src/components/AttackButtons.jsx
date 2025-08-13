@@ -12,19 +12,18 @@ const AttackButtons = ({ onPunch, onKick, onUserGesture }) => {
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
-
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
+      onUserGesture?.();
+      onPunch(); // 🔊 fire once
       setTimeout(() => setPunchCooldown(false), 2500);
       return true;
     } else {
       setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
+      onUserGesture?.();
+      onKick(); // 🔊 fire once
       setTimeout(() => setKickCooldown(false), 3000);
       return true;
     }
@@ -34,14 +33,14 @@ const AttackButtons = ({ onPunch, onKick, onUserGesture }) => {
   const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    onUserGesture?.(); // inform parent to prime audio if needed
+
     return handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    onUserGesture?.();
+
     return handleAttackStart("kick");
   };
 
@@ -64,7 +63,6 @@ const AttackButtons = ({ onPunch, onKick, onUserGesture }) => {
     };
 
     const touchKickHandler = (e) => {
-      onUserGesture?.();
       const success = handleKickStart(e);
       if (success) {
         e.preventDefault();
@@ -136,7 +134,6 @@ const AttackButtons = ({ onPunch, onKick, onUserGesture }) => {
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
         onMouseDown={() => {
-          onUserGesture?.();
           if (!isCooldown) handleAttackStart(type);
         }}
         style={{
