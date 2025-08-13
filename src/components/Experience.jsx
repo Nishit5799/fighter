@@ -217,6 +217,20 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
+      if (data?.victimId) {
+        if (data.victimId === players[0]?.id) {
+          carControllerRef1.current?.takeRemoteHit?.(
+            data.attackType,
+            data.attackTime
+          );
+        } else if (data.victimId === players[1]?.id) {
+          carControllerRef2.current?.takeRemoteHit?.(
+            data.attackType,
+            data.attackTime
+          );
+        }
+      }
+
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id

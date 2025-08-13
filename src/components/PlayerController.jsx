@@ -436,6 +436,10 @@ const PlayerController = forwardRef(
     const wrapper = {
       setOpponentRef,
 
+      takeRemoteHit: (attackType, attackTime) => {
+        takeHit(attackType, attackTime);
+      },
+
       setVictory: (isLocalPlayerWinner) => {
         setMatchResult("won");
         setCurrentAnimation("victory");
