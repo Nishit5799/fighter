@@ -838,6 +838,7 @@ const Experience = () => {
         disabled={!isGameStarted || players.length !== 2}
       />
 
+
       {isGameStarted && (
         <AttackButtons
           // 👇 Ignore the boolean "punching"/"kicking" arg (we don't need re-renders)
@@ -855,14 +856,14 @@ const Experience = () => {
             } else if (players[1]?.id === socket?.id) {
               carControllerRef2.current?.startAttackPublic?.("kick");
             }
-          }}
-          onUserGesture={() => {
+          }}          onUserGesture={() => {
             // Extra-safe: prime again on *every* user tap
             carControllerRef1.current?.primeAudio?.();
             carControllerRef2.current?.primeAudio?.();
           }}
         />
       )}
+
       <Info
         onReset={handleReset}
         showPopup={showPopup}
