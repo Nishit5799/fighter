@@ -96,11 +96,19 @@ const PlayerController = forwardRef(
 
     // Init / teardown sounds
     useEffect(() => {
-      punchSound.current = new Audio(SOUNDS.punch);
-      kickSound.current = new Audio(SOUNDS.kick);
-      hitSound.current = new Audio(SOUNDS.hit);
-      victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost);
+      const make = (src) => {
+        const a = new Audio(src);
+        a.preload = "auto";
+        // @ts-ignore
+        a.playsInline = true;
+        a.crossOrigin = "anonymous";
+        return a;
+      };
+      punchSound.current = make(SOUNDS.punch);
+      kickSound.current = make(SOUNDS.kick);
+      hitSound.current = make(SOUNDS.hit);
+      victorySound.current = make(SOUNDS.victory);
+      lostSound.current = make(SOUNDS.lost);
 
       punchSound.current.volume = 0.7;
       kickSound.current.volume = 0.7;
@@ -121,6 +129,37 @@ const PlayerController = forwardRef(
         );
       };
     }, []);
+
+    // --- Audio helpers ---
+    const tryPlay = (ref) => {
+      const a = ref?.current;
+      if (!a) return;
+      a.currentTime = 0;
+      a.play().catch(() => {
+        /* iOS might still reject; animation continues */
+      });
+    };
+
+    // Called once from parent after a user gesture (JOIN button / first touch)
+    const primeAudio = () => {
+      const list = [punchSound, kickSound, hitSound, victorySound, lostSound];
+      list.forEach((ref) => {
+        const a = ref.current;
+        if (!a) return;
+        a.muted = true;
+        a.currentTime = 0;
+        a.play()
+          .then(() => {
+            a.pause();
+            a.currentTime = 0;
+            a.muted = false;
+          })
+          .catch(() => {
+            // Even if this fails, later user-initiated plays will work.
+            a.muted = false;
+          });
+      });
+    };
 
     // Responsive screen check
     useEffect(() => {
@@ -147,17 +186,8 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      }
+      if (type === "punch") tryPlay(punchSound);
+      else if (type === "kick") tryPlay(kickSound);
 
       setIsAttacking(true);
       movementEnabled.current = false;
@@ -192,12 +222,7 @@ const PlayerController = forwardRef(
       // We accept the hit and only use the timestamp for attribution/logging.
       opponentAttackTime.current = attackTime ?? Date.now();
 
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
-        });
-      }
+      tryPlay(hitSound);
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
@@ -435,6 +460,7 @@ const PlayerController = forwardRef(
     // Keep the object literal separate so we don’t capture stale refs above
     const wrapper = {
       setOpponentRef,
+      primeAudio,
 
       takeRemoteHit: (attackType, attackTime) => {
         takeHit(attackType, attackTime);
@@ -446,12 +472,7 @@ const PlayerController = forwardRef(
         movementEnabled.current = false;
 
         setTimeout(() => {
-          if (isLocalPlayerWinner && victorySound.current) {
-            victorySound.current.currentTime = 0;
-            victorySound.current
-              .play()
-              .catch((e) => console.log("Victory sound error:", e));
-          }
+          if (isLocalPlayerWinner) tryPlay(victorySound);
         }, 100);
       },
 
@@ -461,12 +482,7 @@ const PlayerController = forwardRef(
         movementEnabled.current = false;
 
         setTimeout(() => {
-          if (isLocalPlayerLoser && lostSound.current) {
-            lostSound.current.currentTime = 0;
-            lostSound.current
-              .play()
-              .catch((e) => console.log("Lost sound error:", e));
-          }
+          if (isLocalPlayerLoser) tryPlay(lostSound);
         }, 200);
       },
       translation: () => rb.current?.translation(),

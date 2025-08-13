@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 
-const AttackButtons = ({ onPunch, onKick }) => {
+const AttackButtons = ({ onPunch, onKick, onUserGesture }) => {
   const punchRef = useRef();
   const kickRef = useRef();
 
@@ -34,12 +34,14 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const handlePunchStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    onUserGesture?.(); // inform parent to prime audio if needed
     return handleAttackStart("punch");
   };
 
   const handleKickStart = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    onUserGesture?.();
     return handleAttackStart("kick");
   };
 
@@ -62,6 +64,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
     };
 
     const touchKickHandler = (e) => {
+      onUserGesture?.();
       const success = handleKickStart(e);
       if (success) {
         e.preventDefault();
@@ -132,7 +135,10 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => !isCooldown && handleAttackStart(type)}
+        onMouseDown={() => {
+          onUserGesture?.();
+          if (!isCooldown) handleAttackStart(type);
+        }}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
