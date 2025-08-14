@@ -106,7 +106,7 @@ const Experience = () => {
 
       const sources = [
         "/punch.mp3",
-        "/kick.mp3",
+
         "/hit.mp3",
         "/victory.mp3",
         "/lost.mp3",
@@ -131,10 +131,6 @@ const Experience = () => {
 
       Promise.all(warmups).finally(() => {
         audioUnlockedRef.current = true;
-        // NEW: also ask both controllers to prime their internal Audio() tags
-        // (they're created inside PlayerController; this flips iOS into allowing future play())
-        carControllerRef1.current?.primeAudio?.();
-        carControllerRef2.current?.primeAudio?.();
       });
     } catch {
       audioUnlockedRef.current = true;
@@ -221,20 +217,6 @@ const Experience = () => {
     (data) => {
       if (winner || loser) return;
 
-      if (data?.victimId) {
-        if (data.victimId === players[0]?.id) {
-          carControllerRef1.current?.takeRemoteHit?.(
-            data.attackType,
-            data.attackTime
-          );
-        } else if (data.victimId === players[1]?.id) {
-          carControllerRef2.current?.takeRemoteHit?.(
-            data.attackType,
-            data.attackTime
-          );
-        }
-      }
-
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id
@@ -282,42 +264,6 @@ const Experience = () => {
     },
     [socket, players, winner, loser, health1, health2]
   );
-
-  // --- iOS + race hardening ---
-  const pendingHitsRef = useRef([]);
-  const refsReady = useCallback(
-    () => Boolean(carControllerRef1.current && carControllerRef2.current),
-    []
-  );
-
-  // Force-animate the correct victim, then reuse your existing onPlayerHit to handle health/KO
-  const deliverHit = useCallback(
-    (data) => {
-      if (data?.victimId && refsReady()) {
-        if (data.victimId === players[0]?.id) {
-          carControllerRef1.current?.takeRemoteHit?.(
-            data.attackType,
-            data.attackTime
-          );
-        } else if (data.victimId === players[1]?.id) {
-          carControllerRef2.current?.takeRemoteHit?.(
-            data.attackType,
-            data.attackTime
-          );
-        }
-      }
-      onPlayerHit(data);
-    },
-    [players, onPlayerHit, refsReady]
-  );
-
-  const drainPendingHits = useCallback(() => {
-    if (!refsReady()) return;
-    const q = pendingHitsRef.current;
-    if (!q.length) return;
-    pendingHitsRef.current = [];
-    for (const evt of q) deliverHit(evt);
-  }, [deliverHit, refsReady]);
 
   const onPlayerDefeated = useCallback(
     (data) => {
@@ -516,15 +462,7 @@ const Experience = () => {
     socket.on("startGame", startGameHandler);
     socket.on("restartGame", restartGameHandler);
     socket.on("usernameTaken", usernameTakenHandler);
-    // NEW: enqueue early hits until refs exist, then deliver/drain
-    const playerHitHandler = (data) => {
-      if (!refsReady()) {
-        pendingHitsRef.current.push(data);
-        return;
-      }
-      deliverHit(data);
-    };
-    socket.on("playerHit", playerHitHandler);
+    socket.on("playerHit", onPlayerHit);
     socket.on("playerDefeated", onPlayerDefeated);
 
     return () => {
@@ -532,17 +470,10 @@ const Experience = () => {
       socket.off("startGame", startGameHandler);
       socket.off("restartGame", restartGameHandler);
       socket.off("usernameTaken", usernameTakenHandler);
-      socket.off("playerHit", playerHitHandler);
+      socket.off("playerHit", onPlayerHit);
       socket.off("playerDefeated", onPlayerDefeated);
     };
-  }, [
-    socket,
-    isGameStarted,
-    handleReset,
-    deliverHit,
-    onPlayerDefeated,
-    refsReady,
-  ]);
+  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
   // Cross-link player controllers when game starts
   useEffect(() => {
@@ -553,30 +484,17 @@ const Experience = () => {
     ) {
       carControllerRef1.current.setOpponentRef(carControllerRef2.current);
       carControllerRef2.current.setOpponentRef(carControllerRef1.current);
-      drainPendingHits();
     }
-  }, [isGameStarted, players, socket?.id, drainPendingHits]);
-
-  // NEW: once both refs exist, prime the *actual* audio tags inside controllers
-  useEffect(() => {
-    if (
-      isGameStarted &&
-      carControllerRef1.current &&
-      carControllerRef2.current
-    ) {
-      carControllerRef1.current.primeAudio?.();
-      carControllerRef2.current.primeAudio?.();
-    }
-  }, [isGameStarted, players]); // players changes when the second mounts / reconnects
+  }, [isGameStarted, players, socket?.id]);
 
   // ✅ ADD: Re-link after reset or restart
   useEffect(() => {
     if (carControllerRef1.current && carControllerRef2.current) {
       carControllerRef1.current.setOpponentRef(carControllerRef2.current);
       carControllerRef2.current.setOpponentRef(carControllerRef1.current);
-      drainPendingHits();
     }
-  }, [players, drainPendingHits]);
+  }, [players]);
+
   // Restart countdown -> trigger reset
   useEffect(() => {
     if (restartCountdown !== null && restartCountdown > 0) {
@@ -840,29 +758,11 @@ const Experience = () => {
 
       {isGameStarted && (
         <AttackButtons
-          // 👇 Ignore the boolean "punching"/"kicking" arg (we don't need re-renders)
-          onPunch={() => {
-            // Start attack on whichever controller is *local*
-            if (players[0]?.id === socket?.id) {
-              carControllerRef1.current?.startAttackPublic?.("punch");
-            } else if (players[1]?.id === socket?.id) {
-              carControllerRef2.current?.startAttackPublic?.("punch");
-            }
-          }}
-          onKick={() => {
-            if (players[0]?.id === socket?.id) {
-              carControllerRef1.current?.startAttackPublic?.("kick");
-            } else if (players[1]?.id === socket?.id) {
-              carControllerRef2.current?.startAttackPublic?.("kick");
-            }
-          }}
-          onUserGesture={() => {
-            // Extra-safe: prime again on *every* user tap
-            carControllerRef1.current?.primeAudio?.();
-            carControllerRef2.current?.primeAudio?.();
-          }}
+          onPunch={(punching) => setIsPunching(punching)}
+          onKick={(kicking) => setIsKicking(kicking)}
         />
       )}
+
       <Info
         onReset={handleReset}
         showPopup={showPopup}
