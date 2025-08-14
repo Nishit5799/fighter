@@ -61,6 +61,7 @@ const PlayerController = forwardRef(
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
     const lastCollisionTime = useRef(0);
+    const recentCollisions = useRef(new Set());
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
     const contactTimeout = useRef(null);
@@ -194,10 +195,21 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
 
-      // ❗️Do NOT compare foreign timestamps to local ones.
-      // We accept the hit and only use the timestamp for attribution/logging.
       opponentAttackTime.current = attackTime ?? Date.now();
 
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          const ctx = new AC();
+          if (ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.warn("AudioContext resume failed:", e);
+      }
+
+      // Attempt to play audio (but animation should run either way)
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -205,15 +217,16 @@ const PlayerController = forwardRef(
         });
       }
 
-      if (hitTimer.current) {
-        clearTimeout(hitTimer.current);
-      }
-
+      // ✅ Ensure animation always runs
       setIsHit(true);
       setCurrentAnimation("hit");
 
       if (character.current?.playHitSound) {
         character.current.playHitSound();
+      }
+
+      if (hitTimer.current) {
+        clearTimeout(hitTimer.current);
       }
 
       const duration = 1000;
@@ -227,25 +240,29 @@ const PlayerController = forwardRef(
 
     const handleCollisionEnter = (event) => {
       const now = Date.now();
-      if (now - lastCollisionTime.current < 300) return; // debounce to avoid spam
-      lastCollisionTime.current = now;
 
       if (!opponentRef.current || !rb.current) return;
 
       const otherUserData = event.other.rigidBody?.userData;
-      if (otherUserData?.isPlayer) {
-        setIsInContact(true);
-        if (contactTimeout.current) {
-          clearTimeout(contactTimeout.current);
-        }
+      if (!otherUserData?.isPlayer) return;
 
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: now,
-          isLocalPlayer,
-        });
-      }
+      const pairKey = [rb.current.userData?.id, otherUserData.id]
+        .sort()
+        .join("-");
+      if (recentCollisions.current.has(pairKey)) return;
+
+      recentCollisions.current.add(pairKey);
+
+      // Cleanup after 500ms
+      setTimeout(() => recentCollisions.current.delete(pairKey), 500);
+
+      setIsInContact(true);
+      console.log("Collision entered with:", {
+        self: rb.current?.userData?.id,
+        other: otherUserData?.id,
+        time: now,
+        isLocalPlayer,
+      });
     };
 
     const handleCollisionExit = (event) => {
