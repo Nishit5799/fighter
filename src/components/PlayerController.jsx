@@ -255,21 +255,24 @@ const PlayerController = forwardRef(
       const pairKey = [rb.current.userData?.id, otherUserData.id]
         .sort()
         .join("-");
-      if (recentCollisions.current.has(pairKey)) return;
 
-      recentCollisions.current.add(pairKey);
+      // ✅ Only log once per pair per match
+      if (!recentCollisions.current.has(pairKey)) {
+        recentCollisions.current.add(pairKey); // DO NOT delete during match
 
-      // Cleanup after 500ms
-      setTimeout(() => recentCollisions.current.delete(pairKey), 500);
+        // Only log from one player to avoid duplicates
+        if (isLocalPlayer) {
+          console.log("Collision entered with:", {
+            self: rb.current?.userData?.id,
+            other: otherUserData?.id,
+            time: now,
+            isLocalPlayer,
+            matchId: playerId,
+          });
+        }
+      }
 
       setIsInContact(true);
-      console.log("Collision entered with:", {
-        self: rb.current?.userData?.id,
-        other: otherUserData?.id,
-        time: now,
-        isLocalPlayer,
-        matchId: playerId, // ✅ Match context
-      });
     };
 
     const handleCollisionExit = (event) => {
