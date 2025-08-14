@@ -60,7 +60,7 @@ const PlayerController = forwardRef(
 
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
-
+    const lastCollisionTime = useRef(0);
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
     const contactTimeout = useRef(null);
@@ -90,8 +90,11 @@ const PlayerController = forwardRef(
     const movementEnabled = useRef(true);
 
     // Track opponent id (for logging)
+    // Inside useEffect
     useEffect(() => {
-      opponentIdRef.current = opponentRef.current?.id;
+      if (opponentRef.current?.id) {
+        opponentIdRef.current = opponentRef.current.id;
+      }
     }, [opponentRef.current?.id]);
 
     // Init / teardown sounds
@@ -220,6 +223,10 @@ const PlayerController = forwardRef(
     };
 
     const handleCollisionEnter = (event) => {
+      const now = Date.now();
+      if (now - lastCollisionTime.current < 300) return; // debounce to avoid spam
+      lastCollisionTime.current = now;
+
       if (!opponentRef.current || !rb.current) return;
 
       const otherUserData = event.other.rigidBody?.userData;
@@ -232,7 +239,7 @@ const PlayerController = forwardRef(
         console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
-          time: Date.now(),
+          time: now,
           isLocalPlayer,
         });
       }
@@ -269,13 +276,20 @@ const PlayerController = forwardRef(
         WinnerHealth: ${opponentHealth},
         LoserHealth: ${health}`);
 
-          socket.emit("playerDefeated", {
-            winnerId: opponentRef.current.id,
-            loserId: socket.id,
-            winnerHealth: opponentHealth,
-            loserHealth: health,
-            winningAttackTime: opponentAttackTime.current,
-          });
+          if (opponentIdRef.current && opponentIdRef.current !== socket.id) {
+            socket.emit("playerDefeated", {
+              winnerId: opponentIdRef.current,
+              loserId: socket.id,
+              winnerHealth: opponentHealth,
+              loserHealth: health,
+              winningAttackTime: opponentAttackTime.current,
+            });
+          } else {
+            console.error("Invalid opponent ID at defeat time:", {
+              opponentId: opponentIdRef.current,
+              selfId: socket.id,
+            });
+          }
         }
       }
     }, [health, isDefeated, opponentHealth, socket]);
