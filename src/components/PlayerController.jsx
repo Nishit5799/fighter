@@ -137,6 +137,9 @@ const PlayerController = forwardRef(
     // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
+      if (ref?.id) {
+        opponentIdRef.current = ref.id;
+      }
     };
 
     const startAttack = (type) => {
