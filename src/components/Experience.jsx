@@ -183,6 +183,24 @@ const Experience = () => {
     hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
     setRestartCountdown(2);
+
+    // ✅ Resume audio context on reset (iOS-specific fix)
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AC();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          audioContextRef.current.resume().catch((e) => {
+            console.warn("AudioContext resume failed:", e);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("AudioContext resume skipped:", err);
+    }
+
     setTimeout(() => {
       setShowPopup(false);
       setWinner(null);
