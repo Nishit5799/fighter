@@ -90,6 +90,12 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
+    useEffect(() => {
+      // Reset collisions on remount or game restart
+      recentCollisions.current.clear();
+      setIsInContact(false);
+    }, [playerId]);
+
     // Track opponent id (for logging)
     // Inside useEffect
     useEffect(() => {
@@ -262,6 +268,7 @@ const PlayerController = forwardRef(
         other: otherUserData?.id,
         time: now,
         isLocalPlayer,
+        matchId: playerId, // ✅ Match context
       });
     };
 
