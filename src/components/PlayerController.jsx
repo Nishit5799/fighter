@@ -67,6 +67,7 @@ const PlayerController = forwardRef(
     const contactTimeout = useRef(null);
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
+    const [, forceRerender] = useState(0);
 
     const punchSound = useRef(null);
     const kickSound = useRef(null);
@@ -227,6 +228,7 @@ const PlayerController = forwardRef(
       }
 
       setIsHit(true);
+      forceRerender((n) => n + 1);
       setCurrentAnimation("hit");
 
       if (character.current?.playHitSound) {
@@ -328,7 +330,6 @@ const PlayerController = forwardRef(
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
-          // ✅ precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
