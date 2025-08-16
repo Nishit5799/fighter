@@ -367,23 +367,6 @@ const Experience = () => {
     };
   }, [showWelcomeScreen, unlockAllAudio]);
 
-  useEffect(() => {
-    if (!socket) return;
-
-    const handlePlayerCollision = (data) => {
-      // Optional: global feedback (e.g. UI message, sound, flash)
-      if (data.self !== socket.id) {
-        showHitEffect(data);
-      }
-    };
-
-    socket.on("playerCollision", handlePlayerCollision);
-
-    return () => {
-      socket.off("playerCollision", handlePlayerCollision);
-    };
-  }, [socket]);
-
   // Validate username as user types
   useEffect(() => {
     if (playerName.trim() !== "") {
