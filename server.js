@@ -90,6 +90,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         const roomId = findAvailableRoom();
         socket.join(roomId);
+        socket.data.roomId = roomId; // ✅ Save for later use
         const roomState = roomStates.get(roomId);
 
         socket.emit("roomState", {
@@ -140,6 +141,18 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         socket.on("carMove", (data) => {
           socket.to(roomId).emit("carMove", data);
+        });
+
+        socket.on("playerCollision", (data) => {
+          console.log("Received collision event from client:", data);
+
+          const roomId = socket.data.roomId;
+
+          // ✅ Forward collision to all clients in room (including sender)
+          io.to(roomId).emit("playerCollision", data);
+
+          // Or, to only send to the other player:
+          // socket.to(roomId).emit("playerCollision", data);
         });
 
         // 🔧 Always forward hits; don't filter by client clocks

@@ -248,6 +248,7 @@ const PlayerController = forwardRef(
       const now = Date.now();
 
       if (!opponentRef.current || !rb.current) return;
+      if (!socket) return;
 
       const otherUserData = event.other.rigidBody?.userData;
       if (!otherUserData?.isPlayer) return;
@@ -256,19 +257,20 @@ const PlayerController = forwardRef(
         .sort()
         .join("-");
 
-      // ✅ Only log once per pair per match
       if (!recentCollisions.current.has(pairKey)) {
-        recentCollisions.current.add(pairKey); // DO NOT delete during match
+        recentCollisions.current.add(pairKey);
 
-        // Only log from one player to avoid duplicates
+        const collisionData = {
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
+          time: now,
+          matchId: playerId,
+          isLocalPlayer,
+        };
+
         if (isLocalPlayer) {
-          console.log("Collision entered with:", {
-            self: rb.current?.userData?.id,
-            other: otherUserData?.id,
-            time: now,
-            isLocalPlayer,
-            matchId: playerId,
-          });
+          console.log("Collision entered with:", collisionData);
+          socket.emit("playerCollision", collisionData); // ✅ emit once
         }
       }
 
