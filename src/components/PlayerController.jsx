@@ -292,7 +292,6 @@ const PlayerController = forwardRef(
           isLocalPlayer,
         };
 
-        console.log("🟡 Emitting collision:", collisionData);
         socket.emit("playerCollision", collisionData);
       }
 
