@@ -268,10 +268,8 @@ const PlayerController = forwardRef(
           isLocalPlayer,
         };
 
-        if (isLocalPlayer) {
-          console.log("Collision entered with:", collisionData);
-          socket.emit("playerCollision", collisionData); // ✅ emit once
-        }
+        console.log("Collision entered with:", collisionData);
+        socket.emit("playerCollision", collisionData); // ✅ emit regardless of local/remote
       }
 
       setIsInContact(true);
