@@ -327,7 +327,6 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
           takeHit(data.attackType, data.attackTime);
         }
