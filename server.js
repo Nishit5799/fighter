@@ -148,21 +148,15 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerCollision", (data) => {
+          console.log("Received collision event from client:", data);
+
           const roomId = socket.data.roomId;
-          const roomState = roomStates.get(roomId);
-          if (!roomState) return;
 
-          const collisionKey = [data.self, data.other].sort().join("-");
-          if (roomState.recentCollisions.has(collisionKey)) return;
-
-          roomState.recentCollisions.add(collisionKey);
-          setTimeout(
-            () => roomState.recentCollisions.delete(collisionKey),
-            1000
-          );
-
-          console.log("✅ Server emitting collision:", collisionKey);
+          // ✅ Forward collision to all clients in room (including sender)
           io.to(roomId).emit("playerCollision", data);
+
+          // Or, to only send to the other player:
+          // socket.to(roomId).emit("playerCollision", data);
         });
 
         // 🔧 Always forward hits; don't filter by client clocks
