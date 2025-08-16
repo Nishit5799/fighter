@@ -299,11 +299,11 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
+          //   console.log(`Emitting defeat -
+          // Winner: ${opponentRef.current.id},
+          // Loser: ${socket.id},
+          // WinnerHealth: ${opponentHealth},
+          // LoserHealth: ${health}`);
 
           if (opponentIdRef.current && opponentIdRef.current !== socket.id) {
             socket.emit("playerDefeated", {
@@ -313,12 +313,13 @@ const PlayerController = forwardRef(
               loserHealth: health,
               winningAttackTime: opponentAttackTime.current,
             });
-          } else {
-            console.error("Invalid opponent ID at defeat time:", {
-              opponentId: opponentIdRef.current,
-              selfId: socket.id,
-            });
           }
+          // else {
+          //   console.error("Invalid opponent ID at defeat time:", {
+          //     opponentId: opponentIdRef.current,
+          //     selfId: socket.id,
+          //   });
+          // }
         }
       }
     }, [health, isDefeated, opponentHealth, socket]);
