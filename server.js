@@ -152,11 +152,11 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
           const roomId = socket.data.roomId;
 
-          // // ✅ Forward collision to all clients in room (including sender)
-          // io.to(roomId).emit("playerCollision", data);
+          // ✅ Forward collision to all clients in room (including sender)
+          io.to(roomId).emit("playerCollision", data);
 
           // Or, to only send to the other player:
-          socket.to(roomId).emit("playerCollision", data);
+          // socket.to(roomId).emit("playerCollision", data);
         });
 
         // 🔧 Always forward hits; don't filter by client clocks
