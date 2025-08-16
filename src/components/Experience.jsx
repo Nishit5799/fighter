@@ -582,9 +582,9 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.08}
-            substeps={2}
-            solverIterations={8}
+            contactPairPersistentThreshold={0.2}
+            substeps={4}
+            solverIterations={12}
             timeStep="vary"
           >
             <Ring />
