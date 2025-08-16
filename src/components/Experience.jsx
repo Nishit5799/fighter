@@ -509,11 +509,15 @@ const Experience = () => {
 
   // Cross-link player controllers when game starts
   useEffect(() => {
-    if (carControllerRef1.current && carControllerRef2.current) {
+    if (
+      isGameStarted &&
+      carControllerRef1.current &&
+      carControllerRef2.current
+    ) {
       carControllerRef1.current.setOpponentRef(carControllerRef2.current);
       carControllerRef2.current.setOpponentRef(carControllerRef1.current);
     }
-  }, [players, isGameStarted]); // ✅ ensure relink always happens after start/reset
+  }, [isGameStarted, players, socket?.id]);
 
   // ✅ ADD: Re-link after reset or restart
   useEffect(() => {
@@ -568,7 +572,6 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
-                  players={players}
                   ref={carControllerRef1}
                   playerId={players[0]?.id}
                   characterType="cena"
@@ -590,7 +593,6 @@ const Experience = () => {
                   opponentName={players[1]?.name || "Player 2"}
                 />
                 <PlayerController
-                  players={players}
                   ref={carControllerRef2}
                   playerId={players[1]?.id}
                   characterType="austin"

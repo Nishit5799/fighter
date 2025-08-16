@@ -29,7 +29,6 @@ const PlayerController = forwardRef(
       joystickInput,
       position,
       isPlayer1,
-      players,
       color,
       isPunching,
       isKicking,
@@ -97,9 +96,6 @@ const PlayerController = forwardRef(
       recentCollisions.current.clear();
       setIsInContact(false);
     }, [playerId]);
-    useEffect(() => {
-      recentCollisions.current.clear();
-    }, [players]);
 
     // Track opponent id (for logging)
     // Inside useEffect
@@ -251,33 +247,13 @@ const PlayerController = forwardRef(
     const handleCollisionEnter = (event) => {
       const now = Date.now();
 
-      if (!opponentRef.current || !rb.current) {
-        console.warn("⛔ Collision skipped: missing opponentRef or rb", {
-          opponentRef: opponentRef.current,
-          rb: rb.current,
-        });
-        return;
-      }
-
-      if (!socket) {
-        console.warn("⛔ Collision skipped: missing socket");
-        return;
-      }
+      if (!opponentRef.current || !rb.current) return;
+      if (!socket) return;
 
       const otherUserData = event.other.rigidBody?.userData;
-      if (
-        !otherUserData?.isPlayer ||
-        !otherUserData?.id ||
-        !rb.current.userData?.id
-      ) {
-        console.warn("⛔ Collision skipped: invalid userData", {
-          self: rb.current.userData,
-          other: otherUserData,
-        });
-        return;
-      }
+      if (!otherUserData?.isPlayer) return;
 
-      const pairKey = [rb.current.userData.id, otherUserData.id]
+      const pairKey = [rb.current.userData?.id, otherUserData.id]
         .sort()
         .join("-");
 
@@ -285,14 +261,14 @@ const PlayerController = forwardRef(
         recentCollisions.current.add(pairKey);
 
         const collisionData = {
-          self: rb.current.userData.id,
-          other: otherUserData.id,
+          self: rb.current?.userData?.id,
+          other: otherUserData?.id,
           time: now,
           matchId: playerId,
           isLocalPlayer,
         };
 
-        socket.emit("playerCollision", collisionData);
+        socket.emit("playerCollision", collisionData); // ✅ emit regardless of local/remote
       }
 
       setIsInContact(true);
@@ -566,7 +542,7 @@ const PlayerController = forwardRef(
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
-          id: playerId ?? socket?.id, // ✅ fallback if playerId is undefined
+          id: playerId, // instead of socket?.id
           isPlayer: true,
         }}
         solverIterations={10}
