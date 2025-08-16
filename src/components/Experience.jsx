@@ -371,12 +371,10 @@ const Experience = () => {
     if (!socket) return;
 
     const handlePlayerCollision = (data) => {
-      console.log("🔄 Collision broadcast received:", data);
-
       // Optional: global feedback (e.g. UI message, sound, flash)
-      // if (data.self !== socket.id) {
-      //   showHitEffect(data);
-      // }
+      if (data.self !== socket.id) {
+        showHitEffect(data);
+      }
     };
 
     socket.on("playerCollision", handlePlayerCollision);
