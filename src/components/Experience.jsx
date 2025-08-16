@@ -423,6 +423,20 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    const handlePlayerCollision = (data) => {
+      console.log("🟡 Received collision event from client:", data);
+    };
+
+    socket.on("playerCollision", handlePlayerCollision);
+
+    return () => {
+      socket.off("playerCollision", handlePlayerCollision);
+    };
+  }, [socket]);
+
   // Health sync (incoming)
   useEffect(() => {
     if (!socket) return;
