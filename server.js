@@ -144,24 +144,15 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerCollision", (data) => {
-          const pairKey = [data.self, data.other].sort().join("-");
-          const roomState = roomStates.get(socket.data.roomId);
-          if (roomState) {
-            roomState.lastCollisions = roomState.lastCollisions || new Set();
-            if (!roomState.lastCollisions.has(pairKey)) {
-              roomState.lastCollisions.add(pairKey);
+          console.log("Received collision event from client:", data);
 
-              console.log("Received collision event from client:", data);
+          const roomId = socket.data.roomId;
 
-              const roomId = socket.data.roomId;
+          // ✅ Forward collision to all clients in room (including sender)
+          io.to(roomId).emit("playerCollision", data);
 
-              // ✅ Forward collision to all clients in room (including sender)
-              io.to(roomId).emit("playerCollision", data);
-
-              // Or, to only send to the other player:
-              // socket.to(roomId).emit("playerCollision", data);
-            }
-          }
+          // Or, to only send to the other player:
+          // socket.to(roomId).emit("playerCollision", data);
         });
 
         // 🔧 Always forward hits; don't filter by client clocks
