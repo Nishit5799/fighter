@@ -199,7 +199,11 @@ const PlayerController = forwardRef(
     };
 
     const takeHit = (attackType, attackTime) => {
-      if (isHit || isDefeated) return;
+      if (isDefeated) return;
+
+      if (isHit) {
+        clearTimeout(hitTimer.current);
+      }
 
       opponentAttackTime.current = attackTime ?? Date.now();
 
@@ -215,7 +219,6 @@ const PlayerController = forwardRef(
         console.warn("AudioContext resume failed:", e);
       }
 
-      // Attempt to play audio (but animation should run either way)
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
@@ -223,16 +226,11 @@ const PlayerController = forwardRef(
         });
       }
 
-      // ✅ Ensure animation always runs
       setIsHit(true);
       setCurrentAnimation("hit");
 
       if (character.current?.playHitSound) {
         character.current.playHitSound();
-      }
-
-      if (hitTimer.current) {
-        clearTimeout(hitTimer.current);
       }
 
       const duration = 1000;
