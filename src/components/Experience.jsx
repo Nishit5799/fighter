@@ -601,16 +601,7 @@ const Experience = () => {
                   opponentName={players[1]?.name || "Player 2"}
                 />
                 <PlayerController
-                  ref={(ref) => {
-                    if (ref) {
-                      if (ref.isLocalPlayer || ref.playerId === socket.id) {
-                        localPlayerRef.current = ref;
-                      } else {
-                        opponentPlayerRef.current = ref;
-                        localPlayerRef.current?.setOpponentRef(ref); // ✅ Link opponent ref for sync
-                      }
-                    }
-                  }}
+                  ref={carControllerRef2}
                   playerId={players[1]?.id}
                   characterType="austin"
                   joystickInput={
