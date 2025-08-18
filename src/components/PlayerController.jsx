@@ -302,7 +302,6 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          
 
           if (opponentIdRef.current && opponentIdRef.current !== socket.id) {
             socket.emit("playerDefeated", {
@@ -313,7 +312,6 @@ const PlayerController = forwardRef(
               winningAttackTime: opponentAttackTime.current,
             });
           }
-       
         }
       }
     }, [health, isDefeated, opponentHealth, socket]);
@@ -322,7 +320,6 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-      
         if (data.victimId === playerId) {
           takeHit(data.attackType, data.attackTime);
         }

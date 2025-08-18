@@ -8,7 +8,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
-     console.log(`[iOS Touch] ${type} button pressed`);
+    console.log(`[iOS Touch] ${type} button pressed`);
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
