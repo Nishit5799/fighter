@@ -163,22 +163,24 @@ const PlayerController = forwardRef(
 
       if (type === "punch" && punchSound.current) {
         punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        punchSound.current.play().catch(() => {});
       } else if (type === "kick" && kickSound.current) {
         kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+        kickSound.current.play().catch(() => {});
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
+      const gracePeriod = 500;
+      const now = Date.now();
+
+      const recentCollisionHappened =
+        isInContact || now - lastCollisionTime.current < gracePeriod;
+
       if (
-        isInContact &&
+        recentCollisionHappened &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
@@ -187,7 +189,7 @@ const PlayerController = forwardRef(
           attackerId: socket.id,
           damage: damage,
           attackType: type,
-          attackTime: currentTime, // informational only; not used to reject hits
+          attackTime: currentTime,
         });
       }
 
@@ -246,6 +248,7 @@ const PlayerController = forwardRef(
 
     const handleCollisionEnter = (event) => {
       const now = Date.now();
+      lastCollisionTime.current = now;
 
       if (!opponentRef.current || !rb.current) return;
       if (!socket) return;
@@ -299,11 +302,7 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          //   console.log(`Emitting defeat -
-          // Winner: ${opponentRef.current.id},
-          // Loser: ${socket.id},
-          // WinnerHealth: ${opponentHealth},
-          // LoserHealth: ${health}`);
+          
 
           if (opponentIdRef.current && opponentIdRef.current !== socket.id) {
             socket.emit("playerDefeated", {
@@ -314,12 +313,7 @@ const PlayerController = forwardRef(
               winningAttackTime: opponentAttackTime.current,
             });
           }
-          // else {
-          //   console.error("Invalid opponent ID at defeat time:", {
-          //     opponentId: opponentIdRef.current,
-          //     selfId: socket.id,
-          //   });
-          // }
+       
         }
       }
     }, [health, isDefeated, opponentHealth, socket]);
@@ -328,7 +322,7 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        // console.log("onPlayerHit received", data);
+      
         if (data.victimId === playerId) {
           takeHit(data.attackType, data.attackTime);
         }
