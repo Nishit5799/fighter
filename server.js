@@ -151,12 +151,31 @@ Promise.all([pubClient.connect(), subClient.connect()])
           console.log("Received collision event from client:", data);
 
           const roomId = socket.data.roomId;
+          const roomState = roomStates.get(roomId);
+          if (!roomState) return;
 
-          // ✅ Forward collision to all clients in room (including sender)
+          const players = Array.from(roomState.players.keys());
+          const otherPlayerId = players.find((id) => id !== socket.id);
+
+          // ✅ Emit to everyone
           io.to(roomId).emit("playerCollision", data);
 
-          // Or, to only send to the other player:
-          // socket.to(roomId).emit("playerCollision", data);
+          // ✅ If the other player hasn't sent this yet, send it manually
+          if (otherPlayerId) {
+            const mirroredEvent = {
+              self: otherPlayerId,
+              other: socket.id,
+              time: Date.now(),
+              matchId: otherPlayerId,
+              isLocalPlayer: false, // mark as remote
+            };
+
+            io.to(otherPlayerId).emit("playerCollision", mirroredEvent);
+            console.log(
+              "Mirrored collision event to other player:",
+              mirroredEvent
+            );
+          }
         });
 
         // 🔧 Always forward hits; don't filter by client clocks
