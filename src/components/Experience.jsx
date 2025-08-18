@@ -572,7 +572,15 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
-                  ref={carControllerRef1}
+                  ref={(ref) => {
+                    if (ref) {
+                      if (ref.playerId === socket.id) {
+                        localPlayerRef.current = ref;
+                      } else {
+                        opponentPlayerRef.current = ref;
+                      }
+                    }
+                  }}
                   playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
