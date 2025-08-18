@@ -106,7 +106,7 @@ const Experience = () => {
 
       const sources = [
         "/punch.mp3",
-
+        "/kick.mp3",
         "/hit.mp3",
         "/victory.mp3",
         "/lost.mp3",
@@ -183,24 +183,6 @@ const Experience = () => {
     hasLoggedResult.current = false;
     hasPlayedStartSound.current = false;
     setRestartCountdown(2);
-
-    // ✅ Resume audio context on reset (iOS-specific fix)
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AC();
-        }
-        if (audioContextRef.current.state === "suspended") {
-          audioContextRef.current.resume().catch((e) => {
-            console.warn("AudioContext resume failed:", e);
-          });
-        }
-      }
-    } catch (err) {
-      console.warn("AudioContext resume skipped:", err);
-    }
-
     setTimeout(() => {
       setShowPopup(false);
       setWinner(null);
@@ -404,20 +386,6 @@ const Experience = () => {
     }
   }, [shouldReload]);
 
-  useEffect(() => {
-    if (!socket) return;
-
-    const handlePlayerCollision = (data) => {
-      console.log("🟡 Received collision event from client:", data);
-    };
-
-    socket.on("playerCollision", handlePlayerCollision);
-
-    return () => {
-      socket.off("playerCollision", handlePlayerCollision);
-    };
-  }, [socket]);
-
   // Health sync (incoming)
   useEffect(() => {
     if (!socket) return;
@@ -563,24 +531,16 @@ const Experience = () => {
           ></directionalLight>
 
           <Physics
-            contactPairPersistentThreshold={0.2}
-            substeps={4}
-            solverIterations={12}
+            contactPairPersistentThreshold={0.08}
+            substeps={2}
+            solverIterations={8}
             timeStep="vary"
           >
             <Ring />
             {isGameStarted && (
               <>
                 <PlayerController
-                  ref={(ref) => {
-                    if (ref) {
-                      if (ref.playerId === socket.id) {
-                        localPlayerRef.current = ref;
-                      } else {
-                        opponentPlayerRef.current = ref;
-                      }
-                    }
-                  }}
+                  ref={carControllerRef1}
                   playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={

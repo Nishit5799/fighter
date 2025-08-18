@@ -90,12 +90,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         const roomId = findAvailableRoom();
         socket.join(roomId);
-        socket.data.roomId = roomId; // ✅ Save for later use
         const roomState = roomStates.get(roomId);
-
-        if (!roomState.recentCollisions) {
-          roomState.recentCollisions = new Set();
-        }
 
         socket.emit("roomState", {
           players: Array.from(roomState.players.values()),
@@ -112,11 +107,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
             }
           }
 
-          if (!roomState.recentCollisions) {
-            roomState.recentCollisions = new Set();
-          } else {
-            roomState.recentCollisions.clear();
-          }
           roomState.players.set(socket.id, {
             id: socket.id,
             name: playerName,
@@ -150,41 +140,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         socket.on("carMove", (data) => {
           socket.to(roomId).emit("carMove", data);
-        });
-
-        socket.on("playerCollision", (data) => {
-          console.log("🟡 Received collision event from client:", data);
-
-          const roomId = socket.data.roomId;
-          const roomState = roomStates.get(roomId);
-          if (!roomState) return;
-
-          const pairKey = [data.self, data.other].sort().join("-");
-          if (!roomState.recentCollisions)
-            roomState.recentCollisions = new Set();
-
-          if (roomState.recentCollisions.has(pairKey)) {
-            console.log("🔁 Skipping duplicate collision for", pairKey);
-            return;
-          }
-
-          roomState.recentCollisions.add(pairKey);
-          io.to(roomId).emit("playerCollision", data);
-
-          const players = Array.from(roomState.players.keys());
-          const otherPlayerId = players.find((id) => id !== socket.id);
-
-          if (otherPlayerId) {
-            const mirroredEvent = {
-              self: otherPlayerId,
-              other: socket.id,
-              time: Date.now(),
-              matchId: otherPlayerId,
-              isLocalPlayer: false,
-            };
-            io.to(otherPlayerId).emit("playerCollision", mirroredEvent);
-            console.log("🟢 Mirrored collision event:", mirroredEvent);
-          }
         });
 
         // 🔧 Always forward hits; don't filter by client clocks
@@ -268,9 +223,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
     Loser: ${loser.name} (${loser.id})`);
 
           socket.on("restartGame", () => {
-            if (roomState.recentCollisions) {
-              roomState.recentCollisions.clear();
-            }
             roomState.matchResult = null;
             roomState.players.forEach((player) => (player.isReady = false));
             roomState.gameStarted = false;
@@ -279,9 +231,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("restartGame", () => {
-          if (roomState.recentCollisions) {
-            roomState.recentCollisions.clear();
-          }
           roomState.players.clear();
           roomState.gameStarted = false;
           io.to(roomId).emit("restartGame");

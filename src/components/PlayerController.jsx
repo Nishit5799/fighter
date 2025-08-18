@@ -16,7 +16,7 @@ import Cenaa from "./Cenaa";
 
 const SOUNDS = {
   punch: "/punch.mp3",
-  kick: "/punch.mp3",
+  kick: "/kick.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
   lost: "/lost.mp3",
@@ -60,14 +60,12 @@ const PlayerController = forwardRef(
 
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
-    const lastCollisionTime = useRef(0);
-    const recentCollisions = useRef(new Set());
+
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
     const contactTimeout = useRef(null);
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
-    const [, forceRerender] = useState(0);
 
     const punchSound = useRef(null);
     const kickSound = useRef(null);
@@ -91,54 +89,9 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
-    useEffect(() => {
-      recentCollisions.current.clear();
-      setIsInContact(false);
-
-      const tryEmitCollision = () => {
-        if (
-          rb.current &&
-          opponentRef.current &&
-          typeof rb.current.translation === "function" &&
-          typeof opponentRef.current.translation === "function"
-        ) {
-          const myPos = rb.current.translation();
-          const theirPos = opponentRef.current.translation();
-          const distance = myPos.distanceTo(theirPos);
-
-          if (distance < 2) {
-            const collisionData = {
-              self: rb.current?.userData?.id || playerId,
-              other: opponentRef.current?.id,
-              time: Date.now(),
-              matchId: playerId,
-              isLocalPlayer,
-            };
-            socket.emit("playerCollision", collisionData);
-            console.log("🟢 Force-sent initial collision");
-            return true;
-          }
-        }
-        return false;
-      };
-
-      let retries = 0;
-      const maxRetries = 20;
-
-      const interval = setInterval(() => {
-        if (tryEmitCollision() || retries >= maxRetries) {
-          clearInterval(interval);
-        }
-        retries++;
-      }, 250); // Try every 250ms, up to 5 seconds total
-    }, [playerId]);
-
     // Track opponent id (for logging)
-    // Inside useEffect
     useEffect(() => {
-      if (opponentRef.current?.id) {
-        opponentIdRef.current = opponentRef.current.id;
-      }
+      opponentIdRef.current = opponentRef.current?.id;
     }, [opponentRef.current?.id]);
 
     // Init / teardown sounds
@@ -181,9 +134,6 @@ const PlayerController = forwardRef(
     // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
-      if (ref?.id) {
-        opponentIdRef.current = ref.id;
-      }
     };
 
     const startAttack = (type) => {
@@ -199,24 +149,22 @@ const PlayerController = forwardRef(
 
       if (type === "punch" && punchSound.current) {
         punchSound.current.currentTime = 0;
-        punchSound.current.play().catch(() => {});
+        punchSound.current
+          .play()
+          .catch((e) => console.log("Audio play failed:", e));
       } else if (type === "kick" && kickSound.current) {
         kickSound.current.currentTime = 0;
-        kickSound.current.play().catch(() => {});
+        kickSound.current
+          .play()
+          .catch((e) => console.log("Audio play failed:", e));
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      const gracePeriod = 500;
-      const now = Date.now();
-
-      const recentCollisionHappened =
-        isInContact || now - lastCollisionTime.current < gracePeriod;
-
       if (
-        recentCollisionHappened &&
+        isInContact &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
@@ -225,7 +173,7 @@ const PlayerController = forwardRef(
           attackerId: socket.id,
           damage: damage,
           attackType: type,
-          attackTime: currentTime,
+          attackTime: currentTime, // informational only; not used to reject hits
         });
       }
 
@@ -238,25 +186,11 @@ const PlayerController = forwardRef(
     };
 
     const takeHit = (attackType, attackTime) => {
-      if (isDefeated) return;
+      if (isHit || isDefeated) return;
 
-      if (isHit) {
-        clearTimeout(hitTimer.current);
-      }
-
+      // ❗️Do NOT compare foreign timestamps to local ones.
+      // We accept the hit and only use the timestamp for attribution/logging.
       opponentAttackTime.current = attackTime ?? Date.now();
-
-      try {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) {
-          const ctx = new AC();
-          if (ctx.state === "suspended") {
-            ctx.resume().catch(() => {});
-          }
-        }
-      } catch (e) {
-        console.warn("AudioContext resume failed:", e);
-      }
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
@@ -265,8 +199,11 @@ const PlayerController = forwardRef(
         });
       }
 
+      if (hitTimer.current) {
+        clearTimeout(hitTimer.current);
+      }
+
       setIsHit(true);
-      forceRerender((n) => n + 1);
       setCurrentAnimation("hit");
 
       if (character.current?.playHitSound) {
@@ -283,34 +220,22 @@ const PlayerController = forwardRef(
     };
 
     const handleCollisionEnter = (event) => {
-      const now = Date.now();
-      lastCollisionTime.current = now;
-
       if (!opponentRef.current || !rb.current) return;
-      if (!socket) return;
 
       const otherUserData = event.other.rigidBody?.userData;
-      if (!otherUserData?.isPlayer) return;
+      if (otherUserData?.isPlayer) {
+        setIsInContact(true);
+        if (contactTimeout.current) {
+          clearTimeout(contactTimeout.current);
+        }
 
-      const pairKey = [rb.current.userData?.id, otherUserData.id]
-        .sort()
-        .join("-");
-
-      if (!recentCollisions.current.has(pairKey)) {
-        recentCollisions.current.add(pairKey);
-
-        const collisionData = {
+        console.log("Collision entered with:", {
           self: rb.current?.userData?.id,
           other: otherUserData?.id,
-          time: now,
-          matchId: playerId,
+          time: Date.now(),
           isLocalPlayer,
-        };
-
-        socket.emit("playerCollision", collisionData); // ✅ emit regardless of local/remote
+        });
       }
-
-      setIsInContact(true);
     };
 
     const handleCollisionExit = (event) => {
@@ -338,16 +263,19 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
+          console.log(`Emitting defeat - 
+        Winner: ${opponentRef.current.id}, 
+        Loser: ${socket.id},
+        WinnerHealth: ${opponentHealth},
+        LoserHealth: ${health}`);
 
-          if (opponentIdRef.current && opponentIdRef.current !== socket.id) {
-            socket.emit("playerDefeated", {
-              winnerId: opponentIdRef.current,
-              loserId: socket.id,
-              winnerHealth: opponentHealth,
-              loserHealth: health,
-              winningAttackTime: opponentAttackTime.current,
-            });
-          }
+          socket.emit("playerDefeated", {
+            winnerId: opponentRef.current.id,
+            loserId: socket.id,
+            winnerHealth: opponentHealth,
+            loserHealth: health,
+            winningAttackTime: opponentAttackTime.current,
+          });
         }
       }
     }, [health, isDefeated, opponentHealth, socket]);
@@ -356,7 +284,9 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
+        console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
+          // ✅ precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
