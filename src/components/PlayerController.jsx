@@ -92,9 +92,36 @@ const PlayerController = forwardRef(
     const movementEnabled = useRef(true);
 
     useEffect(() => {
-      // Reset collisions on remount or game restart
       recentCollisions.current.clear();
       setIsInContact(false);
+
+      // 🟢 Force collision emit if already overlapping
+      setTimeout(() => {
+        if (
+          rb.current &&
+          opponentRef.current &&
+          typeof rb.current.translation === "function" &&
+          typeof opponentRef.current.translation === "function"
+        ) {
+          const distance = rb.current
+            .translation()
+            .distanceTo(opponentRef.current.translation());
+
+          if (distance < 2) {
+            // 🔧 Adjust this threshold if needed
+            const collisionData = {
+              self: rb.current?.userData?.id || playerId,
+              other: opponentRef.current?.id,
+              time: Date.now(),
+              matchId: playerId,
+              isLocalPlayer,
+            };
+
+            socket.emit("playerCollision", collisionData);
+            console.log("🟢 Force-sent initial collision");
+          }
+        }
+      }, 1000); // Delay to let physics stabilize
     }, [playerId]);
 
     // Track opponent id (for logging)

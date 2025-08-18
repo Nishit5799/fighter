@@ -148,33 +148,39 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("playerCollision", (data) => {
-          console.log("Received collision event from client:", data);
+          console.log("🟡 Received collision event from client:", data);
 
           const roomId = socket.data.roomId;
           const roomState = roomStates.get(roomId);
           if (!roomState) return;
 
+          const pairKey = [data.self, data.other].sort().join("-");
+          if (!roomState.recentCollisions)
+            roomState.recentCollisions = new Set();
+
+          if (roomState.recentCollisions.has(pairKey)) {
+            console.log("🔁 Skipping duplicate collision event for", pairKey);
+            return;
+          }
+
+          roomState.recentCollisions.add(pairKey);
+
+          io.to(roomId).emit("playerCollision", data);
+
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
 
-          // ✅ Emit to everyone
-          io.to(roomId).emit("playerCollision", data);
-
-          // ✅ If the other player hasn't sent this yet, send it manually
           if (otherPlayerId) {
             const mirroredEvent = {
               self: otherPlayerId,
               other: socket.id,
               time: Date.now(),
               matchId: otherPlayerId,
-              isLocalPlayer: false, // mark as remote
+              isLocalPlayer: false,
             };
 
             io.to(otherPlayerId).emit("playerCollision", mirroredEvent);
-            console.log(
-              "Mirrored collision event to other player:",
-              mirroredEvent
-            );
+            console.log("🟢 Mirrored collision event:", mirroredEvent);
           }
         });
 
