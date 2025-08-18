@@ -42,6 +42,46 @@ const PlayerController = forwardRef(
     ref
   ) => {
     // --- Context / state ---
+
+    const forceEmitInitialCollision = () => {
+      let retries = 0;
+      const maxRetries = 20;
+
+      const tryEmitCollision = () => {
+        if (
+          rb.current &&
+          opponentRef.current &&
+          typeof rb.current.translation === "function" &&
+          typeof opponentRef.current.translation === "function"
+        ) {
+          const myPos = rb.current.translation();
+          const theirPos = opponentRef.current.translation();
+          const distance = myPos.distanceTo(theirPos);
+
+          if (distance < 2) {
+            const collisionData = {
+              self: rb.current?.userData?.id || playerId,
+              other: opponentRef.current?.id,
+              time: Date.now(),
+              matchId: playerId,
+              isLocalPlayer,
+            };
+            socket.emit("playerCollision", collisionData);
+            console.log("🟢 Force-sent initial collision");
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const interval = setInterval(() => {
+        if (tryEmitCollision() || retries >= maxRetries) {
+          clearInterval(interval);
+        }
+        retries++;
+      }, 250);
+    };
+
     const socket = useSocket();
     const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
     const [currentAnimation, setCurrentAnimation] = useState("idle");
