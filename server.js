@@ -231,14 +231,16 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("restartGame", () => {
-          roomState.players.clear();
-          roomState.gameStarted = false;
+          if (roomStates.has(roomId)) {
+            roomStates.delete(roomId); // 🧹 full memory cleanup
+            console.log(`Room ${roomId} fully deleted after game restart.`);
+          }
           io.to(roomId).emit("restartGame");
         });
 
         socket.on("disconnect", () => {
           console.log(`Disconnected: ${socket.id}`);
-          if (roomState.players.delete(socket.id)) {
+          if (roomState?.players?.delete(socket.id)) {
             io.to(roomId).emit(
               "updatePlayers",
               Array.from(roomState.players.values())
@@ -246,6 +248,14 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
             if (roomState.gameStarted) {
               io.to(roomId).emit("playerDisconnected", socket.id);
+            }
+
+            // If no players left, clean up immediately (no 60s wait)
+            if (roomState.players.size === 0) {
+              roomStates.delete(roomId);
+              console.log(
+                `Room ${roomId} deleted immediately due to all players gone.`
+              );
             }
           }
         });
