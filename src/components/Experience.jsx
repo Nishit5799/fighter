@@ -106,7 +106,7 @@ const Experience = () => {
 
       const sources = [
         "/punch.mp3",
-        "/kick.mp3",
+
         "/hit.mp3",
         "/victory.mp3",
         "/lost.mp3",

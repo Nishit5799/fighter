@@ -16,7 +16,7 @@ import Cenaa from "./Cenaa";
 
 const SOUNDS = {
   punch: "/punch.mp3",
-  kick: "/kick.mp3",
+  kick: "/punch.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
   lost: "/lost.mp3",
