@@ -231,7 +231,8 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("restartGame", () => {
-          roomStates.delete(roomId); // or reset it explicitly
+          roomState.players.clear();
+          roomState.gameStarted = false;
           io.to(roomId).emit("restartGame");
         });
 
