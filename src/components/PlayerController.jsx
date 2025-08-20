@@ -163,17 +163,19 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      if (
-        isInContact &&
-        socket &&
-        opponentRef.current &&
-        !opponentRef.current.isDefeated
-      ) {
+      if (isInContact && socket && opponentRef.current) {
+        console.log("Emitting playerHit", {
+          attackerId: socket.id,
+          damage,
+          attackType: type,
+          attackTime: currentTime,
+        });
+
         socket.emit("playerHit", {
           attackerId: socket.id,
           damage: damage,
           attackType: type,
-          attackTime: currentTime, // informational only; not used to reject hits
+          attackTime: currentTime,
         });
       }
 

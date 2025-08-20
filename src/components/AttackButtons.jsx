@@ -8,6 +8,10 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
+    if (typeof window !== "undefined" && window.unlockAllAudio) {
+      window.unlockAllAudio();
+    }
+
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
