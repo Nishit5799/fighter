@@ -32,6 +32,7 @@ const keyboardMap = [
 const Experience = () => {
   // --- Context ---
   const socket = useSocket();
+  const [playerId, setPlayerId] = useState(null);
 
   // --- State ---
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
@@ -74,6 +75,21 @@ const Experience = () => {
 
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+
+  useEffect(() => {
+    if (socket && socket.id) {
+      setPlayerId(socket.id);
+    }
+
+    // Just in case socket.id isn't immediately available
+    const interval = setInterval(() => {
+      if (socket?.id && !playerId) {
+        setPlayerId(socket.id);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [socket, playerId]);
 
   // --- Audio: create start sound early ---
   useEffect(() => {
@@ -507,6 +523,10 @@ const Experience = () => {
     }
   }, [restartCountdown, handleReset]);
 
+  if (!playerId) {
+    return <div>Loading...</div>; // or a splash screen
+  }
+
   // --- Render ---
   return (
     <>
@@ -541,7 +561,7 @@ const Experience = () => {
               <>
                 <PlayerController
                   ref={carControllerRef1}
-                  playerId={players[0]?.id}
+                  playerId={playerId}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -562,7 +582,7 @@ const Experience = () => {
                 />
                 <PlayerController
                   ref={carControllerRef2}
-                  playerId={players[1]?.id}
+                  playerId={playerId}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null

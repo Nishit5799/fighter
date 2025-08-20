@@ -59,7 +59,6 @@ const PlayerController = forwardRef(
     const opponentAttackTime = useRef(0);
 
     const hasEmittedDefeat = useRef(false);
-    const opponentIdRef = useRef(null);
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
@@ -283,22 +282,19 @@ const PlayerController = forwardRef(
     }, [health, isDefeated, opponentHealth, socket]);
 
     useEffect(() => {
-      if (!socket) return;
+      if (!socket || !playerId) return;
 
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
+        console.log("✅ Registered onPlayerHit for", playerId);
         if (data.victimId === playerId) {
-          // ✅ precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
 
       socket.on("playerHit", onPlayerHit);
-
-      return () => {
-        socket.off("playerHit", onPlayerHit);
-      };
-    }, [socket]);
+      return () => socket.off("playerHit", onPlayerHit);
+    }, [socket, playerId]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
