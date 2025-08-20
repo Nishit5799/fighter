@@ -157,7 +157,6 @@ const PlayerController = forwardRef(
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
-
       if (isInContact && socket && opponentId) {
         socket.emit("playerHit", {
           attackerId: socket.id,
@@ -252,17 +251,16 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
-        if (!hasEmittedDefeat.current) {
+        if (!hasEmittedDefeat.current && opponentId) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
+          console.log(`Emitting defeat -
+    Winner: ${opponentId},
+    Loser: ${socket.id},
+    WinnerHealth: ${opponentHealth},
+    LoserHealth: ${health}`);
 
           socket.emit("playerDefeated", {
             winnerId: opponentId,
-
             loserId: socket.id,
             winnerHealth: opponentHealth,
             loserHealth: health,
