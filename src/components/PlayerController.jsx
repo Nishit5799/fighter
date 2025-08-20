@@ -88,10 +88,7 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
-    // Track opponent id (for logging)
-    useEffect(() => {
-      opponentIdRef.current = opponentRef.current?.id;
-    }, [opponentRef.current?.id]);
+ 
 
     // Init / teardown sounds
     useEffect(() => {
