@@ -14,10 +14,6 @@ import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
 
-const isIOS =
-  typeof navigator !== "undefined" &&
-  /iPad|iPhone|iPod/.test(navigator.userAgent);
-
 const SOUNDS = {
   punch: "/punch.mp3",
   kick: "/punch.mp3",
@@ -167,24 +163,17 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      const shouldEmitHit =
+      if (
+        isInContact &&
         socket &&
         opponentRef.current &&
-        !opponentRef.current.isDefeated &&
-        (isIOS || isInContact); // Allow iOS to bypass contact check
-
-      if (shouldEmitHit) {
-        console.log("💥 Emitting hit:", {
-          platform: isIOS ? "iOS" : "Other",
-          type,
-          isInContact,
-        });
-
+        !opponentRef.current.isDefeated
+      ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
           damage: damage,
           attackType: type,
-          attackTime: currentTime,
+          attackTime: currentTime, // informational only; not used to reject hits
         });
       }
 
