@@ -55,6 +55,7 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const [opponentId, setOpponentId] = useState(null);
 
   // --- Refs ---
   const beginSoundRef = useRef(null);
@@ -309,6 +310,14 @@ const Experience = () => {
     [players, socket?.id]
   );
 
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("opponentId", setOpponentId);
+
+    return () => socket.off("opponentId", setOpponentId);
+  }, [socket]);
+
   // --- Effects (that rely on the helpers/handlers above) ---
   // Attach gesture unlock to input + JOIN button
   useEffect(() => {
@@ -542,6 +551,7 @@ const Experience = () => {
                 <PlayerController
                   ref={carControllerRef1}
                   playerId={players[0]?.id}
+                  opponentId={opponentId}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -563,6 +573,7 @@ const Experience = () => {
                 <PlayerController
                   ref={carControllerRef2}
                   playerId={players[1]?.id}
+                  opponentId={opponentId}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null

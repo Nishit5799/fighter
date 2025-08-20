@@ -38,6 +38,7 @@ const PlayerController = forwardRef(
       playerName,
       opponentName,
       isLocalPlayer,
+      opponentId,
     },
     ref
   ) => {
@@ -87,8 +88,6 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
-
- 
 
     // Init / teardown sounds
     useEffect(() => {
@@ -159,17 +158,11 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      if (isInContact && socket && opponentRef.current) {
-        console.log("Emitting playerHit", {
-          attackerId: socket.id,
-          damage,
-          attackType: type,
-          attackTime: currentTime,
-        });
-
+      if (isInContact && socket && opponentId) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage,
+          victimId: opponentId,
+          damage,
           attackType: type,
           attackTime: currentTime,
         });
@@ -268,7 +261,8 @@ const PlayerController = forwardRef(
         LoserHealth: ${health}`);
 
           socket.emit("playerDefeated", {
-            winnerId: opponentRef.current.id,
+            winnerId: opponentId,
+
             loserId: socket.id,
             winnerHealth: opponentHealth,
             loserHealth: health,

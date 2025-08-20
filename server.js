@@ -117,6 +117,12 @@ Promise.all([pubClient.connect(), subClient.connect()])
             "updatePlayers",
             Array.from(roomState.players.values())
           );
+          const players = Array.from(roomState.players.keys());
+          if (players.length === 2) {
+            const [player1, player2] = players;
+            io.to(player1).emit("opponentId", player2);
+            io.to(player2).emit("opponentId", player1);
+          }
         });
 
         socket.on("playerReady", () => {
