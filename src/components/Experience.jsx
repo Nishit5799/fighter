@@ -208,14 +208,20 @@ const Experience = () => {
   }, []);
 
   const handleReady = useCallback(() => {
-    if (socket) {
-      socket.emit("playerReady", playerName);
-      setIsReady(true);
-    }
-  }, [socket, playerName]);
+    unlockAllAudio(); // Ensure iOS context unlocked first
+
+    setTimeout(() => {
+      if (socket) {
+        socket.emit("playerReady", playerName);
+        setIsReady(true);
+        console.log("✅ Sent playerReady after audio unlock");
+      }
+    }, 300); // Short delay to ensure order
+  }, [socket, playerName, unlockAllAudio]);
 
   const onPlayerHit = useCallback(
     (data) => {
+      console.log("🎯 Hit registered", data);
       if (winner || loser) return;
 
       socket.emit("updateHealth", {
@@ -498,6 +504,10 @@ const Experience = () => {
 
   // ✅ ADD: Re-link after reset or restart
   useEffect(() => {
+    console.log("✅ Opponent refs linked:", {
+      p1: carControllerRef1.current?.id,
+      p2: carControllerRef2.current?.id,
+    });
     if (carControllerRef1.current && carControllerRef2.current) {
       carControllerRef1.current.setOpponentRef(carControllerRef2.current);
       carControllerRef2.current.setOpponentRef(carControllerRef1.current);

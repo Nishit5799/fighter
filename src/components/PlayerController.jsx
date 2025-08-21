@@ -132,7 +132,17 @@ const PlayerController = forwardRef(
     };
 
     const startAttack = (type) => {
-      if (isAttacking || isDefeated) return;
+      if (
+        isAttacking ||
+        isDefeated ||
+        !playerId ||
+        !opponentId ||
+        !socket ||
+        !isInContact
+      ) {
+        console.warn("❌ Cannot attack: setup incomplete");
+        return;
+      }
 
       const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
@@ -276,13 +286,18 @@ const PlayerController = forwardRef(
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         console.log("✅ Registered onPlayerHit for", playerId);
+
         if (data.victimId === playerId) {
           takeHit(data.attackType, data.attackTime);
         }
       };
 
+      socket.off("playerHit", onPlayerHit); // Safety: remove before add
       socket.on("playerHit", onPlayerHit);
-      return () => socket.off("playerHit", onPlayerHit);
+
+      return () => {
+        socket.off("playerHit", onPlayerHit);
+      };
     }, [socket, playerId]);
 
     // --- Frame loop ---
