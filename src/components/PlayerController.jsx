@@ -38,8 +38,6 @@ const PlayerController = forwardRef(
       playerName,
       opponentName,
       isLocalPlayer,
-      opponentId,
-      audioUnlockedRef,
     },
     ref
   ) => {
@@ -52,7 +50,6 @@ const PlayerController = forwardRef(
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
-    const hasReceivedHit = useRef(false); // ✅ Track if hit landed
 
     // --- Refs ---
     const attackTimer = useRef(null);
@@ -62,6 +59,7 @@ const PlayerController = forwardRef(
     const opponentAttackTime = useRef(0);
 
     const hasEmittedDefeat = useRef(false);
+    const opponentIdRef = useRef(null);
 
     const opponentRef = useRef();
     const [isInContact, setIsInContact] = useState(false);
@@ -90,6 +88,11 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
+
+    // Track opponent id (for logging)
+    useEffect(() => {
+      opponentIdRef.current = opponentRef.current?.id;
+    }, [opponentRef.current?.id]);
 
     // Init / teardown sounds
     useEffect(() => {
@@ -134,26 +137,11 @@ const PlayerController = forwardRef(
     };
 
     const startAttack = (type) => {
-      if (
-        isAttacking ||
-        isDefeated ||
-        !playerId ||
-        !opponentId ||
-        !socket ||
-        !isInContact
-      ) {
-        console.warn("❌ Cannot attack: setup incomplete");
-        return;
-      }
-      if (audioUnlockedRef.current === false) {
-        console.warn("⚠️ Audio context not unlocked, blocking attack.");
-        return;
-      }
+      if (isAttacking || isDefeated) return;
 
       const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
       setLastAttackTime(currentTime);
-      hasReceivedHit.current = false; // Reset before attack
 
       if (attackTimer.current) {
         clearTimeout(attackTimer.current);
@@ -174,13 +162,18 @@ const PlayerController = forwardRef(
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
-      if (isInContact && socket && opponentId) {
+
+      if (
+        isInContact &&
+        socket &&
+        opponentRef.current &&
+        !opponentRef.current.isDefeated
+      ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          victimId: opponentId,
-          damage,
+          damage: damage,
           attackType: type,
-          attackTime: currentTime,
+          attackTime: currentTime, // informational only; not used to reject hits
         });
       }
 
@@ -268,16 +261,16 @@ const PlayerController = forwardRef(
         setCurrentAnimation("fall");
         movementEnabled.current = false;
 
-        if (!hasEmittedDefeat.current && opponentId) {
+        if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat -
-    Winner: ${opponentId},
-    Loser: ${socket.id},
-    WinnerHealth: ${opponentHealth},
-    LoserHealth: ${health}`);
+          console.log(`Emitting defeat - 
+        Winner: ${opponentRef.current.id}, 
+        Loser: ${socket.id},
+        WinnerHealth: ${opponentHealth},
+        LoserHealth: ${health}`);
 
           socket.emit("playerDefeated", {
-            winnerId: opponentId,
+            winnerId: opponentRef.current.id,
             loserId: socket.id,
             winnerHealth: opponentHealth,
             loserHealth: health,
@@ -288,25 +281,22 @@ const PlayerController = forwardRef(
     }, [health, isDefeated, opponentHealth, socket]);
 
     useEffect(() => {
-      if (!socket || !playerId) return;
+      if (!socket) return;
 
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
-        console.log("✅ Registered onPlayerHit for", playerId);
-
         if (data.victimId === playerId) {
-          hasReceivedHit.current = true; // ✅ Confirm hit
+          // ✅ precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
 
-      socket.off("playerHit", onPlayerHit); // Safety: remove before add
       socket.on("playerHit", onPlayerHit);
 
       return () => {
         socket.off("playerHit", onPlayerHit);
       };
-    }, [socket, playerId]);
+    }, [socket]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {

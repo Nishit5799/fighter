@@ -8,8 +8,6 @@ const AttackButtons = ({ onPunch, onKick }) => {
   const [kickCooldown, setKickCooldown] = useState(false);
 
   const handleAttackStart = (type) => {
-
-
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)

@@ -55,7 +55,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [opponentId, setOpponentId] = useState(null);
 
   // --- Refs ---
   const beginSoundRef = useRef(null);
@@ -151,8 +150,8 @@ const Experience = () => {
       setShowPopup(true);
       return;
     }
+
     unlockAllAudio();
-    audioUnlockedRef.current = true;
 
     const trimmedName = playerName.trim();
     if (trimmedName !== "" && !hasJoinedRoom) {
@@ -208,21 +207,14 @@ const Experience = () => {
   }, []);
 
   const handleReady = useCallback(() => {
-    unlockAllAudio();
-    audioUnlockedRef.current = true;
-
-    setTimeout(() => {
-      if (socket) {
-        socket.emit("playerReady", playerName);
-        setIsReady(true);
-        console.log("✅ Sent playerReady after audio unlock");
-      }
-    }, 300); // Short delay to ensure order
-  }, [socket, playerName, unlockAllAudio]);
+    if (socket) {
+      socket.emit("playerReady", playerName);
+      setIsReady(true);
+    }
+  }, [socket, playerName]);
 
   const onPlayerHit = useCallback(
     (data) => {
-      console.log("🎯 Hit registered", data);
       if (winner || loser) return;
 
       socket.emit("updateHealth", {
@@ -317,14 +309,6 @@ const Experience = () => {
     [players, socket?.id]
   );
 
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on("opponentId", setOpponentId);
-
-    return () => socket.off("opponentId", setOpponentId);
-  }, [socket]);
-
   // --- Effects (that rely on the helpers/handlers above) ---
   // Attach gesture unlock to input + JOIN button
   useEffect(() => {
@@ -334,7 +318,6 @@ const Experience = () => {
 
     const handler = () => {
       unlockAllAudio();
-      audioUnlockedRef.current = true;
     };
 
     const opts = { passive: true };
@@ -444,8 +427,7 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      unlockAllAudio();
-      audioUnlockedRef.current = true;
+      unlockAllAudio(); // ✅ ensure iOS AudioContext is resumed
       let count = 3;
       setCountdown(count);
 
@@ -507,10 +489,6 @@ const Experience = () => {
 
   // ✅ ADD: Re-link after reset or restart
   useEffect(() => {
-    console.log("✅ Opponent refs linked:", {
-      p1: carControllerRef1.current?.id,
-      p2: carControllerRef2.current?.id,
-    });
     if (carControllerRef1.current && carControllerRef2.current) {
       carControllerRef1.current.setOpponentRef(carControllerRef2.current);
       carControllerRef2.current.setOpponentRef(carControllerRef1.current);
@@ -564,7 +542,6 @@ const Experience = () => {
                 <PlayerController
                   ref={carControllerRef1}
                   playerId={players[0]?.id}
-                  opponentId={opponentId}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -582,12 +559,10 @@ const Experience = () => {
                   isLocalPlayer={players[0]?.id === socket?.id}
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
-                  audioUnlockedRef={audioUnlockedRef}
                 />
                 <PlayerController
                   ref={carControllerRef2}
                   playerId={players[1]?.id}
-                  opponentId={opponentId}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
@@ -605,7 +580,6 @@ const Experience = () => {
                   isLocalPlayer={players[1]?.id === socket?.id}
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
-                  audioUnlockedRef={audioUnlockedRef}
                 />
               </>
             )}
