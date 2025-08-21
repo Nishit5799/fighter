@@ -272,20 +272,21 @@ const PlayerController = forwardRef(
 
     useEffect(() => {
       if (!socket) return;
-      const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
-        console.log(
-          "✅ Registered onPlayerHit for",
-          data.victimId,
-          "vs",
-          socket.id
-        );
-        if (data.victimId === socket.id) {
-          takeHit(data.attackType, data.attackTime);
-        }
+
+      const registerHit = () => {
+        socket.on("playerHit", (data) => {
+          console.log("onPlayerHit received", data);
+          if (data.victimId === socket.id) {
+            takeHit(data.attackType, data.attackTime);
+          }
+        });
       };
-      socket.on("playerHit", onPlayerHit);
-      return () => socket.off("playerHit", onPlayerHit);
+
+      const delay = setTimeout(registerHit, 100); // give time for socket.id to be set
+      return () => {
+        clearTimeout(delay);
+        socket.off("playerHit");
+      };
     }, [socket]);
 
     // --- Frame loop ---
