@@ -90,7 +90,6 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
-   
 
     // Init / teardown sounds
     useEffect(() => {
@@ -183,22 +182,6 @@ const PlayerController = forwardRef(
           attackType: type,
           attackTime: currentTime,
         });
-        setTimeout(() => {
-          if (
-            !hasReceivedHit.current &&
-            !isDefeated &&
-            isLocalPlayer &&
-            !isHit
-          ) {
-            console.warn("⚠️ Hit not registered in time, forcing reload");
-            socket.emit("attackFailed", {
-              playerId: socket.id,
-              attackType: type,
-              time: Date.now(),
-            });
-            window.location.reload(); // 🔁 Force reload fallback
-          }
-        }, 1000); // 1 second timeout
       }
 
       const duration = 1000;
