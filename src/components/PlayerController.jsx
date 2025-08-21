@@ -271,23 +271,19 @@ const PlayerController = forwardRef(
     }, [health, isDefeated, opponentHealth, socket]);
 
     useEffect(() => {
-      if (!socket) return;
+      if (!socket || !playerId) return;
 
-      const registerHit = () => {
-        socket.on("playerHit", (data) => {
-          console.log("onPlayerHit received", data);
-          if (data.victimId === socket.id) {
-            takeHit(data.attackType, data.attackTime);
-          }
-        });
+      const onPlayerHit = (data) => {
+        console.log("onPlayerHit received", data);
+        console.log("✅ Registered onPlayerHit for", playerId);
+        if (data.victimId === playerId) {
+          takeHit(data.attackType, data.attackTime);
+        }
       };
 
-      const delay = setTimeout(registerHit, 100); // give time for socket.id to be set
-      return () => {
-        clearTimeout(delay);
-        socket.off("playerHit");
-      };
-    }, [socket]);
+      socket.on("playerHit", onPlayerHit);
+      return () => socket.off("playerHit", onPlayerHit);
+    }, [socket, playerId]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
