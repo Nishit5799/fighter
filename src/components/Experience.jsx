@@ -151,8 +151,8 @@ const Experience = () => {
       setShowPopup(true);
       return;
     }
-
     unlockAllAudio();
+    audioUnlockedRef.current = true;
 
     const trimmedName = playerName.trim();
     if (trimmedName !== "" && !hasJoinedRoom) {
@@ -208,7 +208,8 @@ const Experience = () => {
   }, []);
 
   const handleReady = useCallback(() => {
-    unlockAllAudio(); // Ensure iOS context unlocked first
+    unlockAllAudio();
+    audioUnlockedRef.current = true;
 
     setTimeout(() => {
       if (socket) {
@@ -333,6 +334,7 @@ const Experience = () => {
 
     const handler = () => {
       unlockAllAudio();
+      audioUnlockedRef.current = true;
     };
 
     const opts = { passive: true };
@@ -442,7 +444,8 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      unlockAllAudio(); // ✅ ensure iOS AudioContext is resumed
+      unlockAllAudio();
+      audioUnlockedRef.current = true;
       let count = 3;
       setCountdown(count);
 
@@ -579,6 +582,7 @@ const Experience = () => {
                   isLocalPlayer={players[0]?.id === socket?.id}
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
+                  audioUnlockedRef={audioUnlockedRef}
                 />
                 <PlayerController
                   ref={carControllerRef2}
@@ -601,6 +605,7 @@ const Experience = () => {
                   isLocalPlayer={players[1]?.id === socket?.id}
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
+                  audioUnlockedRef={audioUnlockedRef}
                 />
               </>
             )}

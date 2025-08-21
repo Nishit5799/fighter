@@ -39,6 +39,7 @@ const PlayerController = forwardRef(
       opponentName,
       isLocalPlayer,
       opponentId,
+      audioUnlockedRef,
     },
     ref
   ) => {
@@ -51,6 +52,7 @@ const PlayerController = forwardRef(
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
+    const hasReceivedHit = useRef(false); // ✅ Track if hit landed
 
     // --- Refs ---
     const attackTimer = useRef(null);
@@ -88,6 +90,7 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
+    const audioUnlockedRef = useRef(true); // or get this from props/context
 
     // Init / teardown sounds
     useEffect(() => {
@@ -143,10 +146,15 @@ const PlayerController = forwardRef(
         console.warn("❌ Cannot attack: setup incomplete");
         return;
       }
+      if (audioUnlockedRef.current === false) {
+        console.warn("⚠️ Audio context not unlocked, blocking attack.");
+        return;
+      }
 
       const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
       setLastAttackTime(currentTime);
+      hasReceivedHit.current = false; // Reset before attack
 
       if (attackTimer.current) {
         clearTimeout(attackTimer.current);
@@ -175,6 +183,22 @@ const PlayerController = forwardRef(
           attackType: type,
           attackTime: currentTime,
         });
+        setTimeout(() => {
+          if (
+            !hasReceivedHit.current &&
+            !isDefeated &&
+            isLocalPlayer &&
+            !isHit
+          ) {
+            console.warn("⚠️ Hit not registered in time, forcing reload");
+            socket.emit("attackFailed", {
+              playerId: socket.id,
+              attackType: type,
+              time: Date.now(),
+            });
+            window.location.reload(); // 🔁 Force reload fallback
+          }
+        }, 1000); // 1 second timeout
       }
 
       const duration = 1000;
@@ -288,6 +312,7 @@ const PlayerController = forwardRef(
         console.log("✅ Registered onPlayerHit for", playerId);
 
         if (data.victimId === playerId) {
+          hasReceivedHit.current = true; // ✅ Confirm hit
           takeHit(data.attackType, data.attackTime);
         }
       };
