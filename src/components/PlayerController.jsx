@@ -271,19 +271,22 @@ const PlayerController = forwardRef(
     }, [health, isDefeated, opponentHealth, socket]);
 
     useEffect(() => {
-      if (!socket || !playerId) return;
-
+      if (!socket) return;
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
-        console.log("✅ Registered onPlayerHit for", playerId);
-        if (data.victimId === playerId) {
+        console.log(
+          "✅ Registered onPlayerHit for",
+          data.victimId,
+          "vs",
+          socket.id
+        );
+        if (data.victimId === socket.id) {
           takeHit(data.attackType, data.attackTime);
         }
       };
-
       socket.on("playerHit", onPlayerHit);
       return () => socket.off("playerHit", onPlayerHit);
-    }, [socket, playerId]);
+    }, [socket]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
