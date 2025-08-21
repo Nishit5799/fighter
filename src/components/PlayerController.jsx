@@ -90,7 +90,7 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
-    const audioUnlockedRef = useRef(true); // or get this from props/context
+   
 
     // Init / teardown sounds
     useEffect(() => {
