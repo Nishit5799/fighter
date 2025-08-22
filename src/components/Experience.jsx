@@ -131,16 +131,6 @@ const Experience = () => {
 
       Promise.all(warmups).finally(() => {
         audioUnlockedRef.current = true;
-        // Force playback to unlock audio context
-        if (beginSoundRef.current && audioContextRef.current) {
-          beginSoundRef.current
-            .play()
-            .then(() => {
-              beginSoundRef.current.pause();
-              beginSoundRef.current.currentTime = 0;
-            })
-            .catch(() => {});
-        }
       });
     } catch {
       audioUnlockedRef.current = true;
