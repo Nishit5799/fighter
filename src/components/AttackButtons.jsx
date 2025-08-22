@@ -49,39 +49,35 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
     if (!punchBtn || !kickBtn) return;
 
-    const options = { passive: false, capture: true };
+    const options = { passive: false };
 
     const touchPunchHandler = (e) => {
+      e.preventDefault();
       const success = handlePunchStart(e);
+      console.log("Punch triggered", Date.now());
       if (success) {
-        e.preventDefault();
         e.stopPropagation();
-        return false;
       }
-      return true;
+      return false;
     };
 
     const touchKickHandler = (e) => {
+      e.preventDefault();
       const success = handleKickStart(e);
+      console.log("Kick triggered", Date.now());
       if (success) {
-        e.preventDefault();
         e.stopPropagation();
-        return false;
       }
-      return true;
+      return false;
     };
-    punchBtn.addEventListener("touchstart", touchPunchHandler, options);
-    punchBtn.addEventListener("mousedown", handlePunchStart);
 
-    kickBtn.addEventListener("touchstart", touchKickHandler, options);
-    kickBtn.addEventListener("mousedown", handleKickStart);
+    // Prefer click for iOS reliability
+    punchBtn.addEventListener("click", touchPunchHandler, false);
+    kickBtn.addEventListener("click", touchKickHandler, false);
 
     return () => {
-      punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
-      punchBtn.removeEventListener("mousedown", handlePunchStart);
-
-      kickBtn.removeEventListener("touchstart", touchKickHandler, options);
-      kickBtn.removeEventListener("mousedown", handleKickStart);
+      punchBtn.removeEventListener("click", touchPunchHandler, false);
+      kickBtn.removeEventListener("click", touchKickHandler, false);
     };
   }, [punchCooldown, kickCooldown]);
 
@@ -128,6 +124,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
       <button
         ref={ref}
+        onFocus={() => console.log("Focused")} // Add this line for testing
         disabled={isCooldown}
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
