@@ -55,6 +55,7 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
   const beginSoundRef = useRef(null);
@@ -141,8 +142,6 @@ const Experience = () => {
     (name) => !players.some((player) => player.name === name),
     [players]
   );
-
-  const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Handlers (callbacks used by effects must be defined before those effects) ---
   const handleJoinRoom = useCallback(() => {
@@ -491,11 +490,19 @@ const Experience = () => {
 
   // ✅ ADD: Re-link after reset or restart
   useEffect(() => {
-    if (carControllerRef1.current && carControllerRef2.current) {
-      carControllerRef1.current.setOpponentRef(carControllerRef2.current);
-      carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+    const relink = () => {
+      if (carControllerRef1.current && carControllerRef2.current) {
+        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+      }
+    };
+
+    // Relink after game starts
+    if (isGameStarted) {
+      const timeout = setTimeout(relink, 100); // Give refs time to mount
+      return () => clearTimeout(timeout);
     }
-  }, [players]);
+  }, [isGameStarted, players]);
 
   // Restart countdown -> trigger reset
   useEffect(() => {
@@ -543,6 +550,7 @@ const Experience = () => {
               <>
                 <PlayerController
                   ref={carControllerRef1}
+                  key={players[0]?.id || "player1"} // 👈 forces remount when ID changes
                   playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
@@ -565,6 +573,7 @@ const Experience = () => {
                 <PlayerController
                   ref={carControllerRef2}
                   playerId={players[1]?.id}
+                  key={players[1]?.id || "player2"} // 👈 same for second player
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null

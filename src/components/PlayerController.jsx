@@ -136,75 +136,26 @@ const PlayerController = forwardRef(
       opponentRef.current = ref;
     };
 
-    const startAttack = (type) => {
-      if (isAttacking || isDefeated) return;
-
-      const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      const damage = type === "kick" ? 20 : 10;
-      const currentTime = Date.now();
-      setLastAttackTime(currentTime);
-
-      if (attackTimer.current) {
-        clearTimeout(attackTimer.current);
-      }
-
-      const sound = type === "kick" ? kickSound.current : punchSound.current;
-      if (sound) {
-        sound.currentTime = 0;
-        sound.play().catch((e) => console.log("Audio play failed:", e));
-      }
-
-      setIsAttacking(true);
-      movementEnabled.current = false;
-      setCurrentAnimation(type);
-
-      // ✅ Physics Nudge for iOS
-      if (isiOS && rb.current) {
-        const vel = rb.current.linvel();
-        const forwardNudge = new Vector3(
-          Math.sin(rotationTarget.current),
-          0.02, // slight vertical bump
-          Math.cos(rotationTarget.current)
-        )
-          .normalize()
-          .multiplyScalar(0.05); // minimal forward push
-
-        vel.x += forwardNudge.x;
-        vel.y += forwardNudge.y;
-        vel.z += forwardNudge.z;
-
-        rb.current.setLinvel(vel, true);
-
-        console.log("✅ iOS nudge applied:", forwardNudge);
-      }
-
-      console.log("🟡 Attacking", {
-        isInContact,
-        opponentExists: !!opponentRef.current,
-        opponentAlive: !opponentRef.current?.isDefeated,
-        isiOS,
+    if (
+      (isInContact || isiOS) &&
+      socket &&
+      opponentRef.current &&
+      !opponentRef.current.isDefeated
+    ) {
+      socket.emit("playerHit", {
+        attackerId: socket.id,
+        damage,
+        attackType: type,
+        attackTime: currentTime,
       });
 
-      if (
-        (isInContact || isiOS) &&
-        socket &&
-        opponentRef.current &&
-        !opponentRef.current.isDefeated
-      ) {
-        socket.emit("playerHit", {
-          attackerId: socket.id,
-          damage,
-          attackType: type,
-          attackTime: currentTime,
-        });
+      // ⛑ iOS FIX: manually trigger hit locally
+      if (isiOS) {
+        setTimeout(() => {
+          opponentRef.current?.takeHit?.(type, currentTime);
+        }, 30); // slight delay to simulate server bounce
       }
-
-      attackTimer.current = setTimeout(() => {
-        setIsAttacking(false);
-        movementEnabled.current = !isDefeated;
-        setCurrentAnimation(isDefeated ? "fall" : "idle");
-      }, 1000);
-    };
+    }
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
@@ -331,6 +282,12 @@ const PlayerController = forwardRef(
         setIsAttacking(false);
         hasEmittedDefeat.current = false;
         movementEnabled.current = true;
+        opponentAttackTime.current = 0;
+
+        // Optional: if your Cenaa or Stone component has a method to force-reset animations
+        if (character.current?.resetAnimation) {
+          character.current.resetAnimation(); // this won’t break anything if it doesn't exist
+        }
       };
 
       socket.on("startGame", handleStartGame);
@@ -474,6 +431,7 @@ const PlayerController = forwardRef(
     // Keep the object literal separate so we don’t capture stale refs above
     const wrapper = {
       setOpponentRef,
+      takeHit, // 👈 ADD THIS LINE
 
       setVictory: (isLocalPlayerWinner) => {
         setMatchResult("won");
