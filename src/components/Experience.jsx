@@ -142,6 +142,8 @@ const Experience = () => {
     [players]
   );
 
+  const localPlayer = players.find((p) => p.id === socket?.id);
+
   // --- Handlers (callbacks used by effects must be defined before those effects) ---
   const handleJoinRoom = useCallback(() => {
     if (!socket) {
@@ -758,8 +760,9 @@ const Experience = () => {
 
       {isGameStarted && (
         <AttackButtons
-          onPunch={(punching) => setIsPunching(punching)}
-          onKick={(kicking) => setIsKicking(kicking)}
+          key={localPlayer?.id || playerName} // 👈 unique per match or player
+          onPunch={setIsPunching}
+          onKick={setIsKicking}
         />
       )}
 

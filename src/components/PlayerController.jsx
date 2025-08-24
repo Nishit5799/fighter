@@ -304,6 +304,18 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!socket) return;
 
+      const handleStartGame = () => {
+        console.log("🔁 Resetting PlayerController for new game");
+
+        setIsDefeated(false);
+        setMatchResult(null);
+        setCurrentAnimation("idle");
+        setIsHit(false);
+        setIsAttacking(false);
+        hasEmittedDefeat.current = false;
+        movementEnabled.current = true;
+      };
+
       const onPlayerHit = (data) => {
         console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
@@ -313,9 +325,11 @@ const PlayerController = forwardRef(
       };
 
       socket.on("playerHit", onPlayerHit);
+      socket.on("startGame", handleStartGame);
 
       return () => {
         socket.off("playerHit", onPlayerHit);
+        socket.off("startGame", handleStartGame);
       };
     }, [socket]);
 

@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
+import { useSocket } from "../context/SocketContext";
 
 const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
   const kickRef = useRef();
+  const socket = useSocket();
 
   const [punchCooldown, setPunchCooldown] = useState(false);
   const [kickCooldown, setKickCooldown] = useState(false);
@@ -38,14 +40,21 @@ const AttackButtons = ({ onPunch, onKick }) => {
     return true;
   };
 
-  // Global iOS touch test (optional)
+  // Reset attack state on every new game
   useEffect(() => {
-    const debugTouch = () => console.log("TOUCH START registered (global)");
-    document.addEventListener("touchstart", debugTouch, { passive: false });
-    return () => {
-      document.removeEventListener("touchstart", debugTouch);
+    if (!socket) return;
+
+    const handleStartGame = () => {
+      setPunchCooldown(false);
+      setKickCooldown(false);
+      setFirstAttackDone(false);
     };
-  }, []);
+
+    socket.on("startGame", handleStartGame);
+    return () => {
+      socket.off("startGame", handleStartGame);
+    };
+  }, [socket]);
 
   const renderButton = (type, ref, icon, isCooldown, duration) => (
     <div className="relative w-16 h-16 select-none">
