@@ -38,40 +38,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
     return true;
   };
 
-  const handlePunchStart = (e) => handleAttackStart("punch", e);
-  const handleKickStart = (e) => handleAttackStart("kick", e);
-
-  useEffect(() => {
-    const punchBtn = punchRef.current;
-    const kickBtn = kickRef.current;
-    if (!punchBtn || !kickBtn) return;
-
-    const options = { passive: false };
-
-    const touchPunchHandler = (e) => {
-      const success = handlePunchStart(e);
-      return success ? false : true;
-    };
-
-    const touchKickHandler = (e) => {
-      const success = handleKickStart(e);
-      return success ? false : true;
-    };
-
-    punchBtn.addEventListener("touchstart", touchPunchHandler, options);
-    punchBtn.addEventListener("mousedown", handlePunchStart, options);
-    kickBtn.addEventListener("touchstart", touchKickHandler, options);
-    kickBtn.addEventListener("mousedown", handleKickStart, options);
-
-    return () => {
-      punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
-      punchBtn.removeEventListener("mousedown", handlePunchStart, options);
-      kickBtn.removeEventListener("touchstart", touchKickHandler, options);
-      kickBtn.removeEventListener("mousedown", handleKickStart, options);
-    };
-  }, [punchCooldown, kickCooldown]);
-
-  // Log for debugging iOS touch input
+  // Global iOS touch test (optional)
   useEffect(() => {
     const debugTouch = () => console.log("TOUCH START registered (global)");
     document.addEventListener("touchstart", debugTouch, { passive: false });
@@ -127,7 +94,14 @@ const AttackButtons = ({ onPunch, onKick }) => {
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
           active:bg-opacity-100 transition-all select-none user-select-none
           ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={(e) => !isCooldown && handleAttackStart(type, e)}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          !isCooldown && handleAttackStart(type, e);
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          !isCooldown && handleAttackStart(type, e);
+        }}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
