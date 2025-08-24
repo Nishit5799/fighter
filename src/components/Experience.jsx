@@ -462,7 +462,19 @@ const Experience = () => {
     socket.on("startGame", startGameHandler);
     socket.on("restartGame", restartGameHandler);
     socket.on("usernameTaken", usernameTakenHandler);
-    socket.on("playerHit", onPlayerHit);
+    socket.on("playerHit", (data) => {
+      const { attackerId, victimId, attackType, damage, attackTime } = data;
+
+      console.log("🔴 Received playerHit", {
+        attackerId,
+        victimId,
+        attackType,
+        damage,
+        attackTime,
+        isLocalPlayer:
+          socket.id === victimId ? "(I was hit)" : "(Opponent was hit)",
+      });
+    });
     socket.on("playerDefeated", onPlayerDefeated);
 
     return () => {
