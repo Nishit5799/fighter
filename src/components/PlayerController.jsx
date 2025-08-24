@@ -139,6 +139,7 @@ const PlayerController = forwardRef(
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
+      const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
       const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
       setLastAttackTime(currentTime);
@@ -147,42 +148,62 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+      const sound = type === "kick" ? kickSound.current : punchSound.current;
+      if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch((e) => console.log("Audio play failed:", e));
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
+      // ✅ Physics Nudge for iOS
+      if (isiOS && rb.current) {
+        const vel = rb.current.linvel();
+        const forwardNudge = new Vector3(
+          Math.sin(rotationTarget.current),
+          0.02, // slight vertical bump
+          Math.cos(rotationTarget.current)
+        )
+          .normalize()
+          .multiplyScalar(0.05); // minimal forward push
+
+        vel.x += forwardNudge.x;
+        vel.y += forwardNudge.y;
+        vel.z += forwardNudge.z;
+
+        rb.current.setLinvel(vel, true);
+
+        console.log("✅ iOS nudge applied:", forwardNudge);
+      }
+
+      console.log("🟡 Attacking", {
+        isInContact,
+        opponentExists: !!opponentRef.current,
+        opponentAlive: !opponentRef.current?.isDefeated,
+        isiOS,
+      });
+
       if (
-        isInContact &&
+        (isInContact || isiOS) &&
         socket &&
         opponentRef.current &&
         !opponentRef.current.isDefeated
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage,
+          damage,
           attackType: type,
-          attackTime: currentTime, // informational only; not used to reject hits
+          attackTime: currentTime,
         });
       }
 
-      const duration = 1000;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
         setCurrentAnimation(isDefeated ? "fall" : "idle");
-      }, duration);
+      }, 1000);
     };
 
     const takeHit = (attackType, attackTime) => {
