@@ -304,6 +304,23 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!socket) return;
 
+      const onPlayerHit = (data) => {
+        console.log("onPlayerHit received", data);
+        if (data.victimId === playerId) {
+          // ✅ precise match
+          takeHit(data.attackType, data.attackTime);
+        }
+      };
+
+      socket.on("playerHit", onPlayerHit);
+
+      return () => {
+        socket.off("playerHit", onPlayerHit);
+      };
+    }, [socket]);
+    useEffect(() => {
+      if (!socket) return;
+
       const handleStartGame = () => {
         console.log("🔁 Resetting PlayerController for new game");
 
@@ -316,21 +333,8 @@ const PlayerController = forwardRef(
         movementEnabled.current = true;
       };
 
-      const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
-        if (data.victimId === playerId) {
-          // ✅ precise match
-          takeHit(data.attackType, data.attackTime);
-        }
-      };
-
-      socket.on("playerHit", onPlayerHit);
       socket.on("startGame", handleStartGame);
-
-      return () => {
-        socket.off("playerHit", onPlayerHit);
-        socket.off("startGame", handleStartGame);
-      };
+      return () => socket.off("startGame", handleStartGame);
     }, [socket]);
 
     // --- Frame loop ---
