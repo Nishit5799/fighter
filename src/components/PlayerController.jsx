@@ -78,6 +78,10 @@ const PlayerController = forwardRef(
     const RUN_SPEED = 2.5;
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
+    // --- Attack ring config (shared by logic + visuals) ---
+    const ATTACK_RADIUS = 0.75; // tweak to adjust required distance
+    const RING_Y = 0.05; // slightly above floor to avoid z-fighting
+
     const rb = useRef();
     const container = useRef();
     const character = useRef();
@@ -89,6 +93,11 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
+
+    // Debug ring refs
+    const DEBUG_HIT_RANGE = true;
+    const debugRangeRef = useRef();
+    const debugMaterialRef = useRef();
 
     // Track opponent id (for logging)
     useEffect(() => {
@@ -137,16 +146,21 @@ const PlayerController = forwardRef(
       opponentRef.current = ref;
     };
 
-    const isCloseEnough = () => {
-      if (!opponentRef.current || !rb.current) return false;
-      const selfPos = rb.current.translation();
-      const otherPos = opponentRef.current.translation?.();
-      if (!otherPos) return false;
+    // 2D distance + "ring contact" helper (uses same ATTACK_RADIUS for both players)
+    const distance2D = (a, b) => {
+      const dx = a.x - b.x;
+      const dz = a.z - b.z;
+      return Math.sqrt(dx * dx + dz * dz);
+    };
 
-      const dx = selfPos.x - otherPos.x;
-      const dz = selfPos.z - otherPos.z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
-      return distance < 1.5; // 👈 You can tweak this threshold
+    const ringsInContact = () => {
+      if (!opponentRef.current || !rb.current) return false;
+      const selfPos = rb.current.translation?.();
+      const otherPos = opponentRef.current.translation?.();
+      if (!selfPos || !otherPos) return false;
+
+      // Same radius both sides → contact when distance ≤ 2R
+      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
@@ -171,7 +185,7 @@ const PlayerController = forwardRef(
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
-      // ✅ Physics Nudge for iOS
+      // ✅ Physics Nudge for iOS (does not override contact logic)
       if (isiOS && rb.current) {
         const vel = rb.current.linvel();
         const forwardNudge = new Vector3(
@@ -187,19 +201,10 @@ const PlayerController = forwardRef(
         vel.z += forwardNudge.z;
 
         rb.current.setLinvel(vel, true);
-
-        console.log("✅ iOS nudge applied:", forwardNudge);
       }
 
-      console.log("🟡 Attacking", {
-        isInContact,
-        opponentExists: !!opponentRef.current,
-        opponentAlive: !opponentRef.current?.isDefeated,
-        isiOS,
-      });
-
       if (
-        (isInContact || isCloseEnough()) &&
+        (isInContact || ringsInContact()) &&
         socket &&
         opponentRef.current &&
         !opponentRef.current?.isDefeated
@@ -222,14 +227,13 @@ const PlayerController = forwardRef(
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
 
-      // ❗️Do NOT compare foreign timestamps to local ones.
-      // We accept the hit and only use the timestamp for attribution/logging.
+      // Accept the hit; timestamp is for attribution/logging only
       opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
+          // iOS can block audio the first time; animation still runs
         });
       }
 
@@ -262,13 +266,6 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
-
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
       }
     };
 
@@ -297,11 +294,6 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
 
           socket.emit("playerDefeated", {
             winnerId: opponentRef.current.id,
@@ -318,9 +310,8 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
         if (data.victimId === playerId) {
-          // ✅ precise match
+          // precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -331,12 +322,11 @@ const PlayerController = forwardRef(
         socket.off("playerHit", onPlayerHit);
       };
     }, [socket]);
+
     useEffect(() => {
       if (!socket) return;
 
       const handleStartGame = () => {
-        console.log("🔁 Resetting PlayerController for new game");
-
         setIsDefeated(false);
         setMatchResult(null);
         setCurrentAnimation("idle");
@@ -346,15 +336,45 @@ const PlayerController = forwardRef(
         movementEnabled.current = true;
         opponentAttackTime.current = 0;
 
-        // Optional: if your Cenaa or Stone component has a method to force-reset animations
         if (character.current?.resetAnimation) {
-          character.current.resetAnimation(); // this won’t break anything if it doesn't exist
+          character.current.resetAnimation();
         }
       };
 
       socket.on("startGame", handleStartGame);
       return () => socket.off("startGame", handleStartGame);
     }, [socket]);
+
+    // --- Debug range (visual) ---
+    useEffect(() => {
+      if (!DEBUG_HIT_RANGE || !container.current) return;
+
+      const geometry = new CircleGeometry(ATTACK_RADIUS, 48);
+      const material = new MeshBasicMaterial({
+        color: 0xff0000,
+        opacity: 0.25,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+      });
+      debugMaterialRef.current = material;
+
+      const mesh = new Mesh(geometry, material);
+      mesh.rotation.x = -Math.PI / 2; // lay flat
+      mesh.position.set(0, RING_Y, 0); // center on player, slightly above floor
+      mesh.renderOrder = 9999; // draw on top
+
+      container.current.add(mesh);
+      debugRangeRef.current = mesh;
+
+      return () => {
+        if (container.current && debugRangeRef.current) {
+          container.current.remove(debugRangeRef.current);
+        }
+        geometry.dispose();
+        material.dispose();
+      };
+    }, []);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
@@ -467,6 +487,16 @@ const PlayerController = forwardRef(
           camera.lookAt(cameraLookAt.current);
         }
       }
+
+      // --- Live color feedback for ring contact (red → out, green → in) ---
+      if (DEBUG_HIT_RANGE && debugMaterialRef.current && opponentRef.current) {
+        const mine = rb.current?.translation?.();
+        const theirs = opponentRef.current.translation?.();
+        if (mine && theirs) {
+          const inRange = distance2D(mine, theirs) <= ATTACK_RADIUS * 2;
+          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
+        }
+      }
     });
 
     // --- Socket move sync (remote) ---
@@ -528,41 +558,6 @@ const PlayerController = forwardRef(
       rigidBody: rb.current,
       isDefeated,
     };
-
-    const DEBUG_HIT_RANGE = true;
-    const debugRangeRef = useRef();
-
-    useEffect(() => {
-      if (!DEBUG_HIT_RANGE || !container.current) return;
-
-      const radius = 0.5;
-      const geometry = new CircleGeometry(radius, 32);
-      const material = new MeshBasicMaterial({
-        color: 0xff0000,
-        opacity: 0.25,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
-      });
-
-      material.renderOrder = 999;
-
-      const mesh = new Mesh(geometry, material);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.y = 2.5;
-      mesh.position.z = 0;
-
-      container.current.add(mesh);
-      debugRangeRef.current = mesh;
-
-      return () => {
-        if (container.current && debugRangeRef.current) {
-          container.current.remove(debugRangeRef.current);
-        }
-        geometry.dispose();
-        material.dispose();
-      };
-    }, []);
 
     // Cleanup timeouts and audio refs on unmount
     useEffect(() => {
