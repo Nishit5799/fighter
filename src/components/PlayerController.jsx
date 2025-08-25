@@ -80,7 +80,7 @@ const PlayerController = forwardRef(
 
     // --- Attack ring config (shared by logic + visuals) ---
     const ATTACK_RADIUS = 0.75; // tweak to adjust required distance
-    const RING_Y = 0.05; // slightly above floor to avoid z-fighting
+    const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
     const container = useRef();
@@ -160,7 +160,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
+      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS;
     };
 
     const startAttack = (type) => {
@@ -349,7 +349,7 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!DEBUG_HIT_RANGE || !container.current) return;
 
-      const geometry = new CircleGeometry(ATTACK_RADIUS, 48);
+      const geometry = new CircleGeometry(ATTACK_RADIUS, 24);
       const material = new MeshBasicMaterial({
         color: 0xff0000,
         opacity: 0.25,
