@@ -535,7 +535,7 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!DEBUG_HIT_RANGE || !container.current) return;
 
-      const radius = 1.5;
+      const radius = 0.5;
       const geometry = new CircleGeometry(radius, 32);
       const material = new MeshBasicMaterial({
         color: 0xff0000,
@@ -549,7 +549,8 @@ const PlayerController = forwardRef(
 
       const mesh = new Mesh(geometry, material);
       mesh.rotation.x = -Math.PI / 2;
-      mesh.position.y = 0.05;
+      mesh.position.y = 2.5;
+      mesh.position.z = 0;
 
       container.current.add(mesh);
       debugRangeRef.current = mesh;
