@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
 import { Vector3 } from "three";
+import { CircleGeometry, MeshBasicMaterial, Mesh } from "three";
 import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import { MathUtils } from "three/src/math/MathUtils";
@@ -136,6 +137,18 @@ const PlayerController = forwardRef(
       opponentRef.current = ref;
     };
 
+    const isCloseEnough = () => {
+      if (!opponentRef.current || !rb.current) return false;
+      const selfPos = rb.current.translation();
+      const otherPos = opponentRef.current.translation?.();
+      if (!otherPos) return false;
+
+      const dx = selfPos.x - otherPos.x;
+      const dz = selfPos.z - otherPos.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+      return distance < 1.5; // 👈 You can tweak this threshold
+    };
+
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
@@ -185,26 +198,11 @@ const PlayerController = forwardRef(
         isiOS,
       });
 
-      const selfPos = rb.current?.translation?.();
-      const oppPos = opponentRef.current?.rigidBody?.translation?.();
-
-      const distance =
-        selfPos && oppPos
-          ? Math.sqrt(
-              (selfPos.x - oppPos.x) ** 2 +
-                (selfPos.y - oppPos.y) ** 2 +
-                (selfPos.z - oppPos.z) ** 2
-            )
-          : Infinity;
-
-      const hitRange = 1.8; // Adjust as needed — this defines how close they must be
-      console.log("Attack distance:", distance);
-
       if (
+        (isInContact || isCloseEnough()) &&
         socket &&
         opponentRef.current &&
-        !opponentRef.current.isDefeated &&
-        distance < hitRange
+        !opponentRef.current?.isDefeated
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
@@ -530,6 +528,37 @@ const PlayerController = forwardRef(
       rigidBody: rb.current,
       isDefeated,
     };
+
+    const DEBUG_HIT_RANGE = true;
+    const debugRangeRef = useRef();
+
+    useEffect(() => {
+      if (!DEBUG_HIT_RANGE || !container.current) return;
+
+      const radius = 1.5;
+      const geometry = new CircleGeometry(radius, 32);
+      const material = new MeshBasicMaterial({
+        color: 0xff0000,
+        opacity: 0.25,
+        transparent: true,
+        depthWrite: false,
+      });
+
+      const mesh = new Mesh(geometry, material);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = 0.05;
+
+      container.current.add(mesh);
+      debugRangeRef.current = mesh;
+
+      return () => {
+        if (container.current && debugRangeRef.current) {
+          container.current.remove(debugRangeRef.current);
+        }
+        geometry.dispose();
+        material.dispose();
+      };
+    }, []);
 
     // Cleanup timeouts and audio refs on unmount
     useEffect(() => {
