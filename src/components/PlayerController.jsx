@@ -542,7 +542,10 @@ const PlayerController = forwardRef(
         opacity: 0.25,
         transparent: true,
         depthWrite: false,
+        depthTest: false,
       });
+
+      material.renderOrder = 999;
 
       const mesh = new Mesh(geometry, material);
       mesh.rotation.x = -Math.PI / 2;
