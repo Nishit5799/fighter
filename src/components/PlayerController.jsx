@@ -185,11 +185,26 @@ const PlayerController = forwardRef(
         isiOS,
       });
 
+      const selfPos = rb.current?.translation?.();
+      const oppPos = opponentRef.current?.rigidBody?.translation?.();
+
+      const distance =
+        selfPos && oppPos
+          ? Math.sqrt(
+              (selfPos.x - oppPos.x) ** 2 +
+                (selfPos.y - oppPos.y) ** 2 +
+                (selfPos.z - oppPos.z) ** 2
+            )
+          : Infinity;
+
+      const hitRange = 1.8; // Adjust as needed — this defines how close they must be
+      console.log("Attack distance:", distance);
+
       if (
-        (isInContact || isiOS) &&
         socket &&
         opponentRef.current &&
-        !opponentRef.current.isDefeated
+        !opponentRef.current.isDefeated &&
+        distance < hitRange
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
