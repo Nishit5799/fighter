@@ -79,7 +79,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const ATTACK_RADIUS = 0.75; // tweak to adjust required distance
+    const ATTACK_RADIUS = 0.01; // tweak to adjust required distance
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
@@ -160,7 +160,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return distance2D(selfPos, otherPos) >= ATTACK_RADIUS * 2;
+      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
@@ -310,18 +310,21 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        if (data.victimId === playerId) {
-          // precise match
+        // Only process if this client is the intended victim
+        if (data.victimId !== playerId) return;
+
+        // ✅ Re-check range on receipt to avoid ghost hits
+        if (ringsInContact()) {
           takeHit(data.attackType, data.attackTime);
+        } else {
+          // Optional debug:
+          // console.log("Ignored hit: out of range on receipt");
         }
       };
 
       socket.on("playerHit", onPlayerHit);
-
-      return () => {
-        socket.off("playerHit", onPlayerHit);
-      };
-    }, [socket]);
+      return () => socket.off("playerHit", onPlayerHit);
+    }, [socket, playerId]);
 
     useEffect(() => {
       if (!socket) return;
