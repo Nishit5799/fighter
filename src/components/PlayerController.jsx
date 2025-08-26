@@ -378,21 +378,6 @@ const PlayerController = forwardRef(
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
-      if (
-        DEBUG_HIT_RANGE &&
-        debugMaterialRef.current &&
-        rb.current &&
-        opponentRef.current
-      ) {
-        const mine = rb.current.translation?.();
-        const theirs = opponentRef.current.translation?.();
-        if (mine && theirs) {
-          const dist = distance2D(mine, theirs);
-          const inRange = dist <= ATTACK_RADIUS * 2;
-          // ✅ Green when touching/overlapping, red when not
-          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
-        }
-      }
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
       const vel = rb.current.linvel();
