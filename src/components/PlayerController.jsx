@@ -160,7 +160,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
+      return distance2D(selfPos, otherPos) >= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
