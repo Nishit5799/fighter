@@ -79,7 +79,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const ATTACK_RADIUS = 0.01; // tweak to adjust required distance
+    const ATTACK_RADIUS = 0.75; // tweak to adjust required distance
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
@@ -310,21 +310,18 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        // Only process if this client is the intended victim
-        if (data.victimId !== playerId) return;
-
-        // ✅ Re-check range on receipt to avoid ghost hits
-        if (ringsInContact()) {
+        if (data.victimId === playerId) {
+          // precise match
           takeHit(data.attackType, data.attackTime);
-        } else {
-          // Optional debug:
-          // console.log("Ignored hit: out of range on receipt");
         }
       };
 
       socket.on("playerHit", onPlayerHit);
-      return () => socket.off("playerHit", onPlayerHit);
-    }, [socket, playerId]);
+
+      return () => {
+        socket.off("playerHit", onPlayerHit);
+      };
+    }, [socket]);
 
     useEffect(() => {
       if (!socket) return;
@@ -364,7 +361,7 @@ const PlayerController = forwardRef(
 
       const mesh = new Mesh(geometry, material);
       mesh.rotation.x = -Math.PI / 2; // lay flat
-      mesh.position.set(0, RING_Y, 0); // purely visual height
+      mesh.position.set(0, RING_Y, 0); // center on player, slightly above floor
       mesh.renderOrder = 9999; // draw on top
 
       container.current.add(mesh);
@@ -381,24 +378,6 @@ const PlayerController = forwardRef(
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
-      if (
-        DEBUG_HIT_RANGE &&
-        debugMaterialRef.current &&
-        rb.current &&
-        opponentRef.current
-      ) {
-        const mine = rb.current.translation?.();
-        const theirs = opponentRef.current.translation?.();
-        if (mine && theirs) {
-          const dist = distance2D(mine, theirs);
-          const inRange = dist <= ATTACK_RADIUS * 2;
-          // ✅ Green when touching/overlapping, red when not
-          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
-
-          // (Optional) quick sanity log:
-          // console.log('dist', dist.toFixed(2), 'thr', (ATTACK_RADIUS*2).toFixed(2), 'inRange', inRange);
-        }
-      }
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
       const vel = rb.current.linvel();
