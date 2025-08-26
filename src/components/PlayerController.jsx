@@ -160,7 +160,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS;
+      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
@@ -349,7 +349,7 @@ const PlayerController = forwardRef(
     useEffect(() => {
       if (!DEBUG_HIT_RANGE || !container.current) return;
 
-      const geometry = new CircleGeometry(ATTACK_RADIUS, 24);
+      const geometry = new CircleGeometry(ATTACK_RADIUS, 48);
       const material = new MeshBasicMaterial({
         color: 0xff0000,
         opacity: 0.25,
@@ -361,7 +361,7 @@ const PlayerController = forwardRef(
 
       const mesh = new Mesh(geometry, material);
       mesh.rotation.x = -Math.PI / 2; // lay flat
-      mesh.position.set(0, RING_Y, 0); // center on player, slightly above floor
+      mesh.position.set(0, RING_Y, 0); // purely visual height
       mesh.renderOrder = 9999; // draw on top
 
       container.current.add(mesh);
@@ -378,6 +378,24 @@ const PlayerController = forwardRef(
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
+      if (
+        DEBUG_HIT_RANGE &&
+        debugMaterialRef.current &&
+        rb.current &&
+        opponentRef.current
+      ) {
+        const mine = rb.current.translation?.();
+        const theirs = opponentRef.current.translation?.();
+        if (mine && theirs) {
+          const dist = distance2D(mine, theirs);
+          const inRange = dist <= ATTACK_RADIUS * 2;
+          // ✅ Green when touching/overlapping, red when not
+          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
+
+          // (Optional) quick sanity log:
+          // console.log('dist', dist.toFixed(2), 'thr', (ATTACK_RADIUS*2).toFixed(2), 'inRange', inRange);
+        }
+      }
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
       const vel = rb.current.linvel();
