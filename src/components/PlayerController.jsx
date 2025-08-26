@@ -80,7 +80,7 @@ const PlayerController = forwardRef(
 
     // --- Attack ring config (shared by logic + visuals) ---
     const ATTACK_RADIUS = 0.75; // tweak to adjust required distance
-    const RING_Y = 2.5; // slightly above floor to avoid z-fighting
+    const RING_Y = 0.05; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
     const container = useRef();
