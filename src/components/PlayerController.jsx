@@ -178,6 +178,11 @@ const PlayerController = forwardRef(
       const dz = a.z - b.z;
       return Math.sqrt(dx * dx + dz * dz);
     };
+    const edgeDistance = (a, b) => {
+      const centerDist = groundDistance(a, b);
+      const separation = centerDist - attackRadius * 2; // 2R (both players)
+      return Math.max(separation, 0); // clamp at 0 when touching/overlapping
+    };
 
     const ringsInContact = () => {
       if (!opponentRef.current || !rb.current) return false;
@@ -186,7 +191,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return groundDistance(selfPos, otherPos) <= attackRadius * 2;
+      return edgeDistance(selfPos, otherPos) <= 0;
     };
 
     const startAttack = (type) => {
@@ -197,15 +202,12 @@ const PlayerController = forwardRef(
         const otherPos = opponentRef.current.translation?.();
 
         if (selfPos && otherPos) {
-          const distance = groundDistance(selfPos, otherPos);
+          const distance = edgeDistance(selfPos, otherPos);
           console.log(
-            `[${type.toUpperCase()}] Ground Distance to opponent:`,
+            `[${type.toUpperCase()}] Edge Distance to opponent:`,
             distance.toFixed(3)
           );
-          console.log(
-            `[${type.toUpperCase()}] In range:`,
-            distance <= attackRadius * 2
-          );
+          console.log(`[${type.toUpperCase()}] In range:`, distance <= 0);
         }
       }
 
@@ -551,10 +553,12 @@ const PlayerController = forwardRef(
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
         if (showDebug && distanceLabelRef.current && mine && theirs) {
-          const d = groundDistance(mine, theirs);
-          distanceLabelRef.current.textContent = `dist: ${d.toFixed(
-            2
-          )} | R: ${attackRadius.toFixed(2)}`;
+          const d = edgeDistance(mine, theirs);
+          const inRange = d <= 0;
+          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
+          distanceLabelRef.current.textContent = `${
+            isPlayer1 ? "P1" : "P2"
+          } dist: ${d.toFixed(2)} | R: ${attackRadius.toFixed(2)}`;
         }
       }
     });
