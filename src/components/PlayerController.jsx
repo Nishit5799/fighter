@@ -178,7 +178,7 @@ const PlayerController = forwardRef(
           );
           console.log(
             `[${type.toUpperCase()}] In range:`,
-            distance <= ATTACK_RADIUS * 2
+            distance >= ATTACK_RADIUS * 2
           );
         }
       }
