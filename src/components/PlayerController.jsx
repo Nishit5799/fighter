@@ -181,10 +181,10 @@ const PlayerController = forwardRef(
     const edgeDistance = (a, b, isPlayer1) => {
       const centerDist = groundDistance(a, b);
       const separation = centerDist - attackRadius * 2;
-      const val = Math.max(separation, 0); // clamp at 0 so no negatives on overlap
+      // separation < 0 means overlap
 
-      // Player 1 sees +val, Player 2 sees -val
-      return isPlayer1 ? val : -val;
+      // Player 1 sees +separation, Player 2 sees -separation
+      return isPlayer1 ? separation : -separation;
     };
 
     const ringsInContact = () => {
@@ -194,7 +194,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return groundDistance(selfPos, otherPos) <= attackRadius * 2;
+      return Math.abs(edgeDistance(selfPos, otherPos, isPlayer1)) <= 0;
     };
 
     const startAttack = (type) => {
@@ -558,11 +558,24 @@ const PlayerController = forwardRef(
         if (showDebug && distanceLabelRef.current && mine && theirs) {
           const d = edgeDistance(mine, theirs, isPlayer1);
 
-          const inRange = d <= 0;
-          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
-          distanceLabelRef.current.textContent = `${
-            isPlayer1 ? "P1" : "P2"
-          } dist: ${d.toFixed(2)} | R: ${attackRadius.toFixed(2)}`;
+          // Color code based on signed distance
+          if (d > 0) {
+            // too far
+            debugMaterialRef.current.color.set(0xff0000); // red
+          } else if (d < 0) {
+            // overlapping from this player's perspective
+            debugMaterialRef.current.color.set(0x0000ff); // blue
+          } else {
+            // exactly in contact
+            debugMaterialRef.current.color.set(0x00ff00); // green
+          }
+
+          // Update label text
+          if (distanceLabelRef.current) {
+            distanceLabelRef.current.textContent = `${
+              isPlayer1 ? "P1" : "P2"
+            } dist: ${d.toFixed(2)} | R: ${attackRadius.toFixed(2)}`;
+          }
         }
       }
     });
