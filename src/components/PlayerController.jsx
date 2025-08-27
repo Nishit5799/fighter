@@ -9,7 +9,7 @@ import { CapsuleCollider, RigidBody } from "@react-three/rapier";
 import { Vector3, Box3 } from "three";
 import { CircleGeometry, MeshBasicMaterial, Mesh } from "three";
 import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls } from "@react-three/drei";
+import { useKeyboardControls, Html } from "@react-three/drei";
 import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
@@ -51,6 +51,7 @@ const PlayerController = forwardRef(
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
+    const [showDebug, setShowDebug] = useState(true);
 
     // --- Refs ---
     const attackTimer = useRef(null);
@@ -140,6 +141,18 @@ const PlayerController = forwardRef(
       window.addEventListener("resize", handleResize);
       return () => window.removeEventListener("resize", handleResize);
     }, []);
+
+    // Toggle debug visuals with "R" key
+    useEffect(() => {
+      const onKeyDown = (e) => {
+        if (e.key.toLowerCase() === "r") {
+          setShowDebug((s) => !s);
+          console.log(`[DEBUG] Range visuals: ${!showDebug ? "ON" : "OFF"}`);
+        }
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }, [showDebug]);
 
     // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
@@ -376,15 +389,20 @@ const PlayerController = forwardRef(
 
     // --- Debug range (visual) ---
     useEffect(() => {
-      if (!DEBUG_HIT_RANGE || !container.current || !attackRadius) return;
+      if (!container.current) return;
 
-      // Clean up previous
+      // Clean previous ring if any
       if (debugRangeRef.current) {
         container.current.remove(debugRangeRef.current);
-        debugRangeRef.current.geometry.dispose();
-        debugRangeRef.current.material.dispose();
+        debugRangeRef.current.geometry?.dispose?.();
+        debugRangeRef.current.material?.dispose?.();
+        debugRangeRef.current = null;
+        debugMaterialRef.current = null;
       }
 
+      if (!showDebug || !attackRadius) return;
+
+      // Rebuild ring with current attackRadius
       const geometry = new CircleGeometry(attackRadius, 48);
       const material = new MeshBasicMaterial({
         color: 0xff0000,
@@ -393,10 +411,9 @@ const PlayerController = forwardRef(
         depthWrite: false,
         depthTest: false,
       });
-
       const mesh = new Mesh(geometry, material);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(0, RING_Y, 0);
+      mesh.rotation.x = -Math.PI / 2; // flat
+      mesh.position.set(0, RING_Y, 0); // slightly above floor
       mesh.renderOrder = 9999;
 
       container.current.add(mesh);
@@ -404,13 +421,13 @@ const PlayerController = forwardRef(
       debugMaterialRef.current = material;
 
       return () => {
-        if (debugRangeRef.current) {
+        if (container.current && debugRangeRef.current) {
           container.current.remove(debugRangeRef.current);
         }
         geometry.dispose();
         material.dispose();
       };
-    }, [attackRadius]);
+    }, [attackRadius, showDebug]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
@@ -525,7 +542,7 @@ const PlayerController = forwardRef(
       }
 
       // --- Live color feedback for ring contact (red → out, green → in) ---
-      if (DEBUG_HIT_RANGE && debugMaterialRef.current && opponentRef.current) {
+      if (showDebug && debugMaterialRef.current && opponentRef.current) {
         const mine = rb.current?.translation?.();
         const theirs = opponentRef.current.translation?.();
         if (mine && theirs) {
