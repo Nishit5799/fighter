@@ -147,10 +147,11 @@ const PlayerController = forwardRef(
     };
 
     // 2D distance + "ring contact" helper (uses same ATTACK_RADIUS for both players)
-    const distance2D = (a, b) => {
+    const distance3D = (a, b) => {
       const dx = a.x - b.x;
+      const dy = a.y - b.y;
       const dz = a.z - b.z;
-      return Math.sqrt(dx * dx + dz * dz);
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
     };
 
     const ringsInContact = () => {
@@ -160,7 +161,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return distance2D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
+      return distance3D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
@@ -171,16 +172,13 @@ const PlayerController = forwardRef(
         const otherPos = opponentRef.current.translation?.();
 
         if (selfPos && otherPos) {
-          const dx = selfPos.x - otherPos.x;
-          const dz = selfPos.z - otherPos.z;
-          const distance = Math.sqrt(dx * dx + dz * dz);
-
+          const distance = distance3D(selfPos, otherPos); // 👈 using new 3D version
           console.log(
-            `[${type.toUpperCase()}] Distance to opponent:`,
-            distance.toFixed(2)
+            `[${type.toUpperCase()}] 3D Distance to opponent:`,
+            distance.toFixed(3)
           );
           console.log(
-            `[${type.toUpperCase()}] Is in range:`,
+            `[${type.toUpperCase()}] In range:`,
             distance <= ATTACK_RADIUS * 2
           );
         }
