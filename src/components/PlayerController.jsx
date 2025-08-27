@@ -143,18 +143,6 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // Toggle debug visuals with "R" key
-    useEffect(() => {
-      const onKeyDown = (e) => {
-        if (e.key.toLowerCase() === "r") {
-          setShowDebug((s) => !s);
-          console.log(`[DEBUG] Range visuals: ${!showDebug ? "ON" : "OFF"}`);
-        }
-      };
-      window.addEventListener("keydown", onKeyDown);
-      return () => window.removeEventListener("keydown", onKeyDown);
-    }, [showDebug]);
-
     // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
@@ -712,7 +700,7 @@ const PlayerController = forwardRef(
               onIntersectionExit={handleCollisionExit}
             />
             {/* 👇 Debug label follows player */}
-            {showDebug && (
+            {/* {showDebug && (
               <Html position={[0, RING_Y + 0.5, 0]} center>
                 <div
                   style={{
@@ -728,7 +716,7 @@ const PlayerController = forwardRef(
                   <span ref={distanceLabelRef}>…</span>
                 </div>
               </Html>
-            )}
+            )} */}
           </group>
         </group>
       </RigidBody>
