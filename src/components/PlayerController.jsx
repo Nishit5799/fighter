@@ -80,7 +80,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const [attackRadius, setAttackRadius] = useState(0); // fallback
+    const [attackRadius, setAttackRadius] = useState(1.2); // fallback
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
@@ -194,7 +194,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return Math.abs(edgeDistance(selfPos, otherPos, isPlayer1)) <= 0;
+      return groundDistance(selfPos, otherPos) <= attackRadius * 2;
     };
 
     const startAttack = (type) => {
@@ -552,7 +552,7 @@ const PlayerController = forwardRef(
         const mine = rb.current?.translation?.();
         const theirs = opponentRef.current.translation?.();
         if (mine && theirs) {
-          const inRange = groundDistance(mine, theirs) >= attackRadius * 2;
+          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
         if (showDebug && distanceLabelRef.current && mine && theirs) {
@@ -576,7 +576,7 @@ const PlayerController = forwardRef(
       if (mine && theirs) {
         // Update debug ring color
         if (debugMaterialRef.current) {
-          const inRange = groundDistance(mine, theirs) >= attackRadius * 2;
+          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
 
