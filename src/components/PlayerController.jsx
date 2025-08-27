@@ -99,6 +99,7 @@ const PlayerController = forwardRef(
     const DEBUG_HIT_RANGE = true;
     const debugRangeRef = useRef();
     const debugMaterialRef = useRef();
+    const distanceLabelRef = useRef(null);
 
     // Track opponent id (for logging)
     useEffect(() => {
@@ -549,6 +550,35 @@ const PlayerController = forwardRef(
           const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
+        if (showDebug && distanceLabelRef.current && mine && theirs) {
+          const d = groundDistance(mine, theirs);
+          distanceLabelRef.current.textContent = `dist: ${d.toFixed(
+            2
+          )} | R: ${attackRadius.toFixed(2)}`;
+        }
+      }
+    });
+    // --- Debug frame loop (runs for both players) ---
+    useFrame(() => {
+      if (!showDebug || !rb.current || !opponentRef.current) return;
+
+      const mine = rb.current.translation?.();
+      const theirs = opponentRef.current.translation?.();
+
+      if (mine && theirs) {
+        // Update debug ring color
+        if (debugMaterialRef.current) {
+          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
+          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
+        }
+
+        // Update distance label text
+        if (distanceLabelRef.current) {
+          const d = groundDistance(mine, theirs);
+          distanceLabelRef.current.textContent = `dist: ${d.toFixed(
+            2
+          )} | R: ${attackRadius.toFixed(2)}`;
+        }
       }
     });
 
@@ -700,6 +730,24 @@ const PlayerController = forwardRef(
               onIntersectionEnter={handleCollisionEnter}
               onIntersectionExit={handleCollisionExit}
             />
+            {/* 👇 Debug label follows player */}
+            {showDebug && (
+              <Html position={[0, RING_Y + 0.5, 0]} center>
+                <div
+                  style={{
+                    padding: "4px 8px",
+                    background: "rgba(0,0,0,0.6)",
+                    color: "white",
+                    fontSize: 12,
+                    borderRadius: 6,
+                    whiteSpace: "nowrap",
+                    userSelect: "none",
+                  }}
+                >
+                  <span ref={distanceLabelRef}>…</span>
+                </div>
+              </Html>
+            )}
           </group>
         </group>
       </RigidBody>
