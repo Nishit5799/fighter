@@ -164,8 +164,27 @@ const PlayerController = forwardRef(
     };
 
     const startAttack = (type) => {
-      console.log("Current ATTACK_RADIUS:", ATTACK_RADIUS); // 👈 Add this line
       if (isAttacking || isDefeated) return;
+
+      if (rb.current && opponentRef.current) {
+        const selfPos = rb.current.translation?.();
+        const otherPos = opponentRef.current.translation?.();
+
+        if (selfPos && otherPos) {
+          const dx = selfPos.x - otherPos.x;
+          const dz = selfPos.z - otherPos.z;
+          const distance = Math.sqrt(dx * dx + dz * dz);
+
+          console.log(
+            `[${type.toUpperCase()}] Distance to opponent:`,
+            distance.toFixed(2)
+          );
+          console.log(
+            `[${type.toUpperCase()}] Is in range:`,
+            distance <= ATTACK_RADIUS * 2
+          );
+        }
+      }
 
       const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
       const damage = type === "kick" ? 20 : 10;
