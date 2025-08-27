@@ -80,7 +80,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const [attackRadius, setAttackRadius] = useState(1.2); // fallback
+    const [attackRadius, setAttackRadius] = useState(0); // fallback
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
