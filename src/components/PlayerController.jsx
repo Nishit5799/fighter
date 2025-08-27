@@ -552,7 +552,7 @@ const PlayerController = forwardRef(
         const mine = rb.current?.translation?.();
         const theirs = opponentRef.current.translation?.();
         if (mine && theirs) {
-          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
+          const inRange = groundDistance(mine, theirs) >= attackRadius * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
         if (showDebug && distanceLabelRef.current && mine && theirs) {
@@ -576,7 +576,7 @@ const PlayerController = forwardRef(
       if (mine && theirs) {
         // Update debug ring color
         if (debugMaterialRef.current) {
-          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
+          const inRange = groundDistance(mine, theirs) >= attackRadius * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
 
