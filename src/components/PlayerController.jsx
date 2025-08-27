@@ -79,7 +79,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const ATTACK_RADIUS = 1.2; // tweak to adjust required distance
+    const ATTACK_RADIUS = 0.5; // tweak to adjust required distance
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
@@ -160,7 +160,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return groundDistance(selfPos, otherPos) <= ATTACK_RADIUS * 2;
+      return groundDistance(selfPos, otherPos) >= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
