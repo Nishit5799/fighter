@@ -79,7 +79,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const ATTACK_RADIUS = 0.1; // tweak to adjust required distance
+    const ATTACK_RADIUS = 1.2; // tweak to adjust required distance
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
@@ -147,11 +147,10 @@ const PlayerController = forwardRef(
     };
 
     // 2D distance + "ring contact" helper (uses same ATTACK_RADIUS for both players)
-    const distance3D = (a, b) => {
+    const groundDistance = (a, b) => {
       const dx = a.x - b.x;
-      const dy = a.y - b.y;
       const dz = a.z - b.z;
-      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+      return Math.sqrt(dx * dx + dz * dz);
     };
 
     const ringsInContact = () => {
@@ -161,7 +160,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return distance3D(selfPos, otherPos) <= ATTACK_RADIUS * 2;
+      return groundDistance(selfPos, otherPos) <= ATTACK_RADIUS * 2;
     };
 
     const startAttack = (type) => {
@@ -172,9 +171,9 @@ const PlayerController = forwardRef(
         const otherPos = opponentRef.current.translation?.();
 
         if (selfPos && otherPos) {
-          const distance = distance3D(selfPos, otherPos); // 👈 using new 3D version
+          const distance = groundDistance(selfPos, otherPos);
           console.log(
-            `[${type.toUpperCase()}] 3D Distance to opponent:`,
+            `[${type.toUpperCase()}] Ground Distance to opponent:`,
             distance.toFixed(3)
           );
           console.log(
