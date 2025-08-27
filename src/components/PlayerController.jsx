@@ -394,46 +394,6 @@ const PlayerController = forwardRef(
     }, [socket]);
 
     // --- Debug range (visual) ---
-    useEffect(() => {
-      if (!container.current) return;
-
-      // Clean previous ring if any
-      if (debugRangeRef.current) {
-        container.current.remove(debugRangeRef.current);
-        debugRangeRef.current.geometry?.dispose?.();
-        debugRangeRef.current.material?.dispose?.();
-        debugRangeRef.current = null;
-        debugMaterialRef.current = null;
-      }
-
-      if (!showDebug || !attackRadius) return;
-
-      // Rebuild ring with current attackRadius
-      const geometry = new CircleGeometry(attackRadius, 48);
-      const material = new MeshBasicMaterial({
-        color: 0xff0000,
-        opacity: 0.25,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
-      });
-      const mesh = new Mesh(geometry, material);
-      mesh.rotation.x = -Math.PI / 2; // flat
-      mesh.position.set(0, RING_Y, 0); // slightly above floor
-      mesh.renderOrder = 9999;
-
-      container.current.add(mesh);
-      debugRangeRef.current = mesh;
-      debugMaterialRef.current = material;
-
-      return () => {
-        if (container.current && debugRangeRef.current) {
-          container.current.remove(debugRangeRef.current);
-        }
-        geometry.dispose();
-        material.dispose();
-      };
-    }, [attackRadius, showDebug]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
