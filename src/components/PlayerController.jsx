@@ -178,10 +178,13 @@ const PlayerController = forwardRef(
       const dz = a.z - b.z;
       return Math.sqrt(dx * dx + dz * dz);
     };
-    const edgeDistance = (a, b) => {
+    const edgeDistance = (a, b, isPlayer1) => {
       const centerDist = groundDistance(a, b);
-      const separation = centerDist - attackRadius * 2; // 2R (both players)
-      return Math.max(separation, 0); // clamp at 0 when touching/overlapping
+      const separation = centerDist - attackRadius * 2;
+      const val = Math.max(separation, 0); // clamp at 0 so no negatives on overlap
+
+      // Player 1 sees +val, Player 2 sees -val
+      return isPlayer1 ? val : -val;
     };
 
     const ringsInContact = () => {
@@ -191,7 +194,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return edgeDistance(selfPos, otherPos) <= 0;
+      return Math.abs(edgeDistance(selfPos, otherPos, isPlayer1)) <= 0;
     };
 
     const startAttack = (type) => {
@@ -553,7 +556,8 @@ const PlayerController = forwardRef(
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
         if (showDebug && distanceLabelRef.current && mine && theirs) {
-          const d = edgeDistance(mine, theirs);
+          const d = edgeDistance(mine, theirs, isPlayer1);
+
           const inRange = d <= 0;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
           distanceLabelRef.current.textContent = `${
