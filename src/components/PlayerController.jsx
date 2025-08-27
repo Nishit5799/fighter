@@ -510,7 +510,7 @@ const PlayerController = forwardRef(
         const mine = rb.current?.translation?.();
         const theirs = opponentRef.current.translation?.();
         if (mine && theirs) {
-          const inRange = distance3D(mine, theirs) <= ATTACK_RADIUS * 2;
+          const inRange = groundDistance(mine, theirs) <= ATTACK_RADIUS * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
       }
