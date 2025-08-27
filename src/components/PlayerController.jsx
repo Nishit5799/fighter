@@ -164,6 +164,7 @@ const PlayerController = forwardRef(
     };
 
     const startAttack = (type) => {
+      console.log("Current ATTACK_RADIUS:", ATTACK_RADIUS); // 👈 Add this line
       if (isAttacking || isDefeated) return;
 
       const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
