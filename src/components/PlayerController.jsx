@@ -6,7 +6,7 @@ import React, {
   useImperativeHandle,
 } from "react";
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
-import { Vector3 } from "three";
+import { Vector3, Box3 } from "three";
 import { CircleGeometry, MeshBasicMaterial, Mesh } from "three";
 import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
@@ -79,7 +79,7 @@ const PlayerController = forwardRef(
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
     // --- Attack ring config (shared by logic + visuals) ---
-    const ATTACK_RADIUS = 0.5; // tweak to adjust required distance
+    const [attackRadius, setAttackRadius] = useState(1.2); // fallback
     const RING_Y = 2.5; // slightly above floor to avoid z-fighting
 
     const rb = useRef();
@@ -146,6 +146,18 @@ const PlayerController = forwardRef(
       opponentRef.current = ref;
     };
 
+    useEffect(() => {
+      if (!character.current) return;
+
+      const box = new Box3().setFromObject(character.current);
+      const size = box.getSize(new Vector3());
+
+      const reach = Math.max(size.x, size.z) * 0.5 + 0.1; // add padding
+      console.log("Calculated attackRadius from model:", reach.toFixed(2));
+
+      setAttackRadius(reach);
+    }, [characterType]);
+
     // 2D distance + "ring contact" helper (uses same ATTACK_RADIUS for both players)
     const groundDistance = (a, b) => {
       const dx = a.x - b.x;
@@ -160,7 +172,7 @@ const PlayerController = forwardRef(
       if (!selfPos || !otherPos) return false;
 
       // Same radius both sides → contact when distance ≤ 2R
-      return groundDistance(selfPos, otherPos) >= ATTACK_RADIUS * 2;
+      return groundDistance(selfPos, otherPos) <= attackRadius * 2;
     };
 
     const startAttack = (type) => {
@@ -178,7 +190,7 @@ const PlayerController = forwardRef(
           );
           console.log(
             `[${type.toUpperCase()}] In range:`,
-            distance >= ATTACK_RADIUS * 2
+            distance <= attackRadius * 2
           );
         }
       }
@@ -364,9 +376,16 @@ const PlayerController = forwardRef(
 
     // --- Debug range (visual) ---
     useEffect(() => {
-      if (!DEBUG_HIT_RANGE || !container.current) return;
+      if (!DEBUG_HIT_RANGE || !container.current || !attackRadius) return;
 
-      const geometry = new CircleGeometry(ATTACK_RADIUS, 48);
+      // Clean up previous
+      if (debugRangeRef.current) {
+        container.current.remove(debugRangeRef.current);
+        debugRangeRef.current.geometry.dispose();
+        debugRangeRef.current.material.dispose();
+      }
+
+      const geometry = new CircleGeometry(attackRadius, 48);
       const material = new MeshBasicMaterial({
         color: 0xff0000,
         opacity: 0.25,
@@ -374,24 +393,24 @@ const PlayerController = forwardRef(
         depthWrite: false,
         depthTest: false,
       });
-      debugMaterialRef.current = material;
 
       const mesh = new Mesh(geometry, material);
-      mesh.rotation.x = -Math.PI / 2; // lay flat
-      mesh.position.set(0, RING_Y, 0); // center on player, slightly above floor
-      mesh.renderOrder = 9999; // draw on top
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(0, RING_Y, 0);
+      mesh.renderOrder = 9999;
 
       container.current.add(mesh);
       debugRangeRef.current = mesh;
+      debugMaterialRef.current = material;
 
       return () => {
-        if (container.current && debugRangeRef.current) {
+        if (debugRangeRef.current) {
           container.current.remove(debugRangeRef.current);
         }
         geometry.dispose();
         material.dispose();
       };
-    }, []);
+    }, [attackRadius]);
 
     // --- Frame loop ---
     useFrame(({ camera }) => {
@@ -510,7 +529,7 @@ const PlayerController = forwardRef(
         const mine = rb.current?.translation?.();
         const theirs = opponentRef.current.translation?.();
         if (mine && theirs) {
-          const inRange = groundDistance(mine, theirs) <= ATTACK_RADIUS * 2;
+          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
           debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
         }
       }
