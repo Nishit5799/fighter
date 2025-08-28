@@ -128,7 +128,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
   );
 
   return (
-    <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 sm:hidden select-none z-[100]">
+    <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
       {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 

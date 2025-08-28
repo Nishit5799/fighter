@@ -699,24 +699,6 @@ const PlayerController = forwardRef(
               onIntersectionEnter={handleCollisionEnter}
               onIntersectionExit={handleCollisionExit}
             />
-            {/* 👇 Debug label follows player */}
-            {/* {showDebug && (
-              <Html position={[0, RING_Y + 0.5, 0]} center>
-                <div
-                  style={{
-                    padding: "4px 8px",
-                    background: "rgba(0,0,0,0.6)",
-                    color: "white",
-                    fontSize: 12,
-                    borderRadius: 6,
-                    whiteSpace: "nowrap",
-                    userSelect: "none",
-                  }}
-                >
-                  <span ref={distanceLabelRef}>…</span>
-                </div>
-              </Html>
-            )} */}
           </group>
         </group>
       </RigidBody>

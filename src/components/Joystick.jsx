@@ -126,7 +126,7 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
       <div className="fixed bottom-5 left-5 flex flex-col items-center gap-4">
         <div
           ref={joystickRef}
-          className="w-30 h-30 rounded-full bg-white bg-opacity-50 touch-none flex items-center justify-center sm:hidden select-none user-select-none"
+          className="w-30 h-30 rounded-full bg-white bg-opacity-50 touch-none flex items-center justify-center select-none user-select-none"
         >
           <div
             ref={thumbstickRef}
@@ -170,8 +170,8 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
             className={`w-16 h-16 rounded-full ${
               runState === "running" ? "bg-green-600" : "bg-gray-600"
             } bg-opacity-80 flex items-center justify-center text-white 
-              ${runState !== "ready" ? "opacity-100 cursor-not-allowed" : ""}
-              active:bg-opacity-100 transition-all select-none user-select-none sm:hidden`}
+    ${runState !== "ready" ? "opacity-100 cursor-not-allowed" : ""}
+    active:bg-opacity-100 transition-all select-none user-select-none`}
             onClick={triggerRun}
           >
             <span className="text-2xl font-bold">{renderRunLabel()}</span>
