@@ -19,6 +19,16 @@ import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 
+// (near the top, after other imports)
+const SOUND_FILES = {
+  punch: "/punch.mp3",
+  kick: "/punch.mp3",
+  hit: "/hit.mp3",
+  victory: "/victory.mp3",
+  lost: "/lost.mp3",
+  begin: "/begin.mp3",
+};
+
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
   { name: "backward", keys: ["ArrowDown", "KeyS"] },
@@ -61,6 +71,14 @@ const Experience = () => {
   const beginSoundRef = useRef(null);
   const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
+  const soundsRef = useRef({
+    punch: null,
+    kick: null,
+    hit: null,
+    victory: null,
+    lost: null,
+    begin: null,
+  });
   const nameInputRef = useRef(null);
   const joinBtnRef = useRef(null);
 
@@ -105,37 +123,69 @@ const Experience = () => {
         }
       }
 
-      const sources = [
-        "/punch.mp3",
-
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-        "/begin.mp3",
-      ];
-
-      const warmups = sources.map((src) => {
-        const a = new Audio(src);
-        a.preload = "auto";
-        // @ts-ignore
-        a.playsInline = true;
-        a.muted = true; // stays muted permanently
+      const items = Object.values(soundsRef.current).filter(Boolean);
+      const warmups = items.map((a) => {
+        a.muted = true;
         return a
           .play()
           .then(() => {
             a.pause();
             a.currentTime = 0;
+            a.muted = false; // unmute the SAME elements we’ll reuse
             return true;
           })
           .catch(() => false);
       });
 
-      Promise.all(warmups).finally(() => {
+      Promise.allSettled(warmups).finally(() => {
         audioUnlockedRef.current = true;
       });
     } catch {
       audioUnlockedRef.current = true;
     }
+  }, []);
+  useEffect(() => {
+    const handler = () => unlockAllAudio();
+    const opts = { passive: true };
+    const events = [
+      "pointerdown",
+      "touchstart",
+      "mousedown",
+      "click",
+      "keydown",
+    ];
+
+    events.forEach((ev) => document.addEventListener(ev, handler, opts));
+    return () =>
+      events.forEach((ev) => document.removeEventListener(ev, handler, opts));
+  }, [unlockAllAudio]);
+
+  useEffect(() => {
+    const make = (src, vol = 0.8) => {
+      const a = new Audio(src);
+      a.preload = "auto";
+      // @ts-ignore
+      a.playsInline = true;
+      a.crossOrigin = "anonymous";
+      a.volume = vol;
+      return a;
+    };
+
+    soundsRef.current.punch = make(SOUND_FILES.punch, 0.7);
+    soundsRef.current.kick = make(SOUND_FILES.kick, 0.7);
+    soundsRef.current.hit = make(SOUND_FILES.hit, 0.4);
+    soundsRef.current.victory = make(SOUND_FILES.victory, 0.85);
+    soundsRef.current.lost = make(SOUND_FILES.lost, 0.85);
+    soundsRef.current.begin = make(SOUND_FILES.begin, 0.75);
+
+    return () => {
+      Object.values(soundsRef.current).forEach((a) => {
+        try {
+          a?.pause();
+          a?.remove?.();
+        } catch {}
+      });
+    };
   }, []);
 
   const isUsernameUnique = useCallback(
@@ -428,7 +478,7 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      unlockAllAudio(); // ✅ ensure iOS AudioContext is resumed
+      unlockAllAudio();
       let count = 3;
       setCountdown(count);
 
@@ -440,12 +490,10 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
-          if (!hasPlayedStartSound.current && beginSoundRef.current) {
-            beginSoundRef.current.currentTime = 0;
-            beginSoundRef.current
-              .play()
-              .catch((e) => console.log("Audio play failed:", e));
-            hasPlayedStartSound.current = true;
+          const begin = soundsRef.current.begin;
+          if (begin) {
+            begin.currentTime = 0;
+            begin.play().catch((e) => console.log("Begin sound failed:", e));
           }
         }
       }, 1000);
@@ -569,6 +617,7 @@ const Experience = () => {
                   isLocalPlayer={players[0]?.id === socket?.id}
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
+                  audio={soundsRef.current}
                 />
                 <PlayerController
                   ref={carControllerRef2}
@@ -591,6 +640,7 @@ const Experience = () => {
                   isLocalPlayer={players[1]?.id === socket?.id}
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
+                  audio={soundsRef.current}
                 />
               </>
             )}

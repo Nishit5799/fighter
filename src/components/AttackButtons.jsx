@@ -101,8 +101,12 @@ const AttackButtons = ({ onPunch, onKick }) => {
         ref={ref}
         disabled={isCooldown}
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
-          active:bg-opacity-100 transition-all select-none user-select-none
-          ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
+    active:bg-opacity-100 transition-all select-none user-select-none
+    ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
+        onClick={(e) => {
+          e.preventDefault();
+          !isCooldown && handleAttackStart(type, e);
+        }}
         onTouchStart={(e) => {
           e.preventDefault();
           !isCooldown && handleAttackStart(type, e);

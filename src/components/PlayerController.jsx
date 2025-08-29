@@ -39,6 +39,7 @@ const PlayerController = forwardRef(
       playerName,
       opponentName,
       isLocalPlayer,
+      audio,
     },
     ref
   ) => {
@@ -108,31 +109,57 @@ const PlayerController = forwardRef(
 
     // Init / teardown sounds
     useEffect(() => {
-      punchSound.current = new Audio(SOUNDS.punch);
-      kickSound.current = new Audio(SOUNDS.kick);
-      hitSound.current = new Audio(SOUNDS.hit);
-      victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost);
+      // If Experience provided shared, unlocked audio, use it
+      if (
+        audio?.punch &&
+        audio?.kick &&
+        audio?.hit &&
+        audio?.victory &&
+        audio?.lost
+      ) {
+        punchSound.current = audio.punch;
+        kickSound.current = audio.kick;
+        hitSound.current = audio.hit;
+        victorySound.current = audio.victory;
+        lostSound.current = audio.lost;
+        return; // Experience owns lifecycle; no teardown here
+      }
 
-      punchSound.current.volume = 0.7;
-      kickSound.current.volume = 0.7;
-      hitSound.current.volume = 0.4;
-      victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8;
+      // Fallback (only if audio prop is missing)
+      const make = (src, vol = 0.8) => {
+        const a = new Audio(src);
+        // @ts-ignore
+        a.playsInline = true;
+        a.preload = "auto";
+        a.volume = vol;
+        return a;
+      };
+
+      punchSound.current = make("/punch.mp3", 0.7);
+      kickSound.current = make("/kick.mp3", 0.7);
+      hitSound.current = make("/hit.mp3", 0.4);
+      victorySound.current = make("/victory.mp3", 0.85);
+      lostSound.current = make("/lost.mp3", 0.85);
 
       return () => {
+        // clean up only if we created local elements
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (soundRef) => {
-            if (soundRef.current) {
-              soundRef.current.pause();
-              soundRef.current.src = "";
-              soundRef.current.remove();
-              soundRef.current = null;
-            }
+          (r) => {
+            try {
+              if (
+                r.current &&
+                (!audio || !Object.values(audio).includes(r.current))
+              ) {
+                r.current.pause();
+                r.current.src = "";
+                r.current.remove?.();
+              }
+            } catch {}
+            r.current = null;
           }
         );
       };
-    }, []);
+    }, [audio]);
 
     // Responsive screen check
     useEffect(() => {
