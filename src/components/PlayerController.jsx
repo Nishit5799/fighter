@@ -211,13 +211,12 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-   const soundSrc = type === "kick" ? SOUNDS.kick : SOUNDS.punch;
-playSound(soundSrc, 0.7);
+      const soundSrc = type === "kick" ? SOUNDS.kick : SOUNDS.punch;
+      playSound(soundSrc, 0.7);
 
-
-setIsAttacking(true);
-movementEnabled.current = false;
-setCurrentAnimation(type);
+      setIsAttacking(true);
+      movementEnabled.current = false;
+      setCurrentAnimation(type);
 
       setIsAttacking(true);
       movementEnabled.current = false;
