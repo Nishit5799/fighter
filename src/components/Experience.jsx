@@ -98,44 +98,84 @@ const Experience = () => {
   const unlockAllAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
 
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ensureAudioContext = () => {
-      if (!AC) return;
-      if (!audioContextRef.current) audioContextRef.current = new AC();
-      if (audioContextRef.current.state === "suspended") {
-        return audioContextRef.current.resume().catch(() => {});
+    if (!audioContextRef.current && AC) {
+      audioContextRef.current = new AC();
+    }
+
+    const resumeCtx = async () => {
+      try {
+        if (
+          audioContextRef.current &&
+          audioContextRef.current.state === "suspended"
+        ) {
+          await audioContextRef.current.resume();
+        }
+      } catch {}
+    };
+
+    // iOS path: DO NOT touch your MP3 <audio> tags at unlock time.
+    // Prime with a silent WebAudio source instead (no audible output).
+    const unlockWithSilentWebAudio = async () => {
+      await resumeCtx();
+      try {
+        const ctx = audioContextRef.current;
+        if (!ctx) {
+          audioUnlockedRef.current = true;
+          return;
+        }
+        const gain = ctx.createGain();
+        gain.gain.value = 0; // silence
+        gain.connect(ctx.destination);
+
+        // 1-sample buffer ( totally silent )
+        const silentBuf = ctx.createBuffer(1, 1, ctx.sampleRate);
+        const src = ctx.createBufferSource();
+        src.buffer = silentBuf;
+        src.connect(gain);
+        src.start(0);
+        src.stop(0); // end immediately
+
+        audioUnlockedRef.current = true;
+      } catch {
+        audioUnlockedRef.current = true;
       }
     };
 
-    const warm = () => {
-      const items = Object.values(soundsRef.current).filter(Boolean);
+    // Non-iOS path: keep your existing muted warm if you want.
+    const unlockByWarmingTagsMuted = async () => {
+      await resumeCtx();
 
-      // 🔁 If sounds aren't created yet, retry a few times instead of marking unlocked
+      const items = Object.values(soundsRef.current).filter(Boolean);
       if (items.length === 0) {
-        unlockRetryRef.current += 1;
+        // retry a few times until soundsRef is populated
+        unlockRetryRef.current = (unlockRetryRef.current || 0) + 1;
         if (unlockRetryRef.current <= 10) {
-          setTimeout(warm, 50); // try again in ~1 frame
+          setTimeout(unlockByWarmingTagsMuted, 50);
+          return;
         }
-        return; // DO NOT flip audioUnlockedRef yet
+        // as a fallback, just mark unlocked
+        audioUnlockedRef.current = true;
+        return;
       }
 
       const warmups = items.map((a) => {
         const prevVol = a.volume;
-        a.muted = true; // hard mute
-        a.volume = 0; // belt-and-suspenders
+        a.muted = true;
+        a.volume = 0;
         a.currentTime = 0;
-
         return a
           .play()
           .then(() => {
             a.pause();
             a.currentTime = 0;
-            a.muted = false; // restore after playback is fully stopped
+            a.muted = false;
             a.volume = prevVol;
             return true;
           })
           .catch(() => {
-            // If play is blocked, still restore safely and continue
             a.muted = false;
             a.volume = prevVol;
             return false;
@@ -147,10 +187,11 @@ const Experience = () => {
       });
     };
 
-    // 1) Make sure WebAudio is resumed (if present)
-    ensureAudioContext();
-    // 2) Warm the EXACT elements (with retry if not ready yet)
-    warm();
+    if (isiOS) {
+      unlockWithSilentWebAudio(); // ✅ no MP3 touched → truly silent on iPhone/iPad
+    } else {
+      unlockByWarmingTagsMuted(); // desktop / android: you can keep the tag warmup
+    }
   }, []);
 
   useEffect(() => {
