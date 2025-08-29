@@ -23,26 +23,6 @@ const SOUNDS = {
   lost: "/lost.mp3",
 };
 
-let audioContext;
-function ensureAudioContextUnlocked() {
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  if (!audioContext) audioContext = new AC();
-  if (audioContext.state === "suspended") {
-    audioContext.resume().catch(() => {});
-  }
-}
-
-const playSound = (src, volume = 0.7) => {
-  try {
-    ensureAudioContextUnlocked();
-    const a = new Audio(src);
-    a.volume = volume;
-    a.playsInline = true;
-    a.play().catch(() => {});
-  } catch {}
-};
-
 const PlayerController = forwardRef(
   (
     {
@@ -231,12 +211,11 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      const soundSrc = type === "kick" ? SOUNDS.kick : SOUNDS.punch;
-      playSound(soundSrc, 0.7);
-
-      setIsAttacking(true);
-      movementEnabled.current = false;
-      setCurrentAnimation(type);
+      const sound = type === "kick" ? kickSound.current : punchSound.current;
+      if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch((e) => console.log("Audio play failed:", e));
+      }
 
       setIsAttacking(true);
       movementEnabled.current = false;

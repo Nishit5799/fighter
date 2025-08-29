@@ -138,28 +138,6 @@ const Experience = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const unlockAudioOnFirstTouch = () => {
-      unlockAllAudio();
-      window.removeEventListener("touchstart", unlockAudioOnFirstTouch);
-      window.removeEventListener("mousedown", unlockAudioOnFirstTouch);
-    };
-
-    window.addEventListener("touchstart", unlockAudioOnFirstTouch, {
-      once: true,
-      passive: true,
-    });
-    window.addEventListener("mousedown", unlockAudioOnFirstTouch, {
-      once: true,
-      passive: true,
-    });
-
-    return () => {
-      window.removeEventListener("touchstart", unlockAudioOnFirstTouch);
-      window.removeEventListener("mousedown", unlockAudioOnFirstTouch);
-    };
-  }, [unlockAllAudio]);
-
   const isUsernameUnique = useCallback(
     (name) => !players.some((player) => player.name === name),
     [players]
