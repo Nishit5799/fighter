@@ -23,6 +23,16 @@ const SOUNDS = {
   lost: "/lost.mp3",
 };
 
+const playSound = (src, volume = 0.7) => {
+  try {
+    const a = new Audio(src);
+    a.volume = volume;
+    // @ts-ignore
+    a.playsInline = true; // helps on iOS
+    a.play().catch(() => {});
+  } catch {}
+};
+
 const PlayerController = forwardRef(
   (
     {
