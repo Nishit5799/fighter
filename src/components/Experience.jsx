@@ -68,7 +68,7 @@ const Experience = () => {
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
-  const beginSoundRef = useRef(null);
+  const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
   const soundsRef = useRef({
@@ -94,40 +94,35 @@ const Experience = () => {
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
 
-  // --- Audio: create start sound early ---
-  useEffect(() => {
-    beginSoundRef.current = new Audio("/begin.mp3");
-    beginSoundRef.current.volume = 0.7;
-    return () => {
-      if (beginSoundRef.current) {
-        beginSoundRef.current.pause();
-        beginSoundRef.current = null;
-      }
-    };
-  }, []);
-
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
-    try {
-      const AC =
-        window.AudioContext ||
-        // @ts-ignore
-        window.webkitAudioContext;
-      if (AC) {
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AC();
+
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ensureAudioContext = () => {
+      if (!AC) return;
+      if (!audioContextRef.current) audioContextRef.current = new AC();
+      if (audioContextRef.current.state === "suspended") {
+        return audioContextRef.current.resume().catch(() => {});
+      }
+    };
+
+    const warm = () => {
+      const items = Object.values(soundsRef.current).filter(Boolean);
+
+      // 🔁 If sounds aren't created yet, retry a few times instead of marking unlocked
+      if (items.length === 0) {
+        unlockRetryRef.current += 1;
+        if (unlockRetryRef.current <= 10) {
+          setTimeout(warm, 50); // try again in ~1 frame
         }
-        if (audioContextRef.current.state === "suspended") {
-          audioContextRef.current.resume().catch(() => {});
-        }
+        return; // DO NOT flip audioUnlockedRef yet
       }
 
-      const items = Object.values(soundsRef.current).filter(Boolean);
       const warmups = items.map((a) => {
         const prevVol = a.volume;
         a.muted = true; // hard mute
-        a.volume = 0; // double-safety in case muted toggles late
+        a.volume = 0; // belt-and-suspenders
         a.currentTime = 0;
 
         return a
@@ -135,13 +130,12 @@ const Experience = () => {
           .then(() => {
             a.pause();
             a.currentTime = 0;
-            // restore AFTER playback is fully stopped
-            a.muted = false;
+            a.muted = false; // restore after playback is fully stopped
             a.volume = prevVol;
             return true;
           })
           .catch(() => {
-            // If play is blocked, still mark as warmed
+            // If play is blocked, still restore safely and continue
             a.muted = false;
             a.volume = prevVol;
             return false;
@@ -151,10 +145,14 @@ const Experience = () => {
       Promise.allSettled(warmups).finally(() => {
         audioUnlockedRef.current = true;
       });
-    } catch {
-      audioUnlockedRef.current = true;
-    }
+    };
+
+    // 1) Make sure WebAudio is resumed (if present)
+    ensureAudioContext();
+    // 2) Warm the EXACT elements (with retry if not ready yet)
+    warm();
   }, []);
+
   useEffect(() => {
     const handler = () => unlockAllAudio();
     const opts = { passive: true };
