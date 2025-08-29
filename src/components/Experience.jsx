@@ -125,16 +125,27 @@ const Experience = () => {
 
       const items = Object.values(soundsRef.current).filter(Boolean);
       const warmups = items.map((a) => {
-        a.muted = true;
+        const prevVol = a.volume;
+        a.muted = true; // hard mute
+        a.volume = 0; // double-safety in case muted toggles late
+        a.currentTime = 0;
+
         return a
           .play()
           .then(() => {
             a.pause();
             a.currentTime = 0;
-            a.muted = false; // unmute the SAME elements we’ll reuse
+            // restore AFTER playback is fully stopped
+            a.muted = false;
+            a.volume = prevVol;
             return true;
           })
-          .catch(() => false);
+          .catch(() => {
+            // If play is blocked, still mark as warmed
+            a.muted = false;
+            a.volume = prevVol;
+            return false;
+          });
       });
 
       Promise.allSettled(warmups).finally(() => {
