@@ -65,7 +65,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [fppMode, setFppMode] = useState(false);
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -610,7 +609,6 @@ const Experience = () => {
                   ref={carControllerRef1}
                   key={players[0]?.id || "player1"} // 👈 forces remount when ID changes
                   playerId={players[0]?.id}
-                  fppMode={fppMode}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -635,7 +633,6 @@ const Experience = () => {
                   playerId={players[1]?.id}
                   key={players[1]?.id || "player2"} // 👈 same for second player
                   characterType="austin"
-                  fppMode={fppMode}
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
                   }
@@ -831,8 +828,6 @@ const Experience = () => {
 
       {isGameStarted && (
         <AttackButtons
-          fppMode={fppMode}
-          onToggleFPP={() => setFppMode((prev) => !prev)}
           key={localPlayer?.id || playerName} // 👈 unique per match or player
           onPunch={setIsPunching}
           onKick={setIsKicking}

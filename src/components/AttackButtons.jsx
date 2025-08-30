@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSocket } from "../context/SocketContext";
 
-const AttackButtons = ({ onPunch, onKick, fppMode, onToggleFPP }) => {
+const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
   const kickRef = useRef();
   const socket = useSocket();
@@ -133,13 +133,6 @@ const AttackButtons = ({ onPunch, onKick, fppMode, onToggleFPP }) => {
 
   return (
     <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
-      {/* FPP/TPP Toggle Button */}
-      <button
-        onClick={onToggleFPP}
-        className="mb-4 px-4 py-2 bg-purple-600 text-white rounded-full shadow-md hover:bg-purple-700"
-      >
-        {fppMode ? "Switch to TPP" : "Switch to FPP"}
-      </button>
       {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 

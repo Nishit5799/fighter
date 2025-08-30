@@ -40,7 +40,6 @@ const PlayerController = forwardRef(
       opponentName,
       isLocalPlayer,
       audio,
-      fppMode,
     },
     ref
   ) => {
@@ -512,18 +511,8 @@ const PlayerController = forwardRef(
           rotationTarget.current,
           0.1
         );
-        const camGroup = fppMode ? character : cameraPosition;
-        const lookGroup = fppMode ? cameraTarget : cameraTarget; // could customize later
-
-        if (camGroup?.current) {
-          camGroup.current.getWorldPosition(cameraworldPosition.current);
-          camera.position.lerp(cameraworldPosition.current, 0.1);
-        }
-        if (lookGroup?.current) {
-          lookGroup.current.getWorldPosition(cameraLookAtWorldPosition.current);
-          cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
-          camera.lookAt(cameraLookAt.current);
-        }
+        cameraPosition.current.getWorldPosition(cameraworldPosition.current);
+        camera.position.lerp(cameraworldPosition.current, 0.1);
         if (cameraTarget.current) {
           cameraTarget.current.getWorldPosition(
             cameraLookAtWorldPosition.current
