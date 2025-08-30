@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSocket } from "../context/SocketContext";
 
-const AttackButtons = ({ onPunch, onKick }) => {
+const AttackButtons = ({ onPunch, onKick, fppMode, onToggleFPP }) => {
   const punchRef = useRef();
   const kickRef = useRef();
   const socket = useSocket();
