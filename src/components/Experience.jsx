@@ -65,7 +65,6 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const [isFpp, setIsFpp] = useState(false); // ← Add near other useStates
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -88,6 +87,8 @@ const Experience = () => {
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
+  const cameraToggleRef = useRef();
+
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
@@ -607,9 +608,13 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
-                  isFpp={isFpp}
-                  ref={carControllerRef1}
-                  key={players[0]?.id || "player1"} // 👈 forces remount when ID changes
+                  ref={(el) => {
+                    carControllerRef1.current = el;
+                    if (players[0]?.id === socket?.id) {
+                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    }
+                  }}
+                  key={players[0]?.id || "player1"}
                   playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
@@ -630,11 +635,16 @@ const Experience = () => {
                   opponentName={players[1]?.name || "Player 2"}
                   audio={soundsRef.current}
                 />
+
                 <PlayerController
-                  isFpp={isFpp}
-                  ref={carControllerRef2}
+                  ref={(el) => {
+                    carControllerRef2.current = el;
+                    if (players[1]?.id === socket?.id) {
+                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    }
+                  }}
+                  key={players[1]?.id || "player2"}
                   playerId={players[1]?.id}
-                  key={players[1]?.id || "player2"} // 👈 same for second player
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
@@ -831,11 +841,10 @@ const Experience = () => {
 
       {isGameStarted && (
         <AttackButtons
-          isFpp={isFpp}
-          setIsFpp={setIsFpp}
           key={localPlayer?.id || playerName} // 👈 unique per match or player
           onPunch={setIsPunching}
           onKick={setIsKicking}
+          onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         />
       )}
 

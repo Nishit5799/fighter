@@ -40,7 +40,6 @@ const PlayerController = forwardRef(
       opponentName,
       isLocalPlayer,
       audio,
-      isFpp,
     },
     ref
   ) => {
@@ -512,36 +511,14 @@ const PlayerController = forwardRef(
           rotationTarget.current,
           0.1
         );
-
-        if (isFpp) {
-          // First-person camera with random offset
-          const offsetX = (Math.random() - 0.5) * 0.2;
-          const offsetY = 3.5 + (Math.random() - 0.5) * 0.2;
-          const offsetZ = -0.3 + (Math.random() - 0.5) * 0.1;
-
-          const fpOffset = new Vector3(
-            offsetX,
-            offsetY,
-            offsetZ
-          ).applyAxisAngle(new Vector3(0, 1, 0), container.current.rotation.y);
-
-          const cameraPos = container.current.position.clone().add(fpOffset);
-          camera.position.lerp(cameraPos, 0.2);
-
-          camera.lookAt(
-            container.current.position.clone().add(new Vector3(0, 2.8, 0))
+        cameraPosition.current.getWorldPosition(cameraworldPosition.current);
+        camera.position.lerp(cameraworldPosition.current, 0.1);
+        if (cameraTarget.current) {
+          cameraTarget.current.getWorldPosition(
+            cameraLookAtWorldPosition.current
           );
-        } else {
-          // Third-person camera
-          cameraPosition.current.getWorldPosition(cameraworldPosition.current);
-          camera.position.lerp(cameraworldPosition.current, 0.1);
-          if (cameraTarget.current) {
-            cameraTarget.current.getWorldPosition(
-              cameraLookAtWorldPosition.current
-            );
-            cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
-            camera.lookAt(cameraLookAt.current);
-          }
+          cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
+          camera.lookAt(cameraLookAt.current);
         }
       }
 
@@ -622,8 +599,25 @@ const PlayerController = forwardRef(
     // --- Imperative API ---
     useImperativeHandle(ref, () => wrapper);
 
+    const isFpp = useRef(false);
+
+    const toggleFppTpp = () => {
+      isFpp.current = !isFpp.current;
+
+      if (isFpp.current) {
+        // ✅ FPP: In front of face and looking FORWARD
+        cameraPosition.current.position.set(0, 3.1, -0.5);
+        cameraTarget.current.position.set(0, 3.1, -1); // fixed: forward
+      } else {
+        // TPP: Behind and above
+        cameraPosition.current.position.set(0, 4.5, 2.5);
+        cameraTarget.current.position.set(0, 0, -5.5);
+      }
+    };
+
     // Keep the object literal separate so we don’t capture stale refs above
     const wrapper = {
+      toggleFppTpp,
       setOpponentRef,
 
       setVictory: (isLocalPlayerWinner) => {
@@ -700,7 +694,7 @@ const PlayerController = forwardRef(
         canSleep={false}
       >
         <group ref={container} position={position}>
-          <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
+          <group ref={cameraTarget} position-z={-5.5} />
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>
             {characterType === "cena" ? (
