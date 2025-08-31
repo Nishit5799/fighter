@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSocket } from "../context/SocketContext";
 
-const AttackButtons = ({ onPunch, onKick }) => {
+const AttackButtons = ({ onPunch, onKick, isFpp, setIsFpp }) => {
   const punchRef = useRef();
   const kickRef = useRef();
   const socket = useSocket();
@@ -133,6 +133,12 @@ const AttackButtons = ({ onPunch, onKick }) => {
 
   return (
     <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
+      <button
+        onClick={() => setIsFpp((prev) => !prev)}
+        className="mb-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm"
+      >
+        {isFpp ? "Switch to TPP" : "Switch to FPP"}
+      </button>
       {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 

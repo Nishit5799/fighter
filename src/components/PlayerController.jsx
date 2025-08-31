@@ -40,6 +40,7 @@ const PlayerController = forwardRef(
       opponentName,
       isLocalPlayer,
       audio,
+      isFpp,
     },
     ref
   ) => {
@@ -511,14 +512,36 @@ const PlayerController = forwardRef(
           rotationTarget.current,
           0.1
         );
-        cameraPosition.current.getWorldPosition(cameraworldPosition.current);
-        camera.position.lerp(cameraworldPosition.current, 0.1);
-        if (cameraTarget.current) {
-          cameraTarget.current.getWorldPosition(
-            cameraLookAtWorldPosition.current
+
+        if (isFpp) {
+          // First-person camera with random offset
+          const offsetX = (Math.random() - 0.5) * 0.2;
+          const offsetY = 3.5 + (Math.random() - 0.5) * 0.2;
+          const offsetZ = -0.3 + (Math.random() - 0.5) * 0.1;
+
+          const fpOffset = new Vector3(
+            offsetX,
+            offsetY,
+            offsetZ
+          ).applyAxisAngle(new Vector3(0, 1, 0), container.current.rotation.y);
+
+          const cameraPos = container.current.position.clone().add(fpOffset);
+          camera.position.lerp(cameraPos, 0.2);
+
+          camera.lookAt(
+            container.current.position.clone().add(new Vector3(0, 2.8, 0))
           );
-          cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
-          camera.lookAt(cameraLookAt.current);
+        } else {
+          // Third-person camera
+          cameraPosition.current.getWorldPosition(cameraworldPosition.current);
+          camera.position.lerp(cameraworldPosition.current, 0.1);
+          if (cameraTarget.current) {
+            cameraTarget.current.getWorldPosition(
+              cameraLookAtWorldPosition.current
+            );
+            cameraLookAt.current.lerp(cameraLookAtWorldPosition.current, 0.1);
+            camera.lookAt(cameraLookAt.current);
+          }
         }
       }
 
