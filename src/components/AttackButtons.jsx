@@ -135,7 +135,7 @@ const AttackButtons = ({ onPunch, onKick, onToggleCamera }) => {
     <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
       <button
         onClick={onToggleCamera}
-        className="w-16 h-16 left-5 rounded-full bg-purple-500 text-white font-bold text-xl"
+        className="w-16 h-16 rounded-full bg-purple-500 text-white font-bold text-xl"
       >
         🎥
       </button>
