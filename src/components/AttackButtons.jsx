@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSocket } from "../context/SocketContext";
 
-const AttackButtons = ({ onPunch, onKick, onToggleCamera }) => {
+const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
   const kickRef = useRef();
   const socket = useSocket();
@@ -133,12 +133,6 @@ const AttackButtons = ({ onPunch, onKick, onToggleCamera }) => {
 
   return (
     <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
-      <button
-        onClick={onToggleCamera}
-        className="w-16 h-16 rounded-full bg-purple-500 text-white font-bold text-xl"
-      >
-        🎥
-      </button>
       {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 

@@ -95,6 +95,7 @@ const PlayerController = forwardRef(
     const cameraLookAt = useRef(new Vector3());
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
+    const mainCameraRef = useRef(null);
 
     // Debug ring refs
     const DEBUG_HIT_RANGE = true;
@@ -413,6 +414,9 @@ const PlayerController = forwardRef(
     // --- Frame loop ---
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1 || isDefeated) return;
+      if (isPlayer1) {
+        mainCameraRef.current = camera;
+      }
 
       const vel = rb.current.linvel();
       const movement = { x: 0, z: 0 };
@@ -605,13 +609,19 @@ const PlayerController = forwardRef(
       isFpp.current = !isFpp.current;
 
       if (isFpp.current) {
-        // ✅ FPP: In front of face and looking FORWARD
-        cameraPosition.current.position.set(0, 3.1, -0.5);
-        cameraTarget.current.position.set(0, 3.1, -1); // fixed: forward
+        cameraPosition.current.position.set(0, 3.1, -0.14);
+        cameraTarget.current.position.set(0, 3.1, -1.5);
+        if (mainCameraRef.current) {
+          mainCameraRef.current.fov = 125;
+          mainCameraRef.current.updateProjectionMatrix();
+        }
       } else {
-        // TPP: Behind and above
         cameraPosition.current.position.set(0, 4.5, 2.5);
         cameraTarget.current.position.set(0, 0, -5.5);
+        if (mainCameraRef.current) {
+          mainCameraRef.current.fov = 50;
+          mainCameraRef.current.updateProjectionMatrix();
+        }
       }
     };
 

@@ -21,6 +21,16 @@ import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 
+// (near the top, after other imports)
+const SOUND_FILES = {
+  punch: "/punch.mp3",
+  kick: "/punch.mp3",
+  hit: "/hit.mp3",
+  victory: "/victory.mp3",
+  lost: "/lost.mp3",
+  begin: "/begin.mp3",
+};
+
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
   { name: "backward", keys: ["ArrowDown", "KeyS"] },
@@ -32,7 +42,10 @@ const keyboardMap = [
 ];
 
 const Experience = () => {
+  // --- Context ---
   const socket = useSocket();
+
+  // --- State ---
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
   const [isPunching, setIsPunching] = useState(false);
   const [isKicking, setIsKicking] = useState(false);
@@ -54,68 +67,155 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
-  const beginSoundRef = useRef(null);
+  const localPlayer = players.find((p) => p.id === socket?.id);
+
+  // --- Refs ---
+  const unlockRetryRef = useRef(0);
+  const audioUnlockedRef = useRef(false);
+  const audioContextRef = useRef(null);
+  const soundsRef = useRef({
+    punch: null,
+    kick: null,
+    hit: null,
+    victory: null,
+    lost: null,
+    begin: null,
+  });
+  const nameInputRef = useRef(null);
+  const joinBtnRef = useRef(null);
+
   const hasPlayedStartSound = useRef(false);
   const hasLoggedResult = useRef(false);
 
   const carControllerRef1 = useRef();
   const carControllerRef2 = useRef();
+  const cameraToggleRef = useRef();
+
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
 
-  useEffect(() => {
-    beginSoundRef.current = new Audio("/begin.mp3");
-    beginSoundRef.current.volume = 0.7;
+  // --- Memo ---
+  const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
 
-    return () => {
-      if (beginSoundRef.current) {
-        beginSoundRef.current.pause();
-        beginSoundRef.current = null;
+  // --- Helpers ---
+  const unlockAllAudio = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ensureAudioContext = () => {
+      if (!AC) return;
+      if (!audioContextRef.current) audioContextRef.current = new AC();
+      if (audioContextRef.current.state === "suspended") {
+        return audioContextRef.current.resume().catch(() => {});
       }
     };
+
+    const warm = () => {
+      const items = Object.values(soundsRef.current).filter(Boolean);
+
+      // 🔁 If sounds aren't created yet, retry a few times instead of marking unlocked
+      if (items.length === 0) {
+        unlockRetryRef.current += 1;
+        if (unlockRetryRef.current <= 10) {
+          setTimeout(warm, 50); // try again in ~1 frame
+        }
+        return; // DO NOT flip audioUnlockedRef yet
+      }
+
+      const warmups = items.map((a) => {
+        const prevVol = a.volume;
+        a.muted = true; // hard mute
+        a.volume = 0; // belt-and-suspenders
+        a.currentTime = 0;
+
+        return a
+          .play()
+          .then(() => {
+            a.pause();
+            a.currentTime = 0;
+            a.muted = false; // restore after playback is fully stopped
+            a.volume = prevVol;
+            return true;
+          })
+          .catch(() => {
+            // If play is blocked, still restore safely and continue
+            a.muted = false;
+            a.volume = prevVol;
+            return false;
+          });
+      });
+
+      Promise.allSettled(warmups).finally(() => {
+        audioUnlockedRef.current = true;
+      });
+    };
+
+    // 1) Make sure WebAudio is resumed (if present)
+    ensureAudioContext();
+    // 2) Warm the EXACT elements (with retry if not ready yet)
+    warm();
   }, []);
 
   useEffect(() => {
-    const unlockAudio = () => {
-      const sounds = [
-        "/punch.mp3",
-        "/kick.mp3",
-        "/hit.mp3",
-        "/victory.mp3",
-        "/lost.mp3",
-      ];
-      sounds.forEach((src) => {
-        const audio = new Audio(src);
-        audio.muted = true;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.muted = false;
-          })
-          .catch(() => {});
-      });
+    const handler = () => unlockAllAudio();
+    const opts = { passive: true };
+    const events = [
+      "pointerdown",
+      "touchstart",
+      "mousedown",
+      "click",
+      "keydown",
+    ];
 
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("mousedown", unlockAudio);
+    events.forEach((ev) => document.addEventListener(ev, handler, opts));
+    return () =>
+      events.forEach((ev) => document.removeEventListener(ev, handler, opts));
+  }, [unlockAllAudio]);
+
+  useEffect(() => {
+    const make = (src, vol = 0.8) => {
+      const a = new Audio(src);
+      a.preload = "auto";
+      // @ts-ignore
+      a.playsInline = true;
+      a.crossOrigin = "anonymous";
+      a.volume = vol;
+      return a;
     };
 
-    window.addEventListener("touchstart", unlockAudio, { once: true });
-    window.addEventListener("mousedown", unlockAudio, { once: true });
+    soundsRef.current.punch = make(SOUND_FILES.punch, 0.7);
+    soundsRef.current.kick = make(SOUND_FILES.kick, 0.7);
+    soundsRef.current.hit = make(SOUND_FILES.hit, 0.4);
+    soundsRef.current.victory = make(SOUND_FILES.victory, 0.85);
+    soundsRef.current.lost = make(SOUND_FILES.lost, 0.85);
+    soundsRef.current.begin = make(SOUND_FILES.begin, 0.75);
+
+    return () => {
+      Object.values(soundsRef.current).forEach((a) => {
+        try {
+          a?.pause();
+          a?.remove?.();
+        } catch {}
+      });
+    };
   }, []);
 
-  const isUsernameUnique = (name) => {
-    return !players.some((player) => player.name === name);
-  };
+  const isUsernameUnique = useCallback(
+    (name) => !players.some((player) => player.name === name),
+    [players]
+  );
 
-  const handleJoinRoom = () => {
+  // --- Handlers (callbacks used by effects must be defined before those effects) ---
+  const handleJoinRoom = useCallback(() => {
     if (!socket) {
       console.error("Socket is not available");
       setPopupMessage("Connection error. Please refresh the page.");
       setShowPopup(true);
       return;
     }
+
+    unlockAllAudio();
 
     const trimmedName = playerName.trim();
     if (trimmedName !== "" && !hasJoinedRoom) {
@@ -134,32 +234,14 @@ const Experience = () => {
         setIsUsernameValid(false);
       }
     }
-  };
-
-  useEffect(() => {
-    if (playerName.trim() !== "") {
-      setIsUsernameValid(isUsernameUnique(playerName.trim()));
-    }
-  }, [playerName, players]);
-
-  useEffect(() => {
-    if (showWelcomeScreen) {
-      const letters = Array.from(welcomeTextRef.current.children);
-      gsap.fromTo(
-        letters,
-        { y: -10 },
-        {
-          y: 0,
-          duration: 0.5,
-          stagger: 0.1,
-          ease: "ease.in",
-          repeat: -1,
-          repeatDelay: 0.5,
-          yoyo: true,
-        }
-      );
-    }
-  }, [showWelcomeScreen]);
+  }, [
+    socket,
+    unlockAllAudio,
+    playerName,
+    hasJoinedRoom,
+    players.length,
+    isUsernameUnique,
+  ]);
 
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
@@ -188,27 +270,17 @@ const Experience = () => {
     setShowInfoPopup(true);
   }, []);
 
-  const handleReady = () => {
+  const handleReady = useCallback(() => {
     if (socket) {
       socket.emit("playerReady", playerName);
       setIsReady(true);
     }
-  };
-
-  useEffect(() => {
-    if (shouldReload) {
-      const timer = setTimeout(() => {
-        window.location.reload();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [shouldReload]);
+  }, [socket, playerName]);
 
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
 
-      // Emit health update to opponent
       socket.emit("updateHealth", {
         health1:
           data.attackerId === players[0]?.id
@@ -260,32 +332,12 @@ const Experience = () => {
   const onPlayerDefeated = useCallback(
     (data) => {
       if (!hasLoggedResult.current) {
-        console.log("Received defeat data:", data);
-
-        if (!data || typeof data !== "object") {
-          console.error("Invalid data format");
-          return;
-        }
-
-        if (data.winnerId === data.loserId) {
-          console.error(
-            "Server sent invalid data - winner and loser are the same"
-          );
-          return;
-        }
+        if (!data || typeof data !== "object") return;
+        if (data.winnerId === data.loserId) return;
 
         const winnerPlayer = players.find((p) => p.id === data.winnerId);
         const loserPlayer = players.find((p) => p.id === data.loserId);
-
-        if (!winnerPlayer || !loserPlayer) {
-          console.error("Couldn't find winner or loser in players array");
-          return;
-        }
-
-        console.log("All players:", players);
-        console.log(
-          `Validating - Winner: ${winnerPlayer?.name} (${data.winnerId}), Loser: ${loserPlayer?.name} (${data.loserId})`
-        );
+        if (!winnerPlayer || !loserPlayer) return;
 
         if (players[0]?.id === data.winnerId) {
           setHealth1(data.winnerHealth);
@@ -297,13 +349,6 @@ const Experience = () => {
 
         setWinner(winnerPlayer);
         setLoser(loserPlayer);
-
-        console.log(
-          `Validated Winner: ${winnerPlayer.name} (ID: ${winnerPlayer.id})`
-        );
-        console.log(
-          `Validated Loser: ${loserPlayer.name} (ID: ${loserPlayer.id})`
-        );
 
         hasLoggedResult.current = true;
 
@@ -328,10 +373,86 @@ const Experience = () => {
     [players, socket?.id]
   );
 
+  // --- Effects (that rely on the helpers/handlers above) ---
+  // Attach gesture unlock to input + JOIN button
+  useEffect(() => {
+    const inputEl = nameInputRef.current;
+    const joinEl = joinBtnRef.current;
+    if (!inputEl && !joinEl) return;
+
+    const handler = () => {
+      unlockAllAudio();
+    };
+
+    const opts = { passive: true };
+    if (inputEl) {
+      inputEl.addEventListener("pointerdown", handler, opts);
+      inputEl.addEventListener("touchstart", handler, opts);
+      inputEl.addEventListener("mousedown", handler, opts);
+      inputEl.addEventListener("focus", handler, opts);
+    }
+    if (joinEl) {
+      joinEl.addEventListener("pointerdown", handler, opts);
+      joinEl.addEventListener("touchstart", handler, opts);
+      joinEl.addEventListener("mousedown", handler, opts);
+      joinEl.addEventListener("click", handler, opts);
+    }
+    return () => {
+      if (inputEl) {
+        inputEl.removeEventListener("pointerdown", handler, opts);
+        inputEl.removeEventListener("touchstart", handler, opts);
+        inputEl.removeEventListener("mousedown", handler, opts);
+        inputEl.removeEventListener("focus", handler, opts);
+      }
+      if (joinEl) {
+        joinEl.removeEventListener("pointerdown", handler, opts);
+        joinEl.removeEventListener("touchstart", handler, opts);
+        joinEl.removeEventListener("mousedown", handler, opts);
+        joinEl.removeEventListener("click", handler, opts);
+      }
+    };
+  }, [showWelcomeScreen, unlockAllAudio]);
+
+  // Validate username as user types
+  useEffect(() => {
+    if (playerName.trim() !== "") {
+      setIsUsernameValid(isUsernameUnique(playerName.trim()));
+    }
+  }, [playerName, isUsernameUnique]);
+
+  // Welcome text animation
+  useEffect(() => {
+    if (showWelcomeScreen) {
+      const letters = Array.from(welcomeTextRef.current.children);
+      gsap.fromTo(
+        letters,
+        { y: -10 },
+        {
+          y: 0,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "ease.in",
+          repeat: -1,
+          repeatDelay: 0.5,
+          yoyo: true,
+        }
+      );
+    }
+  }, [showWelcomeScreen]);
+
+  // Hard reload if server says you’re a 3rd player
+  useEffect(() => {
+    if (shouldReload) {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldReload]);
+
+  // Health sync (incoming)
   useEffect(() => {
     if (!socket) return;
-
-    // Add this to your existing socket effect
     const updateHealthHandler = ({
       health1: newHealth1,
       health2: newHealth2,
@@ -339,29 +460,29 @@ const Experience = () => {
       setHealth1(newHealth1);
       setHealth2(newHealth2);
     };
-
     socket.on("updateHealth", updateHealthHandler);
-
     return () => {
       socket.off("updateHealth", updateHealthHandler);
-      // ... keep your other cleanup code
     };
   }, [socket]);
 
+  // Socket events: players, start, restart, username taken, combat
   useEffect(() => {
     if (!socket) return;
 
-    const updatePlayersHandler = (players) => {
-      if (players.length > 2) {
-        const currentPlayerIndex = players.findIndex((p) => p.id === socket.id);
+    const updatePlayersHandler = (playersList) => {
+      if (playersList.length > 2) {
+        const currentPlayerIndex = playersList.findIndex(
+          (p) => p.id === socket.id
+        );
         if (currentPlayerIndex >= 2) {
           setShouldReload(true);
           return;
         }
       }
-      setPlayers(players);
+      setPlayers(playersList);
 
-      if (isGameStarted && players.length === 1) {
+      if (isGameStarted && playersList.length === 1) {
         setPlayerLeft(true);
         setPopupMessage("The other player has left the game.");
         setShowPopup(true);
@@ -370,8 +491,10 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
+      unlockAllAudio();
       let count = 3;
       setCountdown(count);
+
       const interval = setInterval(() => {
         count -= 1;
         setCountdown(count);
@@ -380,12 +503,10 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
-          if (!hasPlayedStartSound.current && beginSoundRef.current) {
-            beginSoundRef.current.currentTime = 0;
-            beginSoundRef.current
-              .play()
-              .catch((e) => console.log("Audio play failed:", e));
-            hasPlayedStartSound.current = true;
+          const begin = soundsRef.current.begin;
+          if (begin) {
+            begin.currentTime = 0;
+            begin.play().catch((e) => console.log("Begin sound failed:", e));
           }
         }
       }, 1000);
@@ -416,24 +537,35 @@ const Experience = () => {
     };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
+  // Cross-link player controllers when game starts
   useEffect(() => {
     if (
       isGameStarted &&
       carControllerRef1.current &&
       carControllerRef2.current
     ) {
-      if (players[0]?.id === socket?.id) {
-        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
-        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
-      } else if (players[1]?.id === socket?.id) {
-        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
-        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
-      }
+      carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+      carControllerRef2.current.setOpponentRef(carControllerRef1.current);
     }
   }, [isGameStarted, players, socket?.id]);
 
-  const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+  // ✅ ADD: Re-link after reset or restart
+  useEffect(() => {
+    const relink = () => {
+      if (carControllerRef1.current && carControllerRef2.current) {
+        carControllerRef1.current.setOpponentRef(carControllerRef2.current);
+        carControllerRef2.current.setOpponentRef(carControllerRef1.current);
+      }
+    };
 
+    // Relink after game starts
+    if (isGameStarted) {
+      const timeout = setTimeout(relink, 100); // Give refs time to mount
+      return () => clearTimeout(timeout);
+    }
+  }, [isGameStarted, players]);
+
+  // Restart countdown -> trigger reset
   useEffect(() => {
     if (restartCountdown !== null && restartCountdown > 0) {
       const interval = setInterval(() => {
@@ -445,6 +577,7 @@ const Experience = () => {
     }
   }, [restartCountdown, handleReset]);
 
+  // --- Render ---
   return (
     <>
       <KeyboardControls map={memoizedKeyboardMap}>
@@ -469,7 +602,6 @@ const Experience = () => {
 
           <Physics
             contactPairPersistentThreshold={0.08}
-            sleepAfterStillness={0.2}
             substeps={2}
             solverIterations={8}
             timeStep="vary"
@@ -478,7 +610,14 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
-                  ref={carControllerRef1}
+                  ref={(el) => {
+                    carControllerRef1.current = el;
+                    if (players[0]?.id === socket?.id) {
+                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    }
+                  }}
+                  key={players[0]?.id || "player1"}
+                  playerId={players[0]?.id}
                   characterType="cena"
                   joystickInput={
                     players[0]?.id === socket?.id ? joystickInput : null
@@ -496,9 +635,18 @@ const Experience = () => {
                   isLocalPlayer={players[0]?.id === socket?.id}
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
+                  audio={soundsRef.current}
                 />
+
                 <PlayerController
-                  ref={carControllerRef2}
+                  ref={(el) => {
+                    carControllerRef2.current = el;
+                    if (players[1]?.id === socket?.id) {
+                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    }
+                  }}
+                  key={players[1]?.id || "player2"}
+                  playerId={players[1]?.id}
                   characterType="austin"
                   joystickInput={
                     players[1]?.id === socket?.id ? joystickInput : null
@@ -516,6 +664,7 @@ const Experience = () => {
                   isLocalPlayer={players[1]?.id === socket?.id}
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
+                  audio={soundsRef.current}
                 />
               </>
             )}
@@ -554,16 +703,20 @@ const Experience = () => {
             </div>
             <div>
               <input
+                ref={nameInputRef}
                 type="text"
                 placeholder="Enter your name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
+                onPointerDown={unlockAllAudio}
                 className="px-4 py-2 mb-4 rounded-lg"
               />
             </div>
             <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
               <button
+                ref={joinBtnRef}
                 onClick={handleJoinRoom}
+                onPointerDown={unlockAllAudio}
                 disabled={
                   hasJoinedRoom ||
                   !isUsernameValid ||
@@ -619,7 +772,7 @@ const Experience = () => {
 
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
-          {/* Player 1 - Always left */}
+          {/* Player 1 */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -633,7 +786,7 @@ const Experience = () => {
             </div>
           </div>
 
-          {/* Player 2 - Always right */}
+          {/* Player 2 */}
           <div className="flex flex-col items-end">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
               <div
@@ -648,6 +801,7 @@ const Experience = () => {
           </div>
         </div>
       )}
+
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
@@ -689,8 +843,10 @@ const Experience = () => {
 
       {isGameStarted && (
         <AttackButtons
-          onPunch={(punching) => setIsPunching(punching)}
-          onKick={(kicking) => setIsKicking(kicking)}
+          key={localPlayer?.id || playerName} // 👈 unique per match or player
+          onPunch={setIsPunching}
+          onKick={setIsKicking}
+          onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         />
       )}
 
@@ -711,6 +867,7 @@ export default Experience;
 
 
 
+
 //playercontroller
 
 import React, {
@@ -721,9 +878,10 @@ import React, {
   useImperativeHandle,
 } from "react";
 import { CapsuleCollider, RigidBody } from "@react-three/rapier";
-import { Vector3 } from "three";
+import { Vector3, Box3 } from "three";
+import { CircleGeometry, MeshBasicMaterial, Mesh } from "three";
 import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls } from "@react-three/drei";
+import { useKeyboardControls, Html } from "@react-three/drei";
 import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
@@ -731,7 +889,7 @@ import Cenaa from "./Cenaa";
 
 const SOUNDS = {
   punch: "/punch.mp3",
-  kick: "/kick.mp3",
+  kick: "/punch.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
   lost: "/lost.mp3",
@@ -740,6 +898,7 @@ const SOUNDS = {
 const PlayerController = forwardRef(
   (
     {
+      playerId,
       joystickInput,
       position,
       isPlayer1,
@@ -752,9 +911,11 @@ const PlayerController = forwardRef(
       playerName,
       opponentName,
       isLocalPlayer,
+      audio,
     },
     ref
   ) => {
+    // --- Context / state ---
     const socket = useSocket();
     const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640);
     const [currentAnimation, setCurrentAnimation] = useState("idle");
@@ -763,9 +924,15 @@ const PlayerController = forwardRef(
     const [isDefeated, setIsDefeated] = useState(false);
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
+    const [showDebug, setShowDebug] = useState(true);
+
+    // --- Refs ---
     const attackTimer = useRef(null);
     const hitTimer = useRef(null);
+
+    // Keep for defeat attribution only; don't use it to reject hits
     const opponentAttackTime = useRef(0);
+
     const hasEmittedDefeat = useRef(false);
     const opponentIdRef = useRef(null);
 
@@ -785,6 +952,10 @@ const PlayerController = forwardRef(
     const RUN_SPEED = 2.5;
     const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
 
+    // --- Attack ring config (shared by logic + visuals) ---
+    const [attackRadius, setAttackRadius] = useState(1.2); // fallback
+    const RING_Y = 2.5; // slightly above floor to avoid z-fighting
+
     const rb = useRef();
     const container = useRef();
     const character = useRef();
@@ -797,37 +968,72 @@ const PlayerController = forwardRef(
     const [, get] = useKeyboardControls();
     const movementEnabled = useRef(true);
 
+    // Debug ring refs
+    const DEBUG_HIT_RANGE = true;
+    const debugRangeRef = useRef();
+    const debugMaterialRef = useRef();
+    const distanceLabelRef = useRef(null);
+
+    // Track opponent id (for logging)
     useEffect(() => {
       opponentIdRef.current = opponentRef.current?.id;
     }, [opponentRef.current?.id]);
 
+    // Init / teardown sounds
     useEffect(() => {
-      punchSound.current = new Audio(SOUNDS.punch);
-      kickSound.current = new Audio(SOUNDS.kick);
-      hitSound.current = new Audio(SOUNDS.hit);
-      victorySound.current = new Audio(SOUNDS.victory);
-      lostSound.current = new Audio(SOUNDS.lost);
+      // If Experience provided shared, unlocked audio, use it
+      if (
+        audio?.punch &&
+        audio?.kick &&
+        audio?.hit &&
+        audio?.victory &&
+        audio?.lost
+      ) {
+        punchSound.current = audio.punch;
+        kickSound.current = audio.kick;
+        hitSound.current = audio.hit;
+        victorySound.current = audio.victory;
+        lostSound.current = audio.lost;
+        return; // Experience owns lifecycle; no teardown here
+      }
 
-      punchSound.current.volume = 0.7;
-      kickSound.current.volume = 0.7;
-      hitSound.current.volume = 0.4;
-      victorySound.current.volume = 0.8;
-      lostSound.current.volume = 0.8;
+      // Fallback (only if audio prop is missing)
+      const make = (src, vol = 0.8) => {
+        const a = new Audio(src);
+        // @ts-ignore
+        a.playsInline = true;
+        a.preload = "auto";
+        a.volume = vol;
+        return a;
+      };
+
+      punchSound.current = make("/punch.mp3", 0.7);
+      kickSound.current = make("/kick.mp3", 0.7);
+      hitSound.current = make("/hit.mp3", 0.4);
+      victorySound.current = make("/victory.mp3", 0.85);
+      lostSound.current = make("/lost.mp3", 0.85);
 
       return () => {
+        // clean up only if we created local elements
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (soundRef) => {
-            if (soundRef.current) {
-              soundRef.current.pause();
-              soundRef.current.src = "";
-              soundRef.current.remove();
-              soundRef.current = null;
-            }
+          (r) => {
+            try {
+              if (
+                r.current &&
+                (!audio || !Object.values(audio).includes(r.current))
+              ) {
+                r.current.pause();
+                r.current.src = "";
+                r.current.remove?.();
+              }
+            } catch {}
+            r.current = null;
           }
         );
       };
-    }, []);
+    }, [audio]);
 
+    // Responsive screen check
     useEffect(() => {
       const handleResize = () => {
         setIsSmallScreen(window.innerWidth < 640);
@@ -836,13 +1042,66 @@ const PlayerController = forwardRef(
       return () => window.removeEventListener("resize", handleResize);
     }, []);
 
+    // --- Helpers / Handlers ---
     const setOpponentRef = (ref) => {
       opponentRef.current = ref;
+    };
+
+    useEffect(() => {
+      if (!character.current) return;
+
+      const box = new Box3().setFromObject(character.current);
+      const size = box.getSize(new Vector3());
+
+      const reach = Math.max(size.x, size.z) * 0.5 + 0.1; // add padding
+      console.log("Calculated attackRadius from model:", reach.toFixed(2));
+
+      setAttackRadius(reach);
+    }, [characterType]);
+
+    // 2D distance + "ring contact" helper (uses same ATTACK_RADIUS for both players)
+    const groundDistance = (a, b) => {
+      const dx = a.x - b.x;
+      const dz = a.z - b.z;
+      return Math.sqrt(dx * dx + dz * dz);
+    };
+    const edgeDistance = (a, b, isPlayer1) => {
+      const centerDist = groundDistance(a, b);
+      const separation = centerDist - attackRadius * 2;
+      // separation < 0 means overlap
+
+      // Player 1 sees +separation, Player 2 sees -separation
+      return isPlayer1 ? separation : -separation;
+    };
+
+    const ringsInContact = () => {
+      if (!opponentRef.current || !rb.current) return false;
+      const selfPos = rb.current.translation?.();
+      const otherPos = opponentRef.current.translation?.();
+      if (!selfPos || !otherPos) return false;
+
+      // Same radius both sides → contact when distance ≤ 2R
+      return Math.abs(edgeDistance(selfPos, otherPos, isPlayer1)) <= 0;
     };
 
     const startAttack = (type) => {
       if (isAttacking || isDefeated) return;
 
+      if (rb.current && opponentRef.current) {
+        const selfPos = rb.current.translation?.();
+        const otherPos = opponentRef.current.translation?.();
+
+        if (selfPos && otherPos) {
+          const distance = edgeDistance(selfPos, otherPos);
+          console.log(
+            `[${type.toUpperCase()}] Edge Distance to opponent:`,
+            distance.toFixed(3)
+          );
+          console.log(`[${type.toUpperCase()}] In range:`, distance <= 0);
+        }
+      }
+
+      const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
       const damage = type === "kick" ? 20 : 10;
       const currentTime = Date.now();
       setLastAttackTime(currentTime);
@@ -851,56 +1110,67 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      if (type === "punch" && punchSound.current) {
-        punchSound.current.currentTime = 0;
-        punchSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
-      } else if (type === "kick" && kickSound.current) {
-        kickSound.current.currentTime = 0;
-        kickSound.current
-          .play()
-          .catch((e) => console.log("Audio play failed:", e));
+      const sound = type === "kick" ? kickSound.current : punchSound.current;
+      if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch((e) => console.log("Audio play failed:", e));
       }
 
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
 
+      // ✅ Physics Nudge for iOS (does not override contact logic)
+      if (isiOS && rb.current) {
+        const vel = rb.current.linvel();
+        const forwardNudge = new Vector3(
+          Math.sin(rotationTarget.current),
+          0.02, // slight vertical bump
+          Math.cos(rotationTarget.current)
+        )
+          .normalize()
+          .multiplyScalar(0.05); // minimal forward push
+
+        vel.x += forwardNudge.x;
+        vel.y += forwardNudge.y;
+        vel.z += forwardNudge.z;
+
+        rb.current.setLinvel(vel, true);
+      }
+
       if (
-        isInContact &&
+        (isInContact || ringsInContact()) &&
         socket &&
         opponentRef.current &&
-        !opponentRef.current.isDefeated
+        !opponentRef.current?.isDefeated
       ) {
         socket.emit("playerHit", {
           attackerId: socket.id,
-          damage: damage,
+          damage,
           attackType: type,
           attackTime: currentTime,
         });
       }
 
-      const duration = 1000;
       attackTimer.current = setTimeout(() => {
         setIsAttacking(false);
         movementEnabled.current = !isDefeated;
         setCurrentAnimation(isDefeated ? "fall" : "idle");
-      }, duration);
+      }, 1000);
     };
 
     const takeHit = (attackType, attackTime) => {
       if (isHit || isDefeated) return;
-      if (attackTime <= lastAttackTime) return;
+
+      // Accept the hit; timestamp is for attribution/logging only
+      opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
         hitSound.current.currentTime = 0;
         hitSound.current.play().catch(() => {
-          console.log("iOS blocked audio, still animating hit");
+          // iOS can block audio the first time; animation still runs
         });
       }
-
-      opponentAttackTime.current = attackTime;
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
@@ -931,13 +1201,6 @@ const PlayerController = forwardRef(
         if (contactTimeout.current) {
           clearTimeout(contactTimeout.current);
         }
-
-        console.log("Collision entered with:", {
-          self: rb.current?.userData?.id,
-          other: otherUserData?.id,
-          time: Date.now(),
-          isLocalPlayer,
-        });
       }
     };
 
@@ -952,6 +1215,7 @@ const PlayerController = forwardRef(
       }
     };
 
+    // --- Effects depending on helpers ---
     useEffect(() => {
       if (isPunching && !isHit) startAttack("punch");
       if (isKicking && !isHit) startAttack("kick");
@@ -965,11 +1229,6 @@ const PlayerController = forwardRef(
 
         if (!hasEmittedDefeat.current) {
           hasEmittedDefeat.current = true;
-          console.log(`Emitting defeat - 
-        Winner: ${opponentRef.current.id}, 
-        Loser: ${socket.id},
-        WinnerHealth: ${opponentHealth},
-        LoserHealth: ${health}`);
 
           socket.emit("playerDefeated", {
             winnerId: opponentRef.current.id,
@@ -986,8 +1245,8 @@ const PlayerController = forwardRef(
       if (!socket) return;
 
       const onPlayerHit = (data) => {
-        console.log("onPlayerHit received", data);
-        if (data.attackerId !== socket.id) {
+        if (data.victimId === playerId) {
+          // precise match
           takeHit(data.attackType, data.attackTime);
         }
       };
@@ -999,6 +1258,31 @@ const PlayerController = forwardRef(
       };
     }, [socket]);
 
+    useEffect(() => {
+      if (!socket) return;
+
+      const handleStartGame = () => {
+        setIsDefeated(false);
+        setMatchResult(null);
+        setCurrentAnimation("idle");
+        setIsHit(false);
+        setIsAttacking(false);
+        hasEmittedDefeat.current = false;
+        movementEnabled.current = true;
+        opponentAttackTime.current = 0;
+
+        if (character.current?.resetAnimation) {
+          character.current.resetAnimation();
+        }
+      };
+
+      socket.on("startGame", handleStartGame);
+      return () => socket.off("startGame", handleStartGame);
+    }, [socket]);
+
+    // --- Debug range (visual) ---
+
+    // --- Frame loop ---
     useFrame(({ camera }) => {
       if (!rb.current || !isPlayer1 || isDefeated) return;
 
@@ -1109,8 +1393,64 @@ const PlayerController = forwardRef(
           camera.lookAt(cameraLookAt.current);
         }
       }
+
+      // --- Live color feedback for ring contact (red → out, green → in) ---
+      if (showDebug && debugMaterialRef.current && opponentRef.current) {
+        const mine = rb.current?.translation?.();
+        const theirs = opponentRef.current.translation?.();
+        if (mine && theirs) {
+          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
+          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
+        }
+        if (showDebug && distanceLabelRef.current && mine && theirs) {
+          const d = edgeDistance(mine, theirs, isPlayer1);
+
+          // Color code based on signed distance
+          if (d > 0) {
+            // too far
+            debugMaterialRef.current.color.set(0xff0000); // red
+          } else if (d < 0) {
+            // overlapping from this player's perspective
+            debugMaterialRef.current.color.set(0x0000ff); // blue
+          } else {
+            // exactly in contact
+            debugMaterialRef.current.color.set(0x00ff00); // green
+          }
+
+          // Update label text
+          if (distanceLabelRef.current) {
+            distanceLabelRef.current.textContent = `${
+              isPlayer1 ? "P1" : "P2"
+            } dist: ${d.toFixed(2)} | R: ${attackRadius.toFixed(2)}`;
+          }
+        }
+      }
+    });
+    // --- Debug frame loop (runs for both players) ---
+    useFrame(() => {
+      if (!showDebug || !rb.current || !opponentRef.current) return;
+
+      const mine = rb.current.translation?.();
+      const theirs = opponentRef.current.translation?.();
+
+      if (mine && theirs) {
+        // Update debug ring color
+        if (debugMaterialRef.current) {
+          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
+          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
+        }
+
+        // Update distance label text
+        if (distanceLabelRef.current) {
+          const d = groundDistance(mine, theirs);
+          distanceLabelRef.current.textContent = `dist: ${d.toFixed(
+            2
+          )} | R: ${attackRadius.toFixed(2)}`;
+        }
+      }
     });
 
+    // --- Socket move sync (remote) ---
     useEffect(() => {
       if (!socket) return;
 
@@ -1128,7 +1468,28 @@ const PlayerController = forwardRef(
       return () => socket.off("carMove", onCarMove);
     }, [socket, isPlayer1]);
 
-    useImperativeHandle(ref, () => ({
+    // --- Imperative API ---
+    useImperativeHandle(ref, () => wrapper);
+
+    const isFpp = useRef(false);
+
+    const toggleFppTpp = () => {
+      isFpp.current = !isFpp.current;
+
+      if (isFpp.current) {
+        // ✅ FPP: In front of face and looking FORWARD
+        cameraPosition.current.position.set(0, 3.1, -0.5);
+        cameraTarget.current.position.set(0, 3.1, -1); // fixed: forward
+      } else {
+        // TPP: Behind and above
+        cameraPosition.current.position.set(0, 4.5, 2.5);
+        cameraTarget.current.position.set(0, 0, -5.5);
+      }
+    };
+
+    // Keep the object literal separate so we don’t capture stale refs above
+    const wrapper = {
+      toggleFppTpp,
       setOpponentRef,
 
       setVictory: (isLocalPlayerWinner) => {
@@ -1164,8 +1525,9 @@ const PlayerController = forwardRef(
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
-    }));
+    };
 
+    // Cleanup timeouts and audio refs on unmount
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
@@ -1183,6 +1545,7 @@ const PlayerController = forwardRef(
       };
     }, []);
 
+    // --- Render ---
     return (
       <RigidBody
         colliders={false}
@@ -1192,18 +1555,18 @@ const PlayerController = forwardRef(
         onCollisionEnter={handleCollisionEnter}
         onCollisionExit={handleCollisionExit}
         userData={{
-          id: socket?.id,
+          id: playerId, // instead of socket?.id
           isPlayer: true,
         }}
         solverIterations={10}
         ccd={true}
         linearDamping={0.5}
         angularDamping={1.0}
-        sleepAfterStillness={0.2}
-        canSleep={true}
+        sleepAfterStillness={0}
+        canSleep={false}
       >
         <group ref={container} position={position}>
-          <group ref={cameraTarget} position-z={-5.5} rotation-y={Math.PI} />
+          <group ref={cameraTarget} position-z={-5.5} />
           <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
           <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>
             {characterType === "cena" ? (
@@ -1262,97 +1625,68 @@ const PlayerController = forwardRef(
 export default PlayerController;
 
 
+
 //AttackButtons
-
 import React, { useRef, useEffect, useState } from "react";
+import { useSocket } from "../context/SocketContext";
 
-const AttackButtons = ({ onPunch, onKick }) => {
+const AttackButtons = ({ onPunch, onKick, onToggleCamera }) => {
   const punchRef = useRef();
   const kickRef = useRef();
+  const socket = useSocket();
 
   const [punchCooldown, setPunchCooldown] = useState(false);
   const [kickCooldown, setKickCooldown] = useState(false);
+  const [firstAttackDone, setFirstAttackDone] = useState(false);
 
-  const handleAttackStart = (type) => {
+  const handleAttackStart = (type, e) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+
+    if (!firstAttackDone) setFirstAttackDone(true);
+
     if (
       (type === "punch" && punchCooldown) ||
       (type === "kick" && kickCooldown)
     ) {
-      return false; // Return false if attack is blocked by cooldown
+      return false;
     }
 
     if (type === "punch") {
       setPunchCooldown(true);
-      onPunch(true); // Trigger punch state
-      setTimeout(() => onPunch(false), 1000); // Reset after 1 second
+      onPunch(true);
+      setTimeout(() => onPunch(false), 1000);
       setTimeout(() => setPunchCooldown(false), 2500);
-      return true;
     } else {
       setKickCooldown(true);
-      onKick(true); // Trigger kick state
-      setTimeout(() => onKick(false), 1000); // Reset after 1 second
+      onKick(true);
+      setTimeout(() => onKick(false), 1000);
       setTimeout(() => setKickCooldown(false), 3000);
-      return true;
     }
+
+    return true;
   };
 
-  // Event handlers that return whether attack was successful
-  const handlePunchStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("punch");
-  };
-
-  const handleKickStart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    return handleAttackStart("kick");
-  };
-
+  // Reset attack state on every new game
   useEffect(() => {
-    const punchBtn = punchRef.current;
-    const kickBtn = kickRef.current;
+    if (!socket) return;
 
-    if (!punchBtn || !kickBtn) return;
-
-    const options = { passive: false, capture: true };
-
-    const touchPunchHandler = (e) => {
-      const success = handlePunchStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      return true;
+    const handleStartGame = () => {
+      setPunchCooldown(false);
+      setKickCooldown(false);
+      setFirstAttackDone(false);
     };
 
-    const touchKickHandler = (e) => {
-      const success = handleKickStart(e);
-      if (success) {
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      }
-      return true;
-    };
-    punchBtn.addEventListener("touchstart", touchPunchHandler, options);
-    punchBtn.addEventListener("mousedown", handlePunchStart);
-
-    kickBtn.addEventListener("touchstart", touchKickHandler, options);
-    kickBtn.addEventListener("mousedown", handleKickStart);
-
+    socket.on("startGame", handleStartGame);
     return () => {
-      punchBtn.removeEventListener("touchstart", touchPunchHandler, options);
-      punchBtn.removeEventListener("mousedown", handlePunchStart);
-
-      kickBtn.removeEventListener("touchstart", touchKickHandler, options);
-      kickBtn.removeEventListener("mousedown", handleKickStart);
+      socket.off("startGame", handleStartGame);
     };
-  }, [punchCooldown, kickCooldown]);
+  }, [socket]);
 
   const renderButton = (type, ref, icon, isCooldown, duration) => (
-    <div className="relative w-16 h-16">
+    <div className="relative w-16 h-16 select-none">
       {/* GREEN STATIC BORDER */}
       <svg
         className="absolute top-0 left-0 w-16 h-16 pointer-events-none"
@@ -1396,15 +1730,25 @@ const AttackButtons = ({ onPunch, onKick }) => {
         ref={ref}
         disabled={isCooldown}
         className={`w-16 h-16 rounded-full bg-blue-500 bg-opacity-70 flex items-center justify-center 
-          active:bg-opacity-100 transition-all select-none user-select-none
-          ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
-        onMouseDown={() => !isCooldown && handleAttackStart(type)}
+    active:bg-opacity-100 transition-all select-none user-select-none
+    ${isCooldown ? "opacity-50 cursor-not-allowed" : ""}`}
+        onClick={(e) => {
+          e.preventDefault();
+          !isCooldown && handleAttackStart(type, e);
+        }}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          !isCooldown && handleAttackStart(type, e);
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          !isCooldown && handleAttackStart(type, e);
+        }}
         style={{
           WebkitTapHighlightColor: "transparent",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
           touchAction: "manipulation",
-          // Correct React syntax for webkit prefixes:
           WebkitOverflowScrolling: "touch",
           WebkitUserDrag: "none",
         }}
@@ -1417,7 +1761,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
   );
 
   return (
-    <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 sm:hidden select-none user-select-none z-[100]">
+    <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
+      <button
+        onClick={onToggleCamera}
+        className="w-16 h-16 rounded-full bg-purple-500 text-white font-bold text-xl"
+      >
+        🎥
+      </button>
       {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 
@@ -1438,18 +1788,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
             stroke-dashoffset: 0;
           }
         }
-
-        /* iOS-specific improvements */
         button {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
           touch-action: manipulation;
           -webkit-tap-highlight-color: transparent;
         }
-
-        /* Prevent touch highlighting */
         * {
-          -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
           -webkit-tap-highlight-color: transparent;
         }
       `}</style>
@@ -1458,6 +1803,7 @@ const AttackButtons = ({ onPunch, onKick }) => {
 };
 
 export default AttackButtons;
+
 
 
 //server.js

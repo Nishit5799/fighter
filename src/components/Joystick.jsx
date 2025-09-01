@@ -1,10 +1,17 @@
 import React, { useRef, useState, useEffect } from "react";
 
-const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
+const Joystick = ({
+  onMove,
+  onStart = () => {},
+  disabled,
+  onToggleRun,
+  onToggleCamera,
+}) => {
   const joystickRef = useRef(null);
   const thumbstickRef = useRef(null);
   const runButtonRef = useRef(null);
   const touchIdRef = useRef(null);
+
   const centerRef = useRef({ x: 0, y: 0 });
 
   const [thumbstickPosition, setThumbstickPosition] = useState({ x: 0, y: 0 });
@@ -12,6 +19,7 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [runState, setRunState] = useState("ready"); // 'ready' | 'running' | 'cooldown'
   const [runCountdown, setRunCountdown] = useState(null); // 5 → 4 → ... → 1
+  const [isFpp, setIsFpp] = useState(false);
 
   const handleTouchStart = (e) => {
     e.preventDefault();
@@ -124,6 +132,15 @@ const Joystick = ({ onMove, onStart = () => {}, disabled, onToggleRun }) => {
   return (
     <>
       <div className="fixed bottom-5 left-5 flex flex-col items-center gap-4">
+        <button
+          onClick={() => {
+            setIsFpp(!isFpp);
+            onToggleCamera();
+          }}
+          className="w-14 h-14 sm:w-16 sm:h-16 rounded-full left-2 bg-purple-500 text-white font-bold text-sm sm:text-xl"
+        >
+          {isFpp ? "TPP" : "FPP"}
+        </button>
         <div
           ref={joystickRef}
           className="w-30 h-30 rounded-full bg-white bg-opacity-50 touch-none flex items-center justify-center select-none user-select-none"

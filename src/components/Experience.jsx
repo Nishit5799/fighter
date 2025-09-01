@@ -829,6 +829,7 @@ const Experience = () => {
       )}
 
       <Joystick
+        onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         onMove={(data) => {
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
@@ -844,7 +845,6 @@ const Experience = () => {
           key={localPlayer?.id || playerName} // 👈 unique per match or player
           onPunch={setIsPunching}
           onKick={setIsKicking}
-          onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         />
       )}
 
