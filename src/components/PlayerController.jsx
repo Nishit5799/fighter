@@ -12,8 +12,10 @@ import { useFrame } from "@react-three/fiber";
 import { useKeyboardControls, Html } from "@react-three/drei";
 import { MathUtils } from "three/src/math/MathUtils";
 import { useSocket } from "../context/SocketContext";
+
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
+import { useControls } from "leva";
 
 const SOUNDS = {
   punch: "/punch.mp3",
@@ -78,7 +80,14 @@ const PlayerController = forwardRef(
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
-    const ROTATION_SPEED = isSmallScreen ? 0.06 : 0.04;
+    const { rotationSpeed } = useControls("⚙️ Settings", {
+      rotationSpeed: {
+        value: isSmallScreen ? 0.06 : 0.04,
+        min: 0.1,
+        max: 0.9,
+        step: 0.1,
+      },
+    });
 
     // --- Attack ring config (shared by logic + visuals) ---
     const [attackRadius, setAttackRadius] = useState(1.2); // fallback
@@ -454,7 +463,7 @@ const PlayerController = forwardRef(
 
           if (joystickMagnitude > 0.1) {
             if (Math.abs(joystickInput.x) > 0.1) {
-              rotationTarget.current += ROTATION_SPEED * joystickInput.x;
+              rotationTarget.current += rotationSpeed * joystickInput.x;
             }
 
             if (joystickInput.y < 0) {
@@ -473,7 +482,7 @@ const PlayerController = forwardRef(
       }
 
       if (movement.x !== 0 && movementEnabled.current && !isHit) {
-        rotationTarget.current += ROTATION_SPEED * movement.x;
+        rotationTarget.current += rotationSpeed * movement.x;
       }
 
       if (movementEnabled.current && !isHit) {
