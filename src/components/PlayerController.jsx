@@ -609,7 +609,7 @@ const PlayerController = forwardRef(
       isFpp.current = !isFpp.current;
 
       if (isFpp.current) {
-        cameraPosition.current.position.set(0, 3.1, -0.17);
+        cameraPosition.current.position.set(0, 3.1, -0.23);
         cameraTarget.current.position.set(0, 3.1, -1.5);
         if (mainCameraRef.current) {
           mainCameraRef.current.fov = 125;
