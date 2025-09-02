@@ -75,6 +75,10 @@ const PlayerController = forwardRef(
     const hitSound = useRef(null);
     const victorySound = useRef(null);
     const lostSound = useRef(null);
+    // --- Smooth FPP camera shift on run ---
+    const fppRunTimer = useRef(null);
+    const isFppRunning = useRef(false);
+    const targetCameraZ = useRef(-0.2); // Default FPP Z
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
@@ -424,11 +428,6 @@ const PlayerController = forwardRef(
         joystickInput &&
         (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
       const { forward, backward, left, right, run, punch, kick } = get();
-
-      // --- Smooth FPP camera shift on run ---
-      const fppRunTimer = useRef(null);
-      const isFppRunning = useRef(false);
-      const targetCameraZ = useRef(-0.2); // Default FPP Z
 
       if (isFpp.current && run) {
         if (!isFppRunning.current) {
