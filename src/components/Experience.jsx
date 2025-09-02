@@ -18,6 +18,7 @@ import Info from "./Info";
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
+import { Leva } from "leva";
 
 // (near the top, after other imports)
 const SOUND_FILES = {
@@ -799,6 +800,31 @@ const Experience = () => {
           </div>
         </div>
       )}
+      {isGameStarted && (
+        <div className="fixed top-[100px] right-5 z-[1000]">
+          <button
+            onClick={() => {
+              const levaPanel = document.querySelector(".leva-c-kUDvEB");
+              if (levaPanel) {
+                levaPanel.style.display =
+                  levaPanel.style.display === "none" ? "block" : "none";
+              }
+            }}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "8px",
+              background: "#222",
+              color: "#fff",
+              border: "1px solid #555",
+              fontSize: "14px",
+              cursor: "pointer",
+            }}
+          >
+            ⚙️ Settings
+          </button>
+        </div>
+      )}
+      <Leva hidden />
 
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
