@@ -83,9 +83,9 @@ const PlayerController = forwardRef(
     const { rotationSpeed } = useControls("⚙️ Settings", {
       rotationSpeed: {
         value: isSmallScreen ? 0.06 : 0.04,
-        min: 0.1,
-        max: 0.9,
-        step: 0.1,
+        min: 0.01,
+        max: 0.09,
+        step: 0.01,
       },
     });
 

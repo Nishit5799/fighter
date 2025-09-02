@@ -18,6 +18,7 @@ import Info from "./Info";
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
+import { Leva } from "leva";
 
 // (near the top, after other imports)
 const SOUND_FILES = {
@@ -838,6 +839,17 @@ const Experience = () => {
         }}
         onStart={() => {}}
         disabled={!isGameStarted || players.length !== 2}
+      />
+      <Leva
+        collapsed={false}
+        theme={{ sizes: { rootWidth: "220px" } }}
+        fill
+        style={{
+          position: "fixed",
+          top: "80px",
+          right: "10px",
+          zIndex: 1000,
+        }}
       />
 
       {isGameStarted && (
