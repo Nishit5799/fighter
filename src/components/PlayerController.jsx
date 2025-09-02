@@ -425,6 +425,32 @@ const PlayerController = forwardRef(
         (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1);
       const { forward, backward, left, right, run, punch, kick } = get();
 
+      // --- Smooth FPP camera shift on run ---
+      const fppRunTimer = useRef(null);
+      const isFppRunning = useRef(false);
+      const targetCameraZ = useRef(-0.2); // Default FPP Z
+
+      if (isFpp.current && run) {
+        if (!isFppRunning.current) {
+          isFppRunning.current = true;
+          targetCameraZ.current = -0.35; // move forward
+          if (fppRunTimer.current) clearTimeout(fppRunTimer.current);
+          fppRunTimer.current = setTimeout(() => {
+            isFppRunning.current = false;
+            targetCameraZ.current = -0.2; // reset after 5s
+          }, 5000);
+        }
+      } else if (isFpp.current && !run && isFppRunning.current) {
+        isFppRunning.current = false;
+        if (fppRunTimer.current) clearTimeout(fppRunTimer.current);
+        targetCameraZ.current = -0.2;
+      }
+
+      if (isFpp.current) {
+        const camPos = cameraPosition.current.position;
+        camPos.z = MathUtils.lerp(camPos.z, targetCameraZ.current, 0.1); // smooth transition
+      }
+
       if (punch && !isAttacking && !isHit) startAttack("punch");
       if (kick && !isAttacking && !isHit) startAttack("kick");
 
@@ -525,39 +551,8 @@ const PlayerController = forwardRef(
           camera.lookAt(cameraLookAt.current);
         }
       }
-
-      // --- Live color feedback for ring contact (red → out, green → in) ---
-      if (showDebug && debugMaterialRef.current && opponentRef.current) {
-        const mine = rb.current?.translation?.();
-        const theirs = opponentRef.current.translation?.();
-        if (mine && theirs) {
-          const inRange = groundDistance(mine, theirs) <= attackRadius * 2;
-          debugMaterialRef.current.color.set(inRange ? 0x00ff00 : 0xff0000);
-        }
-        if (showDebug && distanceLabelRef.current && mine && theirs) {
-          const d = edgeDistance(mine, theirs, isPlayer1);
-
-          // Color code based on signed distance
-          if (d > 0) {
-            // too far
-            debugMaterialRef.current.color.set(0xff0000); // red
-          } else if (d < 0) {
-            // overlapping from this player's perspective
-            debugMaterialRef.current.color.set(0x0000ff); // blue
-          } else {
-            // exactly in contact
-            debugMaterialRef.current.color.set(0x00ff00); // green
-          }
-
-          // Update label text
-          if (distanceLabelRef.current) {
-            distanceLabelRef.current.textContent = `${
-              isPlayer1 ? "P1" : "P2"
-            } dist: ${d.toFixed(2)} | R: ${attackRadius.toFixed(2)}`;
-          }
-        }
-      }
     });
+
     // --- Debug frame loop (runs for both players) ---
     useFrame(() => {
       if (!showDebug || !rb.current || !opponentRef.current) return;
@@ -609,7 +604,7 @@ const PlayerController = forwardRef(
       isFpp.current = !isFpp.current;
 
       if (isFpp.current) {
-        cameraPosition.current.position.set(0, 3.1, -0.2);
+        cameraPosition.current.position.set(0, 3.8, -0.2);
         cameraTarget.current.position.set(0, 3.1, -1.5);
         if (mainCameraRef.current) {
           mainCameraRef.current.fov = 125;
