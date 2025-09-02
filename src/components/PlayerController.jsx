@@ -15,7 +15,7 @@ import { useSocket } from "../context/SocketContext";
 
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
-import { useControls } from "leva";
+import { Leva, useControls } from "leva";
 
 const SOUNDS = {
   punch: "/punch.mp3",
@@ -55,6 +55,7 @@ const PlayerController = forwardRef(
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
     const [showDebug, setShowDebug] = useState(true);
+    const [showSettings, setShowSettings] = useState(false);
 
     // --- Refs ---
     const attackTimer = useRef(null);
@@ -80,14 +81,18 @@ const PlayerController = forwardRef(
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
-    const { rotationSpeed } = useControls("⚙️ Settings", {
-      rotationSpeed: {
-        value: isSmallScreen ? 0.06 : 0.04,
-        min: 0.01,
-        max: 0.09,
-        step: 0.01,
+    const { rotationSpeed } = useControls(
+      "⚙️ Settings",
+      {
+        rotationSpeed: {
+          value: isSmallScreen ? 0.06 : 0.04,
+          min: 0.01,
+          max: 0.09,
+          step: 0.01,
+        },
       },
-    });
+      { collapsed: !showSettings }
+    );
 
     // --- Attack ring config (shared by logic + visuals) ---
     const [attackRadius, setAttackRadius] = useState(1.2); // fallback
@@ -694,77 +699,110 @@ const PlayerController = forwardRef(
 
     // --- Render ---
     return (
-      <RigidBody
-        colliders={false}
-        lockRotations
-        ref={rb}
-        gravityScale={9}
-        onCollisionEnter={handleCollisionEnter}
-        onCollisionExit={handleCollisionExit}
-        userData={{
-          id: playerId, // instead of socket?.id
-          isPlayer: true,
-        }}
-        solverIterations={10}
-        ccd={true}
-        linearDamping={0.5}
-        angularDamping={1.0}
-        sleepAfterStillness={0}
-        canSleep={false}
-      >
-        <group ref={container} position={position}>
-          <group ref={cameraTarget} position-z={-5.5} />
-          <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
-          <group ref={character} rotation-y={Math.PI} castShadow receiveShadow>
-            {characterType === "cena" ? (
-              <Cenaa
-                scale={isSmallScreen ? 2.7 : 3.18}
-                position-y={-0.25}
-                color={color}
-                castShadow
-                animation={
-                  matchResult === "won"
-                    ? "victory"
-                    : matchResult === "lost"
-                    ? "fall"
-                    : isHit
-                    ? "hit"
-                    : currentAnimation
-                }
+      <>
+        <RigidBody
+          colliders={false}
+          lockRotations
+          ref={rb}
+          gravityScale={9}
+          onCollisionEnter={handleCollisionEnter}
+          onCollisionExit={handleCollisionExit}
+          userData={{
+            id: playerId, // instead of socket?.id
+            isPlayer: true,
+          }}
+          solverIterations={10}
+          ccd={true}
+          linearDamping={0.5}
+          angularDamping={1.0}
+          sleepAfterStillness={0}
+          canSleep={false}
+        >
+          <group ref={container} position={position}>
+            <group ref={cameraTarget} position-z={-5.5} />
+            <group ref={cameraPosition} position-y={4.5} position-z={2.5} />
+            <group
+              ref={character}
+              rotation-y={Math.PI}
+              castShadow
+              receiveShadow
+            >
+              {characterType === "cena" ? (
+                <Cenaa
+                  scale={isSmallScreen ? 2.7 : 3.18}
+                  position-y={-0.25}
+                  color={color}
+                  castShadow
+                  animation={
+                    matchResult === "won"
+                      ? "victory"
+                      : matchResult === "lost"
+                      ? "fall"
+                      : isHit
+                      ? "hit"
+                      : currentAnimation
+                  }
+                />
+              ) : (
+                <Stone
+                  scale={isSmallScreen ? 2.7 : 3.18}
+                  position-y={-0.25}
+                  color={color}
+                  castShadow
+                  animation={
+                    matchResult === "won"
+                      ? "victory"
+                      : matchResult === "lost"
+                      ? "fall"
+                      : isHit
+                      ? "hit"
+                      : currentAnimation
+                  }
+                />
+              )}
+              <CapsuleCollider
+                args={[0.4, 0.3]}
+                position={[0, 3, 0]}
+                restitution={0.1}
+                friction={0.5}
               />
-            ) : (
-              <Stone
-                scale={isSmallScreen ? 2.7 : 3.18}
-                position-y={-0.25}
-                color={color}
-                castShadow
-                animation={
-                  matchResult === "won"
-                    ? "victory"
-                    : matchResult === "lost"
-                    ? "fall"
-                    : isHit
-                    ? "hit"
-                    : currentAnimation
-                }
+              <CapsuleCollider
+                args={[0.4, 0.4]}
+                position={[0, 3, 0]}
+                sensor
+                onIntersectionEnter={handleCollisionEnter}
+                onIntersectionExit={handleCollisionExit}
               />
-            )}
-            <CapsuleCollider
-              args={[0.4, 0.3]}
-              position={[0, 3, 0]}
-              restitution={0.1}
-              friction={0.5}
-            />
-            <CapsuleCollider
-              args={[0.4, 0.4]}
-              position={[0, 3, 0]}
-              sensor
-              onIntersectionEnter={handleCollisionEnter}
-              onIntersectionExit={handleCollisionExit}
-            />
+            </group>
           </group>
-        </group>
-      </RigidBody>
+        </RigidBody>
+        <Html position={[0, 5.5, 0]} style={{ pointerEvents: "auto" }}>
+          <div
+            style={{
+              position: "absolute",
+              top: "80px", // adjust for your health bar position
+              right: "20px",
+              zIndex: 1000,
+            }}
+          >
+            <button
+              onClick={() => setShowSettings((prev) => !prev)}
+              style={{
+                padding: "6px 10px",
+                borderRadius: "8px",
+                background: "#222",
+                color: "#fff",
+                border: "1px solid #555",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              ⚙️ Settings
+            </button>
+          </div>
+        </Html>
+        <Leva collapsed={!showSettings} />
+      </>
     );
   }
 );
