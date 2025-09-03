@@ -178,6 +178,28 @@ const Experience = () => {
       events.forEach((ev) => document.removeEventListener(ev, handler, opts));
   }, [unlockAllAudio]);
 
+  // Close settings when clicking anywhere outside the panel & the gear
+  useEffect(() => {
+    if (!showSettings) return;
+
+    const onDocClick = (e) => {
+      const target = e.target;
+
+      // If click happened inside Leva panel, ignore
+      // (Leva mounts a root with class "leva")
+      if (target.closest && target.closest(".leva")) return;
+
+      // If you keep the gear button in Info.jsx (as above), it won’t have a special class,
+      // but clicking it calls toggleSettings directly, so we don't need to filter it here.
+      // Any other click will hide:
+      setShowSettings(false);
+    };
+
+    // Use capture so it fires before slider’s internal handlers
+    document.addEventListener("pointerdown", onDocClick, true);
+    return () => document.removeEventListener("pointerdown", onDocClick, true);
+  }, [showSettings]);
+
   useEffect(() => {
     const make = (src, vol = 0.8) => {
       const a = new Audio(src);
