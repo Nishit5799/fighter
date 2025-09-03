@@ -81,7 +81,7 @@ const PlayerController = forwardRef(
     <Leva
       collapsed={!showSettings}
       panelProps={{
-        position: { x: 20, y: window.innerHeight - 320 },
+        position: { x: 20, y: 40 },
       }}
     />;
 
