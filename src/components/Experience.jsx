@@ -18,7 +18,7 @@ import Info from "./Info";
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
-import { Leva } from "leva";
+import { Leva, useCreateStore } from "leva";
 
 // (near the top, after other imports)
 const SOUND_FILES = {
@@ -45,6 +45,7 @@ const Experience = () => {
   const socket = useSocket();
 
   // --- State ---
+  const levaStore = useCreateStore();
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
   const [isPunching, setIsPunching] = useState(false);
   const [isKicking, setIsKicking] = useState(false);
@@ -584,7 +585,13 @@ const Experience = () => {
   // --- Render ---
   return (
     <>
-      {showSettings && <Leva collapsed={false} />}{" "}
+      <Leva
+        store={levaStore}
+        hidden={!showSettings} // 👈 hide at start
+        collapsed={!showSettings} // 👈 also keep collapsed while hidden
+        titleBar={{ title: "⚙️ Settings", drag: true, filter: false }}
+        style={{ top: 72 }} // 👈 move it down to avoid HUD overlap
+      />
       {/* ✅ Only visible when toggled */}
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
@@ -616,6 +623,7 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
+                  levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef1.current = el;
@@ -646,6 +654,7 @@ const Experience = () => {
                 />
 
                 <PlayerController
+                  levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef2.current = el;

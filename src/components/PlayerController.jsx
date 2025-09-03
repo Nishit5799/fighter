@@ -43,6 +43,7 @@ const PlayerController = forwardRef(
       isLocalPlayer,
       audio,
       showSettings,
+      levaStore,
     },
     ref
   ) => {
@@ -91,8 +92,10 @@ const PlayerController = forwardRef(
           step: 0.01,
         },
       },
-
-      { collapsed: !showSettings }
+      {
+        collapsed: !showSettings,
+        store: levaStore, // 👈 bind to shared, hidden store
+      }
     );
 
     // --- Attack ring config (shared by logic + visuals) ---
