@@ -17,6 +17,13 @@ import Stone from "./Stone";
 import Cenaa from "./Cenaa";
 import { Leva, useControls } from "leva";
 
+<Leva
+  collapsed={!showSettings}
+  panelProps={{
+    position: { x: 20, y: window.innerHeight - 320 },
+  }}
+/>;
+
 const SOUNDS = {
   punch: "/punch.mp3",
   kick: "/punch.mp3",
@@ -82,7 +89,7 @@ const PlayerController = forwardRef(
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
     const { rotationSpeed } = useControls(
-      "⚙️ Settings",
+      "⚙️ Rotation Speed Set",
       {
         rotationSpeed: {
           value: isSmallScreen ? 0.06 : 0.04,
