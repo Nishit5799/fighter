@@ -71,6 +71,7 @@ const Experience = () => {
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
+  const settingsRef = useRef();
   const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
@@ -102,6 +103,22 @@ const Experience = () => {
   const toggleSettings = () => {
     setShowSettings((prev) => !prev);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target)) {
+        setShowSettings(false); // hide panel
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSettings]);
 
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
@@ -177,28 +194,6 @@ const Experience = () => {
     return () =>
       events.forEach((ev) => document.removeEventListener(ev, handler, opts));
   }, [unlockAllAudio]);
-
-  // Close settings when clicking anywhere outside the panel & the gear
-  useEffect(() => {
-    if (!showSettings) return;
-
-    const onDocClick = (e) => {
-      const target = e.target;
-
-      // If click happened inside Leva panel, ignore
-      // (Leva mounts a root with class "leva")
-      if (target.closest && target.closest(".leva")) return;
-
-      // If you keep the gear button in Info.jsx (as above), it won’t have a special class,
-      // but clicking it calls toggleSettings directly, so we don't need to filter it here.
-      // Any other click will hide:
-      setShowSettings(false);
-    };
-
-    // Use capture so it fires before slider’s internal handlers
-    document.addEventListener("pointerdown", onDocClick, true);
-    return () => document.removeEventListener("pointerdown", onDocClick, true);
-  }, [showSettings]);
 
   useEffect(() => {
     const make = (src, vol = 0.8) => {
@@ -607,26 +602,28 @@ const Experience = () => {
   // --- Render ---
   return (
     <>
-      <Leva
-        store={levaStore}
-        hidden={!showSettings} // stays hidden at game start ✅
-        titleBar={false} // remove the panel's title bar ✅
-        style={{
-          position: "fixed", // 👈 be explicit so top/right take effect everywhere
-          top: 96,
-          right: 12,
-          left: "auto",
-          zIndex: 1000,
-          width: 260, // 👈 give the panel breathing room on phones
-          maxWidth: "90vw", // 👈 prevent overflow on very small screens
-        }}
-        theme={{
-          sizes: {
-            // Optional: widen control area inside the panel so labels don’t wrap
-            controlWidth: 220,
-          },
-        }}
-      />
+      <div ref={settingsRef}>
+        <Leva
+          store={levaStore}
+          hidden={!showSettings}
+          titleBar={false}
+          style={{
+            position: "fixed",
+            top: 96,
+            right: 12,
+            left: "auto",
+            zIndex: 1000,
+            width: 260,
+            maxWidth: "90vw",
+          }}
+          theme={{
+            sizes: {
+              controlWidth: 220,
+            },
+          }}
+        />
+      </div>
+
       {/* ✅ Only visible when toggled */}
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
