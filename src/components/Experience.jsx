@@ -72,7 +72,9 @@ const Experience = () => {
 
   // --- Refs ---
   const settingsRef = useRef();
-  const settingsButtonRef = useRef();
+  const settingsPanelRef = useRef(null); // for Leva panel container
+  const settingsButtonRef = useRef(null); // for settings icon button
+
   const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
@@ -110,6 +112,30 @@ const Experience = () => {
       const clickedOutsidePanel =
         settingsPanelRef.current &&
         !settingsPanelRef.current.contains(event.target);
+      const clickedOutsideButton =
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target);
+
+      if (clickedOutsidePanel && clickedOutsideButton) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSettings]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedOutsidePanel =
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target);
+
       const clickedOutsideButton =
         settingsButtonRef.current &&
         !settingsButtonRef.current.contains(event.target);
@@ -610,7 +636,7 @@ const Experience = () => {
   // --- Render ---
   return (
     <>
-      <div ref={settingsRef}>
+      <div ref={settingsPanelRef}>
         <Leva
           store={levaStore}
           hidden={!showSettings}
@@ -900,7 +926,7 @@ const Experience = () => {
         />
       )}
       <Info
-        settingsButtonRef={settingsButtonRef} // 👈 Pass this
+        settingsButtonRef={settingsButtonRef}
         toggleSettings={toggleSettings}
         onReset={handleReset}
         showPopup={showPopup}
