@@ -17,14 +17,7 @@ const Info = ({ showInfoPopup, setShowInfoPopup, onInfoClick }) => {
 
   return (
     <>
-      <div className="fixed sm:top-5 sm:left-1/2 right-[80%] top-[2.2%] transform -translate-x-1/2">
-        <button
-          onClick={onInfoClick}
-          className="bg-blue-500 text-white px-4 py-2 rounded-full"
-        >
-          i
-        </button>
-      </div>
+      <div className="fixed sm:top-5 sm:left-1/2 right-[80%] top-[2.2%] transform -translate-x-1/2"></div>
 
       {showInfoPopup && (
         <div className="fixed inset-0 flex items-center justify-center text-center bg-black bg-opacity-50 z-[100]">
