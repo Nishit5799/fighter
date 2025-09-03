@@ -65,6 +65,7 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -95,6 +96,10 @@ const Experience = () => {
 
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+
+  const toggleSettings = () => {
+    setShowSettings((prev) => !prev);
+  };
 
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
@@ -608,6 +613,7 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
+                  showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef1.current = el;
                     if (players[0]?.id === socket?.id) {
@@ -637,6 +643,7 @@ const Experience = () => {
                 />
 
                 <PlayerController
+                  showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef2.current = el;
                     if (players[1]?.id === socket?.id) {
@@ -829,7 +836,7 @@ const Experience = () => {
       )}
 
       <Joystick
-       onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
+        onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         onMove={(data) => {
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
@@ -845,11 +852,11 @@ const Experience = () => {
           key={localPlayer?.id || playerName} // 👈 unique per match or player
           onPunch={setIsPunching}
           onKick={setIsKicking}
-         
         />
       )}
 
       <Info
+        toggleSettings={toggleSettings}
         onReset={handleReset}
         showPopup={showPopup}
         popupMessage={popupMessage}

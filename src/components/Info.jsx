@@ -1,7 +1,12 @@
 // src/components/Info.jsx
 import React from "react";
 
-const Info = ({ showInfoPopup, setShowInfoPopup, onInfoClick }) => {
+const Info = ({
+  showInfoPopup,
+  setShowInfoPopup,
+  onInfoClick,
+  toggleSettings,
+}) => {
   const infoMessage = `
     Fight your opponent in the arena! Complete the round by eliminating them.
 
@@ -17,7 +22,14 @@ const Info = ({ showInfoPopup, setShowInfoPopup, onInfoClick }) => {
 
   return (
     <>
-      <div className="fixed sm:top-5 sm:left-1/2 right-[80%] top-[2.2%] transform -translate-x-1/2"></div>
+      <div className="fixed sm:top-5 sm:left-1/2 right-[80%] top-[2.2%] transform -translate-x-1/2">
+        <button
+          onClick={toggleSettings}
+          className="bg-gray-800 text-white px-4 py-2 rounded-md shadow-md hover:bg-gray-700 transition"
+        >
+          Settings
+        </button>
+      </div>
 
       {showInfoPopup && (
         <div className="fixed inset-0 flex items-center justify-center text-center bg-black bg-opacity-50 z-[100]">

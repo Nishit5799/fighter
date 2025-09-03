@@ -42,6 +42,7 @@ const PlayerController = forwardRef(
       opponentName,
       isLocalPlayer,
       audio,
+      showSettings,
     },
     ref
   ) => {
@@ -55,7 +56,7 @@ const PlayerController = forwardRef(
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
     const [showDebug, setShowDebug] = useState(true);
-    const [showSettings, setShowSettings] = useState(false);
+  
 
     // --- Refs ---
     const attackTimer = useRef(null);
