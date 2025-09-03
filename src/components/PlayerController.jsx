@@ -85,6 +85,7 @@ const PlayerController = forwardRef(
     const { rotationSpeed } = useControls(
       {
         rotationSpeed: {
+          label: "Rotation speed", // 👈 readable label (prevents truncation of camelCase)
           value: isSmallScreen ? 0.06 : 0.04,
           min: 0.01,
           max: 0.09,

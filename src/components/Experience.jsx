@@ -589,7 +589,21 @@ const Experience = () => {
         store={levaStore}
         hidden={!showSettings} // stays hidden at game start ✅
         titleBar={false} // remove the panel's title bar ✅
-        style={{ top: 88, right: 12, left: "auto", zIndex: 1000 }}
+        style={{
+          position: "fixed", // 👈 be explicit so top/right take effect everywhere
+          top: 96,
+          right: 12,
+          left: "auto",
+          zIndex: 1000,
+          width: 260, // 👈 give the panel breathing room on phones
+          maxWidth: "90vw", // 👈 prevent overflow on very small screens
+        }}
+        theme={{
+          sizes: {
+            // Optional: widen control area inside the panel so labels don’t wrap
+            controlWidth: 220,
+          },
+        }}
       />
       {/* ✅ Only visible when toggled */}
       <KeyboardControls map={memoizedKeyboardMap}>
