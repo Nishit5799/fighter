@@ -72,6 +72,7 @@ const Experience = () => {
 
   // --- Refs ---
   const settingsRef = useRef();
+  const settingsButtonRef = useRef();
   const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
@@ -106,8 +107,15 @@ const Experience = () => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (settingsRef.current && !settingsRef.current.contains(event.target)) {
-        setShowSettings(false); // hide panel
+      const clickedOutsidePanel =
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target);
+      const clickedOutsideButton =
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target);
+
+      if (clickedOutsidePanel && clickedOutsideButton) {
+        setShowSettings(false);
       }
     };
 
@@ -892,6 +900,7 @@ const Experience = () => {
         />
       )}
       <Info
+        settingsButtonRef={settingsButtonRef} // 👈 Pass this
         toggleSettings={toggleSettings}
         onReset={handleReset}
         showPopup={showPopup}
