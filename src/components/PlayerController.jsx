@@ -78,17 +78,11 @@ const PlayerController = forwardRef(
     const hitSound = useRef(null);
     const victorySound = useRef(null);
     const lostSound = useRef(null);
-    <Leva
-      collapsed={!showSettings}
-      panelProps={{
-        position: { x: 20, y: 40 },
-      }}
-    />;
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
     const { rotationSpeed } = useControls(
-      "⚙️ Rotation Speed Set",
+      "⚙️ Settings",
       {
         rotationSpeed: {
           value: isSmallScreen ? 0.06 : 0.04,
@@ -97,7 +91,8 @@ const PlayerController = forwardRef(
           step: 0.01,
         },
       },
-      { collapsed: !showSettings }
+
+      { collapsed: !showSettings, position: { x: 1, y: 2, z: 0 } }
     );
 
     // --- Attack ring config (shared by logic + visuals) ---
