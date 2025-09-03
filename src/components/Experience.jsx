@@ -18,6 +18,7 @@ import Info from "./Info";
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
+import { Leva } from "leva";
 
 // (near the top, after other imports)
 const SOUND_FILES = {
@@ -583,6 +584,8 @@ const Experience = () => {
   // --- Render ---
   return (
     <>
+      {showSettings && <Leva collapsed={false} />}{" "}
+      {/* ✅ Only visible when toggled */}
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <ambientLight intensity={2.3} />
@@ -676,7 +679,6 @@ const Experience = () => {
           </Physics>
         </Canvas>
       </KeyboardControls>
-
       {showWelcomeScreen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 start">
           <div className="text-center">
@@ -747,7 +749,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       {hasJoinedRoom && !isGameStarted && (
         <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
@@ -766,7 +767,6 @@ const Experience = () => {
           )}
         </div>
       )}
-
       {countdown !== null && !isGameStarted && (
         <div className="fixed inset-0 flex items-center justify-center z-[101]">
           <div className="w-[80vw] h-[80vw] rounded-full bg-black text-white text-9xl flex items-center justify-center">
@@ -774,7 +774,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
           {/* Player 1 */}
@@ -806,7 +805,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
@@ -834,7 +832,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       <Joystick
         onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         onMove={(data) => {
@@ -846,7 +843,6 @@ const Experience = () => {
         onStart={() => {}}
         disabled={!isGameStarted || players.length !== 2}
       />
-
       {isGameStarted && (
         <AttackButtons
           key={localPlayer?.id || playerName} // 👈 unique per match or player
@@ -854,7 +850,6 @@ const Experience = () => {
           onKick={setIsKicking}
         />
       )}
-
       <Info
         toggleSettings={toggleSettings}
         onReset={handleReset}

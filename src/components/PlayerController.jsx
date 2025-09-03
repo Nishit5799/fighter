@@ -56,7 +56,6 @@ const PlayerController = forwardRef(
     const [matchResult, setMatchResult] = useState(null);
     const [lastAttackTime, setLastAttackTime] = useState(0);
     const [showDebug, setShowDebug] = useState(true);
-  
 
     // --- Refs ---
     const attackTimer = useRef(null);
@@ -93,7 +92,7 @@ const PlayerController = forwardRef(
         },
       },
 
-      { collapsed: !showSettings, position: { x: 1, y: 2, z: 0 } }
+      { collapsed: !showSettings }
     );
 
     // --- Attack ring config (shared by logic + visuals) ---
