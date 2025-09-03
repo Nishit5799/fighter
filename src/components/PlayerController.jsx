@@ -83,7 +83,6 @@ const PlayerController = forwardRef(
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
     const { rotationSpeed } = useControls(
-      "⚙️ Settings",
       {
         rotationSpeed: {
           value: isSmallScreen ? 0.06 : 0.04,
@@ -92,10 +91,7 @@ const PlayerController = forwardRef(
           step: 0.01,
         },
       },
-      {
-        collapsed: !showSettings,
-        store: levaStore, // 👈 bind to shared, hidden store
-      }
+      { store: levaStore }
     );
 
     // --- Attack ring config (shared by logic + visuals) ---

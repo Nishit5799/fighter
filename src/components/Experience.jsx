@@ -587,10 +587,9 @@ const Experience = () => {
     <>
       <Leva
         store={levaStore}
-        hidden={!showSettings} // 👈 hide at start
-        collapsed={!showSettings} // 👈 also keep collapsed while hidden
-        titleBar={{ title: "⚙️ Settings", drag: true, filter: false }}
-        style={{ top: 72 }} // 👈 move it down to avoid HUD overlap
+        hidden={!showSettings} // stays hidden at game start ✅
+        titleBar={false} // remove the panel's title bar ✅
+        style={{ top: 88, right: 12, left: "auto", zIndex: 1000 }}
       />
       {/* ✅ Only visible when toggled */}
       <KeyboardControls map={memoizedKeyboardMap}>
