@@ -25,7 +25,7 @@ const Info = ({
       <div className="fixed sm:top-5 sm:left-1/2 right-[80%] top-[20%] transform -translate-x-1/2">
         <button
           onClick={toggleSettings}
-          className="bg-gray-800 text-white px-4 py-2 rounded-md shadow-md hover:bg-gray-700 transition"
+          className="bg-gray-800 text-white px-4 py-2 rounded-md shadow-md hover:bg-gray-700 transition z-[1000]"
         >
           ⚙️
         </button>
