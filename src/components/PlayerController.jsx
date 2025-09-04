@@ -44,7 +44,6 @@ const PlayerController = forwardRef(
       audio,
       showSettings,
       levaStore,
-      swipeRotationDelta,
     },
     ref
   ) => {
@@ -455,41 +454,32 @@ const PlayerController = forwardRef(
           if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
-        const joystickMagnitude =
-          joystickInput &&
-          Math.sqrt(
+        if (joystickInput) {
+          const joystickMagnitude = Math.sqrt(
             joystickInput.x * joystickInput.x +
               joystickInput.y * joystickInput.y
           );
 
-        // Store joystick magnitude change
-        if (
-          joystickMagnitude &&
-          Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
+          if (
+            Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
             joystickChangeThreshold
-        ) {
-          lastJoystickMagnitude.current = joystickMagnitude;
-        }
+          ) {
+            lastJoystickMagnitude.current = joystickMagnitude;
+          }
 
-        // ✅ Always apply joystick rotation if valid
-        if (joystickInput && Math.abs(joystickInput.x) > 0.1) {
-          rotationTarget.current += rotationSpeed * joystickInput.x;
-        }
+          if (joystickMagnitude > 0.1) {
+            if (Math.abs(joystickInput.x) > 0.1) {
+              rotationTarget.current += rotationSpeed * joystickInput.x;
+            }
 
-        // ✅ Always apply swipe rotation regardless of joystick
-        if (Math.abs(swipeRotationDelta) > 0.01) {
-          rotationTarget.current -= rotationSpeed * swipeRotationDelta * 2;
-        }
-
-        // ✅ Only move player if joystick magnitude is high enough
-        if (joystickMagnitude > 0.1 && joystickInput) {
-          if (joystickInput.y < 0) {
-            movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
-            if (!isAttacking)
-              setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
-          } else if (joystickInput.y > 0) {
-            movement.z = 0;
-            if (!isAttacking) setCurrentAnimation("idle");
+            if (joystickInput.y < 0) {
+              movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
+              if (!isAttacking)
+                setCurrentAnimation(joystickInput.isRunning ? "run" : "walk");
+            } else if (joystickInput.y > 0) {
+              movement.z = 0;
+              if (!isAttacking) setCurrentAnimation("idle");
+            }
           }
         }
 
