@@ -68,6 +68,7 @@ const Experience = () => {
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -106,6 +107,42 @@ const Experience = () => {
   const toggleSettings = () => {
     setShowSettings((prev) => !prev);
   };
+
+  useEffect(() => {
+    let startX = 0;
+    let currentX = 0;
+    let isTouching = false;
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        startX = e.touches[0].clientX;
+        isTouching = true;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isTouching) return;
+      currentX = e.touches[0].clientX;
+      const deltaX = currentX - startX;
+      const normalizedDelta = deltaX / window.innerWidth;
+      setSwipeRotationDelta(normalizedDelta);
+    };
+
+    const handleTouchEnd = () => {
+      isTouching = false;
+      setSwipeRotationDelta(0);
+    };
+
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -689,6 +726,9 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
+                  swipeRotationDelta={
+                    players[0]?.id === socket?.id ? swipeRotationDelta : 0
+                  }
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
@@ -720,6 +760,9 @@ const Experience = () => {
                 />
 
                 <PlayerController
+                  swipeRotationDelta={
+                    players[1]?.id === socket?.id ? swipeRotationDelta : 0
+                  }
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {

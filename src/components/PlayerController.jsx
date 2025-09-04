@@ -44,6 +44,7 @@ const PlayerController = forwardRef(
       audio,
       showSettings,
       levaStore,
+      swipeRotationDelta,
     },
     ref
   ) => {
@@ -470,6 +471,8 @@ const PlayerController = forwardRef(
           if (joystickMagnitude > 0.1) {
             if (Math.abs(joystickInput.x) > 0.1) {
               rotationTarget.current += rotationSpeed * joystickInput.x;
+            } else if (Math.abs(swipeRotationDelta) > 0.01) {
+              rotationTarget.current += rotationSpeed * swipeRotationDelta * 2; // 2x multiplier for responsiveness
             }
 
             if (joystickInput.y < 0) {
