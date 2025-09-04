@@ -468,13 +468,15 @@ const PlayerController = forwardRef(
             lastJoystickMagnitude.current = joystickMagnitude;
           }
 
-          if (joystickMagnitude > 0.1) {
-            if (Math.abs(joystickInput.x) > 0.1) {
-              rotationTarget.current += rotationSpeed * joystickInput.x;
-            } else if (Math.abs(swipeRotationDelta) > 0.01) {
-              rotationTarget.current += rotationSpeed * swipeRotationDelta * 2; // 2x multiplier for responsiveness
-            }
+          // 🔁 Apply rotation even if joystick is not active
+          if (joystickInput && Math.abs(joystickInput.x) > 0.1) {
+            rotationTarget.current += rotationSpeed * joystickInput.x;
+          } else if (Math.abs(swipeRotationDelta) > 0.01) {
+            rotationTarget.current += rotationSpeed * swipeRotationDelta * 2;
+          }
 
+          // 🔁 Movement only if joystick is active
+          if (joystickMagnitude > 0.1) {
             if (joystickInput.y < 0) {
               movement.z = joystickInput.isRunning ? -RUN_SPEED : -WALK_SPEED;
               if (!isAttacking)
