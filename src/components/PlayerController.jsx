@@ -471,7 +471,9 @@ const PlayerController = forwardRef(
           // 🔁 Apply rotation even if joystick is not active
           if (joystickInput && Math.abs(joystickInput.x) > 0.1) {
             rotationTarget.current += rotationSpeed * joystickInput.x;
-          } else if (Math.abs(swipeRotationDelta) > 0.01) {
+          }
+
+          if (Math.abs(swipeRotationDelta) > 0.01) {
             rotationTarget.current -= rotationSpeed * swipeRotationDelta * 2;
           }
 
