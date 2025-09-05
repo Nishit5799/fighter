@@ -68,7 +68,7 @@ const Experience = () => {
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [swipeRotation, setSwipeRotation] = useState(0); // new state
+  const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -109,86 +109,88 @@ const Experience = () => {
   };
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      const clickedOutsidePanel =
-        settingsPanelRef.current &&
-        !settingsPanelRef.current.contains(event.target);
-      const clickedOutsideButton =
-        settingsButtonRef.current &&
-        !settingsButtonRef.current.contains(event.target);
-
-      if (clickedOutsidePanel && clickedOutsideButton) {
-        setShowSettings(false);
-      }
-    };
-
-    if (showSettings) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showSettings]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      const clickedOutsidePanel =
-        settingsPanelRef.current &&
-        !settingsPanelRef.current.contains(event.target);
-
-      const clickedOutsideButton =
-        settingsButtonRef.current &&
-        !settingsButtonRef.current.contains(event.target);
-
-      if (clickedOutsidePanel && clickedOutsideButton) {
-        setShowSettings(false);
-      }
-    };
-
-    if (showSettings) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showSettings]);
-
-  useEffect(() => {
-    let isSwiping = false;
     let startX = 0;
+    let currentX = 0;
+    let isTouching = false;
 
-    const onTouchStart = (e) => {
+    const handleTouchStart = (e) => {
       if (e.touches.length === 1) {
-        isSwiping = true;
         startX = e.touches[0].clientX;
+        isTouching = true;
       }
     };
 
-    const onTouchMove = (e) => {
-      if (isSwiping && e.touches.length === 1) {
-        const deltaX = e.touches[0].clientX - startX;
-        const sensitivity = 0.002; // tweak this
-        setSwipeRotation(deltaX * sensitivity);
-      }
+    const handleTouchMove = (e) => {
+      if (!isTouching) return;
+      currentX = e.touches[0].clientX;
+      const deltaX = currentX - startX;
+      const normalizedDelta = deltaX / window.innerWidth; // value between -1 and 1
+      setSwipeRotationDelta(normalizedDelta);
     };
 
-    const onTouchEnd = () => {
-      isSwiping = false;
-      setSwipeRotation(0); // Reset swipe rotation
+    const handleTouchEnd = () => {
+      isTouching = false;
+      setSwipeRotationDelta(0); // reset
     };
 
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: true });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchend", handleTouchEnd);
 
     return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
     };
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedOutsidePanel =
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target);
+      const clickedOutsideButton =
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target);
+
+      if (clickedOutsidePanel && clickedOutsideButton) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSettings]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedOutsidePanel =
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target);
+
+      const clickedOutsideButton =
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target);
+
+      if (clickedOutsidePanel && clickedOutsideButton) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSettings]);
+
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -724,7 +726,9 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
-                  swipeRotation={swipeRotation}
+                  swipeRotationDelta={
+                    players[0]?.id === socket?.id ? swipeRotationDelta : 0
+                  }
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
@@ -756,7 +760,9 @@ const Experience = () => {
                 />
 
                 <PlayerController
-                  swipeRotation={swipeRotation}
+                  swipeRotationDelta={
+                    players[1]?.id === socket?.id ? swipeRotationDelta : 0
+                  }
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
