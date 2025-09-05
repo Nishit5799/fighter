@@ -476,9 +476,12 @@ const PlayerController = forwardRef(
           rotationTarget.current += rotationSpeed * joystickInput.x;
         }
 
-        // ✅ Always apply swipe rotation even if joystick is active
-        if (Math.abs(swipeRotationDelta) > 0.01) {
-          rotationTarget.current -= rotationSpeed * swipeRotationDelta * 2;
+        // ✅ Apply swipe rotation even when joystick is held down
+        const swipeStrength = Math.abs(swipeRotationDelta);
+        if (swipeStrength > 0.005) {
+          // Increase multiplier for faster rotation
+          const swipeTurnRate = swipeRotationDelta * rotationSpeed * 2.5;
+          rotationTarget.current -= swipeTurnRate;
         }
 
         // ✅ Movement only if joystick is engaged
