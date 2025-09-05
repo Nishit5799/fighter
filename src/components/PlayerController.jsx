@@ -44,6 +44,7 @@ const PlayerController = forwardRef(
       audio,
       showSettings,
       levaStore,
+      swipeRotation,
     },
     ref
   ) => {
@@ -480,6 +481,9 @@ const PlayerController = forwardRef(
               movement.z = 0;
               if (!isAttacking) setCurrentAnimation("idle");
             }
+          }
+          if (swipeRotation) {
+            rotationTarget.current += swipeRotation * 2;
           }
         }
 

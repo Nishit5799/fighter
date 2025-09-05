@@ -68,6 +68,7 @@ const Experience = () => {
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [swipeRotation, setSwipeRotation] = useState(0); // new state
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -154,6 +155,40 @@ const Experience = () => {
     };
   }, [showSettings]);
 
+  useEffect(() => {
+    let isSwiping = false;
+    let startX = 0;
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        isSwiping = true;
+        startX = e.touches[0].clientX;
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (isSwiping && e.touches.length === 1) {
+        const deltaX = e.touches[0].clientX - startX;
+        const sensitivity = 0.002; // tweak this
+        setSwipeRotation(deltaX * sensitivity);
+      }
+    };
+
+    const onTouchEnd = () => {
+      isSwiping = false;
+      setSwipeRotation(0); // Reset swipe rotation
+    };
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, []);
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -689,6 +724,7 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
+                  swipeRotation={swipeRotation}
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
@@ -720,6 +756,7 @@ const Experience = () => {
                 />
 
                 <PlayerController
+                  swipeRotation={swipeRotation}
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
