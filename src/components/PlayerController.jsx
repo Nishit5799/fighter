@@ -455,6 +455,7 @@ const PlayerController = forwardRef(
           if (!isAttacking && !isHit) setCurrentAnimation("idle");
         }
 
+        // ✅ Blended joystick + swipe turning logic
         const joystickMagnitude =
           joystickInput &&
           Math.sqrt(
@@ -462,7 +463,6 @@ const PlayerController = forwardRef(
               joystickInput.y * joystickInput.y
           );
 
-        // Track joystick change
         if (
           joystickMagnitude &&
           Math.abs(joystickMagnitude - lastJoystickMagnitude.current) >
@@ -471,18 +471,18 @@ const PlayerController = forwardRef(
           lastJoystickMagnitude.current = joystickMagnitude;
         }
 
-        // ✅ Always apply joystick rotation
-        if (joystickInput && Math.abs(joystickInput.x) > 0.1) {
-          rotationTarget.current += rotationSpeed * joystickInput.x;
-        }
+        // ✅ Blend joystick + swipe rotation
+        const joystickTurn =
+          joystickInput && Math.abs(joystickInput.x) > 0.1
+            ? rotationSpeed * joystickInput.x
+            : 0;
 
-        // ✅ Apply swipe rotation even when joystick is held down
-        const swipeStrength = Math.abs(swipeRotationDelta);
-        if (swipeStrength > 0.005) {
-          // Increase multiplier for faster rotation
-          const swipeTurnRate = swipeRotationDelta * rotationSpeed * 2.5;
-          rotationTarget.current -= swipeTurnRate;
-        }
+        const swipeTurn =
+          Math.abs(swipeRotationDelta) > 0.005
+            ? -rotationSpeed * swipeRotationDelta * 2.5
+            : 0;
+
+        rotationTarget.current += joystickTurn + swipeTurn;
 
         // ✅ Movement only if joystick is engaged
         if (joystickMagnitude > 0.1 && joystickInput) {
