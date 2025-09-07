@@ -83,7 +83,7 @@ const PlayerController = forwardRef(
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
-    const SWIPE_ROTATION_MULTIPLIER = 4.0;
+    const SWIPE_ROTATION_MULTIPLIER = 5.0;
     const { rotationSpeed } = useControls(
       {
         rotationSpeed: {

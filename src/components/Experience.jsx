@@ -115,15 +115,13 @@ const Experience = () => {
 
     const handleTouchStart = (e) => {
       const joystickTouchId = joystickRef.current?.getTouchId?.();
+      const candidateTouch = Array.from(e.touches).find(
+        (t) => t.identifier !== joystickTouchId
+      );
 
-      if (e.touches.length > 1) {
-        const secondTouch = Array.from(e.touches).find(
-          (t) => t.identifier !== joystickTouchId
-        );
-        if (secondTouch) {
-          swipeTouchId = secondTouch.identifier;
-          startX = secondTouch.clientX;
-        }
+      if (candidateTouch) {
+        swipeTouchId = candidateTouch.identifier;
+        startX = candidateTouch.clientX;
       }
     };
 
