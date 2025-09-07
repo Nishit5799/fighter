@@ -83,6 +83,7 @@ const PlayerController = forwardRef(
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
+    const SWIPE_ROTATION_MULTIPLIER = 4.0;
     const { rotationSpeed } = useControls(
       {
         rotationSpeed: {
@@ -479,7 +480,7 @@ const PlayerController = forwardRef(
 
         const swipeTurn =
           Math.abs(swipeRotationDelta) > 0.005
-            ? -rotationSpeed * swipeRotationDelta * 2.5
+            ? -rotationSpeed * swipeRotationDelta * SWIPE_ROTATION_MULTIPLIER
             : 0;
 
         rotationTarget.current += joystickTurn + swipeTurn;
