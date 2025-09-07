@@ -100,6 +100,7 @@ const Experience = () => {
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
+  const joystickRef = useRef();
 
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
@@ -109,33 +110,49 @@ const Experience = () => {
   };
 
   useEffect(() => {
+    let swipeTouchId = null;
     let startX = 0;
-    let currentX = 0;
-    let isTouching = false;
 
     const handleTouchStart = (e) => {
-      if (e.touches.length === 1) {
-        startX = e.touches[0].clientX;
-        isTouching = true;
+      const joystickTouchId = joystickRef.current?.getTouchId?.();
+
+      if (e.touches.length > 1) {
+        const secondTouch = Array.from(e.touches).find(
+          (t) => t.identifier !== joystickTouchId
+        );
+        if (secondTouch) {
+          swipeTouchId = secondTouch.identifier;
+          startX = secondTouch.clientX;
+        }
       }
     };
 
     const handleTouchMove = (e) => {
-      if (!isTouching) return;
-      currentX = e.touches[0].clientX;
-      const deltaX = currentX - startX;
-      const normalizedDelta = deltaX / window.innerWidth; // value between -1 and 1
-      setSwipeRotationDelta(normalizedDelta);
+      if (swipeTouchId !== null) {
+        const touch = Array.from(e.touches).find(
+          (t) => t.identifier === swipeTouchId
+        );
+        if (touch) {
+          const deltaX = touch.clientX - startX;
+          const normalizedDelta = deltaX / window.innerWidth;
+          setSwipeRotationDelta(normalizedDelta);
+        }
+      }
     };
 
-    const handleTouchEnd = () => {
-      isTouching = false;
-      setSwipeRotationDelta(0); // reset
+    const handleTouchEnd = (e) => {
+      if (
+        swipeTouchId !== null &&
+        !Array.from(e.touches).some((t) => t.identifier === swipeTouchId)
+      ) {
+        swipeTouchId = null;
+        setSwipeRotationDelta(0);
+      }
     };
 
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchstart", handleTouchStart, { passive: false });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: false });
 
     return () => {
       window.removeEventListener("touchstart", handleTouchStart);
@@ -951,6 +968,7 @@ const Experience = () => {
         </div>
       )}
       <Joystick
+        ref={joystickRef} // ✅ attach ref here
         onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         onMove={(data) => {
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
