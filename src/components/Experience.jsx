@@ -69,6 +69,7 @@ const Experience = () => {
   const [restartCountdown, setRestartCountdown] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
@@ -335,7 +336,10 @@ const Experience = () => {
       }
 
       if (isUsernameUnique(trimmedName)) {
-        socket.emit("joinRoom", trimmedName);
+        if (!isPracticeMode) {
+          socket.emit("joinRoom", trimmedName);
+        }
+
         setHasJoinedRoom(true);
         setIsUsernameValid(true);
       } else {
@@ -370,7 +374,7 @@ const Experience = () => {
       setPlayerName("");
       setHealth1(100);
       setHealth2(100);
-      if (socket) socket.emit("restartGame");
+      if (!isPracticeMode && socket) socket.emit("restartGame");
     }, 2000);
   }, [socket]);
 
@@ -380,25 +384,39 @@ const Experience = () => {
 
   const handleReady = useCallback(() => {
     if (socket) {
-      socket.emit("playerReady", playerName);
+      if (!isPracticeMode) {
+        socket.emit("playerReady", playerName);
+      }
       setIsReady(true);
     }
   }, [socket, playerName]);
 
+  const startPracticeMode = () => {
+    unlockAllAudio();
+    setIsPracticeMode(true);
+    setPlayers([
+      { id: "practice-player", name: "You" },
+      { id: "bot-player", name: "BOT" },
+    ]);
+    setShowWelcomeScreen(false);
+    setIsGameStarted(true);
+  };
+
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
-
-      socket.emit("updateHealth", {
-        health1:
-          data.attackerId === players[0]?.id
-            ? health1
-            : Math.max(0, health1 - data.damage),
-        health2:
-          data.attackerId === players[1]?.id
-            ? health2
-            : Math.max(0, health2 - data.damage),
-      });
+      if (!isPracticeMode) {
+        socket.emit("updateHealth", {
+          health1:
+            data.attackerId === players[0]?.id
+              ? health1
+              : Math.max(0, health1 - data.damage),
+          health2:
+            data.attackerId === players[1]?.id
+              ? health2
+              : Math.max(0, health2 - data.damage),
+        });
+      }
 
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
@@ -576,7 +594,7 @@ const Experience = () => {
 
   // Socket events: players, start, restart, username taken, combat
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || isPracticeMode) return;
 
     const updatePlayersHandler = (playersList) => {
       if (playersList.length > 2) {
@@ -872,6 +890,12 @@ const Experience = () => {
               >
                 JOIN ROOM
               </button>
+              <button
+                onClick={startPracticeMode}
+                className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"
+              >
+                PRACTICE
+              </button>
             </div>
             <div
               onClick={handleInfoClick}
@@ -882,7 +906,7 @@ const Experience = () => {
           </div>
         </div>
       )}
-      {hasJoinedRoom && !isGameStarted && (
+      {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
         <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
           {players.map((player, index) => (
@@ -890,7 +914,7 @@ const Experience = () => {
               {player.name} {player.isReady ? "✅" : "❌"}
             </div>
           ))}
-          {players.length === 2 && !isReady && (
+          {!isPracticeMode && players.length === 2 && !isReady && (
             <button
               onClick={handleReady}
               className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg"
@@ -900,7 +924,7 @@ const Experience = () => {
           )}
         </div>
       )}
-      {countdown !== null && !isGameStarted && (
+      {!isPracticeMode && countdown !== null && !isGameStarted && (
         <div className="fixed inset-0 flex items-center justify-center z-[101]">
           <div className="w-[80vw] h-[80vw] rounded-full bg-black text-white text-9xl flex items-center justify-center">
             {countdown}
