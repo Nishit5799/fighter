@@ -822,29 +822,25 @@ const Experience = () => {
                   // 🟢 Practice-only local hit path
                   practiceMode={isPracticeMode}
                   onPracticeHit={(data) => {
+                    // Always show hit animation if in contact
+                    carControllerRef2.current?.receiveHit(
+                      data.attackType,
+                      data.attackTime
+                    );
+
                     setHealth2((prev) => {
                       const newHealth = Math.max(0, prev - data.damage);
 
                       if (newHealth === 0) {
-                        carControllerRef2.current?.receiveHit(
-                          data.attackType,
-                          data.attackTime
-                        );
-
-                        // Trigger bot defeat animation
+                        // Trigger defeat animation
                         setTimeout(() => {
                           carControllerRef2.current?.setDefeat(true);
-                        }, 200); // slight delay for realism
+                        }, 200);
 
-                        // Reload after animation
+                        // Reload after a short delay
                         setTimeout(() => {
                           window.location.reload();
-                        }, 2500); // adjust delay as needed
-                      } else {
-                        carControllerRef2.current?.receiveHit(
-                          data.attackType,
-                          data.attackTime
-                        );
+                        }, 2500);
                       }
 
                       return newHealth;
