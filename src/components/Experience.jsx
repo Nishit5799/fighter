@@ -834,8 +834,19 @@ const Experience = () => {
                       if (newHealth === 0) {
                         // Trigger bot fall and player victory
                         setTimeout(() => {
-                          carControllerRef2.current?.setDefeat(false); // Don't play lost.mp3
-                          carControllerRef1.current?.setVictory(true); // ✅ Play only victory.mp3
+                          carControllerRef2.current?.setDefeat(false); // Skip lost.mp3
+                          carControllerRef1.current?.setVictory(true); // Show animation
+
+                          // ✅ Play victory.mp3 manually
+                          const victorySound = soundsRef.current?.victory;
+                          if (victorySound) {
+                            try {
+                              victorySound.currentTime = 0;
+                              victorySound.play();
+                            } catch (err) {
+                              console.warn("Victory sound play error:", err);
+                            }
+                          }
                         }, 200);
 
                         // Reload after short delay
