@@ -824,17 +824,31 @@ const Experience = () => {
                   onPracticeHit={(data) => {
                     setHealth2((prev) => {
                       const newHealth = Math.max(0, prev - data.damage);
+
                       if (newHealth === 0) {
+                        carControllerRef2.current?.receiveHit(
+                          data.attackType,
+                          data.attackTime
+                        );
+
+                        // Trigger bot defeat animation
+                        setTimeout(() => {
+                          carControllerRef2.current?.setDefeat(true);
+                        }, 200); // slight delay for realism
+
+                        // Reload after animation
                         setTimeout(() => {
                           window.location.reload();
-                        }, 2000); // short delay to let animation play
+                        }, 2500); // adjust delay as needed
+                      } else {
+                        carControllerRef2.current?.receiveHit(
+                          data.attackType,
+                          data.attackTime
+                        );
                       }
+
                       return newHealth;
                     });
-                    carControllerRef2.current?.receiveHit(
-                      data.attackType,
-                      data.attackTime
-                    );
                   }}
                 />
 
@@ -1014,11 +1028,12 @@ const Experience = () => {
           {isPracticeMode && isGameStarted && (
             <button
               onClick={() => window.location.reload()}
-              className="fixed top-5 left-5 px-4 py-2 bg-red-600 text-white rounded-lg z-[9999]"
+              className="fixed top-20 left-5 px-4 py-2 bg-red-600 text-white rounded-lg z-50"
             >
               Exit Practice
             </button>
           )}
+
           {/* Player 1 */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
