@@ -292,13 +292,14 @@ const PlayerController = forwardRef(
         !opponentRef.current?.isDefeated
       ) {
         if (practiceMode) {
-          // Local-only path in Practice Mode
+          // 🔸 local-only path in practice
           onPracticeHit?.({
             attackType: type,
             damage,
             attackTime: currentTime,
           });
         } else if (socket) {
+          // 🔹 multiplayer path as before
           socket.emit("playerHit", {
             attackerId: socket.id,
             damage,
@@ -667,18 +668,8 @@ const PlayerController = forwardRef(
     // Keep the object literal separate so we don’t capture stale refs above
     const wrapper = {
       receiveHit: (attackType, attackTime) => {
-        // reuse the internal takeHit logic
+        // call the same internal hit routine
         takeHit(attackType, attackTime);
-      },
-      resetForPractice: () => {
-        setIsDefeated(false);
-        setMatchResult(null);
-        setCurrentAnimation("idle");
-        setIsHit(false);
-        setIsAttacking(false);
-        movementEnabled.current = true;
-        opponentAttackTime.current = 0;
-        character.current?.resetAnimation?.();
       },
       toggleFppTpp,
       setOpponentRef,

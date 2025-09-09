@@ -402,41 +402,6 @@ const Experience = () => {
     setIsGameStarted(true);
   };
 
-  // Reset Practice: restore health, clear states, reset animations & positions
-  const resetPractice = useCallback(() => {
-    // health & UI
-    setHealth1(100);
-    setHealth2(100);
-    setWinner(null);
-    setLoser(null);
-    setShowPopup(false);
-    setRestartCountdown(null);
-
-    // reset both controllers' internal state/animation (method added below in PlayerController)
-    carControllerRef1.current?.resetForPractice?.();
-    carControllerRef2.current?.resetForPractice?.();
-
-    // reposition both fighters (spawn points)
-    try {
-      carControllerRef1.current?.rigidBody?.setTranslation(
-        { x: 1.2, y: 0, z: 0 },
-        true
-      );
-      carControllerRef1.current?.rigidBody?.setLinvel(
-        { x: 0, y: 0, z: 0 },
-        true
-      );
-      carControllerRef2.current?.rigidBody?.setTranslation(
-        { x: -1.2, y: 0, z: 0 },
-        true
-      );
-      carControllerRef2.current?.rigidBody?.setLinvel(
-        { x: 0, y: 0, z: 0 },
-        true
-      );
-    } catch {}
-  }, []);
-
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
@@ -573,18 +538,6 @@ const Experience = () => {
       }
     };
   }, [showWelcomeScreen, unlockAllAudio]);
-
-  useEffect(() => {
-    if (!isPracticeMode) return;
-    if (health2 <= 0) {
-      setPopupMessage("BOT down! Restarting practice…");
-      setShowPopup(true);
-      const t = setTimeout(() => {
-        resetPractice();
-      }, 1500);
-      return () => clearTimeout(t);
-    }
-  }, [isPracticeMode, health2, resetPractice]);
 
   // Validate username as user types
   useEffect(() => {
@@ -869,9 +822,15 @@ const Experience = () => {
                   // 🟢 Practice-only local hit path
                   practiceMode={isPracticeMode}
                   onPracticeHit={(data) => {
-                    // reduce BOT health
-                    setHealth2((prev) => Math.max(0, prev - data.damage));
-                    // trigger BOT hit animation locally
+                    setHealth2((prev) => {
+                      const newHealth = Math.max(0, prev - data.damage);
+                      if (newHealth === 0) {
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 1000); // short delay to let animation play
+                      }
+                      return newHealth;
+                    });
                     carControllerRef2.current?.receiveHit(
                       data.attackType,
                       data.attackTime
@@ -1025,15 +984,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-      {isPracticeMode && isGameStarted && (
-        <button
-          onClick={resetPractice}
-          className="fixed top-4 right-4 px-4 py-2 bg-purple-600 text-white rounded-lg shadow z-[110]"
-        >
-          Restart Practice
-        </button>
-      )}
-
       {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
         <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
@@ -1061,6 +1011,14 @@ const Experience = () => {
       )}
       {isGameStarted && (
         <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {isPracticeMode && isGameStarted && (
+            <button
+              onClick={() => window.location.reload()}
+              className="fixed top-5 left-5 px-4 py-2 bg-red-600 text-white rounded-lg z-[9999]"
+            >
+              Exit Practice
+            </button>
+          )}
           {/* Player 1 */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
