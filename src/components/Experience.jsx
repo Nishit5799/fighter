@@ -827,7 +827,7 @@ const Experience = () => {
                       if (newHealth === 0) {
                         setTimeout(() => {
                           window.location.reload();
-                        }, 1000); // short delay to let animation play
+                        }, 2000); // short delay to let animation play
                       }
                       return newHealth;
                     });
