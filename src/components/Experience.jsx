@@ -920,7 +920,7 @@ const Experience = () => {
         </Canvas>
       </KeyboardControls>
       {showWelcomeScreen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/30 bg-opacity-80 z-50 start">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 bg-opacity-80 z-50 start">
           <div className="text-center">
             {hasJoinedRoom && (
               <button
