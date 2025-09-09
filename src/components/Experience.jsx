@@ -822,7 +822,7 @@ const Experience = () => {
                   // 🟢 Practice-only local hit path
                   practiceMode={isPracticeMode}
                   onPracticeHit={(data) => {
-                    // Always show hit animation on bot
+                    // Always show hit animation if in contact
                     carControllerRef2.current?.receiveHit(
                       data.attackType,
                       data.attackTime
@@ -832,13 +832,12 @@ const Experience = () => {
                       const newHealth = Math.max(0, prev - data.damage);
 
                       if (newHealth === 0) {
-                        // Trigger bot fall + player victory
+                        // Trigger defeat animation
                         setTimeout(() => {
                           carControllerRef2.current?.setDefeat(true);
-                          carControllerRef1.current?.setVictory(true);
                         }, 200);
 
-                        // Reload after short delay
+                        // Reload after a short delay
                         setTimeout(() => {
                           window.location.reload();
                         }, 2500);
