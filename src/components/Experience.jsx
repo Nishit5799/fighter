@@ -832,10 +832,10 @@ const Experience = () => {
                       const newHealth = Math.max(0, prev - data.damage);
 
                       if (newHealth === 0) {
-                        // Trigger bot fall + player victory
+                        // Trigger bot fall and player victory
                         setTimeout(() => {
-                          carControllerRef2.current?.setDefeat(true);
-                          carControllerRef1.current?.setVictory(true);
+                          carControllerRef2.current?.setDefeat(false); // Don't play lost.mp3
+                          carControllerRef1.current?.setVictory(true); // ✅ Play only victory.mp3
                         }, 200);
 
                         // Reload after short delay
