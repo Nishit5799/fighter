@@ -45,6 +45,8 @@ const PlayerController = forwardRef(
       showSettings,
       levaStore,
       swipeRotationDelta,
+      practiceMode = false,
+      onPracticeHit, // only used when practiceMode === true
     },
     ref
   ) => {
@@ -286,16 +288,24 @@ const PlayerController = forwardRef(
 
       if (
         (isInContact || ringsInContact()) &&
-        socket &&
         opponentRef.current &&
         !opponentRef.current?.isDefeated
       ) {
-        socket.emit("playerHit", {
-          attackerId: socket.id,
-          damage,
-          attackType: type,
-          attackTime: currentTime,
-        });
+        if (practiceMode) {
+          // Local-only path in Practice Mode
+          onPracticeHit?.({
+            attackType: type,
+            damage,
+            attackTime: currentTime,
+          });
+        } else if (socket) {
+          socket.emit("playerHit", {
+            attackerId: socket.id,
+            damage,
+            attackType: type,
+            attackTime: currentTime,
+          });
+        }
       }
 
       attackTimer.current = setTimeout(() => {
@@ -388,7 +398,7 @@ const PlayerController = forwardRef(
     }, [health, isDefeated, opponentHealth, socket]);
 
     useEffect(() => {
-      if (!socket) return;
+      if (!socket || practiceMode) return;
 
       const onPlayerHit = (data) => {
         if (data.victimId === playerId) {
@@ -402,7 +412,7 @@ const PlayerController = forwardRef(
       return () => {
         socket.off("playerHit", onPlayerHit);
       };
-    }, [socket]);
+    }, [socket, practiceMode]);
 
     useEffect(() => {
       if (!socket) return;
@@ -526,7 +536,7 @@ const PlayerController = forwardRef(
 
       rb.current.setLinvel(vel, true);
 
-      if (socket && !isDefeated) {
+      if (!practiceMode && socket && !isDefeated) {
         socket.emit("carMove", {
           position: rb.current.translation(),
           rotation: container.current.rotation.y,
@@ -613,7 +623,7 @@ const PlayerController = forwardRef(
 
     // --- Socket move sync (remote) ---
     useEffect(() => {
-      if (!socket) return;
+      if (!socket || practiceMode) return;
 
       const onCarMove = (data) => {
         if (data.isPlayer1 !== isPlayer1) {
@@ -627,7 +637,7 @@ const PlayerController = forwardRef(
 
       socket.on("carMove", onCarMove);
       return () => socket.off("carMove", onCarMove);
-    }, [socket, isPlayer1]);
+    }, [socket, isPlayer1, practiceMode]);
 
     // --- Imperative API ---
     useImperativeHandle(ref, () => wrapper);
@@ -656,6 +666,20 @@ const PlayerController = forwardRef(
 
     // Keep the object literal separate so we don’t capture stale refs above
     const wrapper = {
+      receiveHit: (attackType, attackTime) => {
+        // reuse the internal takeHit logic
+        takeHit(attackType, attackTime);
+      },
+      resetForPractice: () => {
+        setIsDefeated(false);
+        setMatchResult(null);
+        setCurrentAnimation("idle");
+        setIsHit(false);
+        setIsAttacking(false);
+        movementEnabled.current = true;
+        opponentAttackTime.current = 0;
+        character.current?.resetAnimation?.();
+      },
       toggleFppTpp,
       setOpponentRef,
 

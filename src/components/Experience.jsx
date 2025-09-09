@@ -402,6 +402,41 @@ const Experience = () => {
     setIsGameStarted(true);
   };
 
+  // Reset Practice: restore health, clear states, reset animations & positions
+  const resetPractice = useCallback(() => {
+    // health & UI
+    setHealth1(100);
+    setHealth2(100);
+    setWinner(null);
+    setLoser(null);
+    setShowPopup(false);
+    setRestartCountdown(null);
+
+    // reset both controllers' internal state/animation (method added below in PlayerController)
+    carControllerRef1.current?.resetForPractice?.();
+    carControllerRef2.current?.resetForPractice?.();
+
+    // reposition both fighters (spawn points)
+    try {
+      carControllerRef1.current?.rigidBody?.setTranslation(
+        { x: 1.2, y: 0, z: 0 },
+        true
+      );
+      carControllerRef1.current?.rigidBody?.setLinvel(
+        { x: 0, y: 0, z: 0 },
+        true
+      );
+      carControllerRef2.current?.rigidBody?.setTranslation(
+        { x: -1.2, y: 0, z: 0 },
+        true
+      );
+      carControllerRef2.current?.rigidBody?.setLinvel(
+        { x: 0, y: 0, z: 0 },
+        true
+      );
+    } catch {}
+  }, []);
+
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
@@ -538,6 +573,18 @@ const Experience = () => {
       }
     };
   }, [showWelcomeScreen, unlockAllAudio]);
+
+  useEffect(() => {
+    if (!isPracticeMode) return;
+    if (health2 <= 0) {
+      setPopupMessage("BOT down! Restarting practice…");
+      setShowPopup(true);
+      const t = setTimeout(() => {
+        resetPractice();
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [isPracticeMode, health2, resetPractice]);
 
   // Validate username as user types
   useEffect(() => {
@@ -759,71 +806,143 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
+                  // 🟢 let swipe-to-turn work for you in practice too
                   swipeRotationDelta={
-                    players[0]?.id === socket?.id ? swipeRotationDelta : 0
+                    isPracticeMode
+                      ? swipeRotationDelta
+                      : players[0]?.id === socket?.id
+                      ? swipeRotationDelta
+                      : 0
                   }
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef1.current = el;
-                    if (players[0]?.id === socket?.id) {
-                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    // 🟢 make this the camera target in Practice (or when you are player 1 in multiplayer)
+                    if (isPracticeMode || players[0]?.id === socket?.id) {
+                      cameraToggleRef.current = el;
                     }
                   }}
                   key={players[0]?.id || "player1"}
                   playerId={players[0]?.id}
                   characterType="cena"
+                  // 🟢 ALWAYS route your joystick to player 1 in Practice
                   joystickInput={
-                    players[0]?.id === socket?.id ? joystickInput : null
+                    isPracticeMode
+                      ? joystickInput
+                      : players[0]?.id === socket?.id
+                      ? joystickInput
+                      : null
                   }
+                  // 🟢 game must be started
                   disabled={!isGameStarted}
                   position={[1.2, 0, 0]}
-                  isPlayer1={players[0]?.id === socket?.id}
-                  color={0x90902d}
-                  isPunching={
-                    players[0]?.id === socket?.id ? isPunching : false
+                  // 🟢 Treat player 1 as the local driver in Practice so the camera follows you
+                  isPlayer1={
+                    isPracticeMode ? true : players[0]?.id === socket?.id
                   }
-                  isKicking={players[0]?.id === socket?.id ? isKicking : false}
+                  color={0x90902d}
+                  // 🟢 Route buttons to you in Practice
+                  isPunching={
+                    isPracticeMode
+                      ? isPunching
+                      : players[0]?.id === socket?.id
+                      ? isPunching
+                      : false
+                  }
+                  isKicking={
+                    isPracticeMode
+                      ? isKicking
+                      : players[0]?.id === socket?.id
+                      ? isKicking
+                      : false
+                  }
                   health={health1}
                   opponentHealth={health2}
-                  isLocalPlayer={players[0]?.id === socket?.id}
+                  // 🟢 You are the local player in Practice
+                  isLocalPlayer={
+                    isPracticeMode ? true : players[0]?.id === socket?.id
+                  }
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
                   audio={soundsRef.current}
+                  // 🟢 Practice-only local hit path
+                  practiceMode={isPracticeMode}
+                  onPracticeHit={(data) => {
+                    // reduce BOT health
+                    setHealth2((prev) => Math.max(0, prev - data.damage));
+                    // trigger BOT hit animation locally
+                    carControllerRef2.current?.receiveHit(
+                      data.attackType,
+                      data.attackTime
+                    );
+                  }}
                 />
 
                 <PlayerController
+                  // ❌ No swipe turning for BOT in practice
                   swipeRotationDelta={
-                    players[1]?.id === socket?.id ? swipeRotationDelta : 0
+                    isPracticeMode
+                      ? 0
+                      : players[1]?.id === socket?.id
+                      ? swipeRotationDelta
+                      : 0
                   }
                   levaStore={levaStore}
                   showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef2.current = el;
-                    if (players[1]?.id === socket?.id) {
-                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    // keep default camera assignment for multiplayer only
+                    if (players[1]?.id === socket?.id && !isPracticeMode) {
+                      cameraToggleRef.current = el;
                     }
                   }}
                   key={players[1]?.id || "player2"}
                   playerId={players[1]?.id}
                   characterType="austin"
+                  // ❌ No joystick for BOT in practice
                   joystickInput={
-                    players[1]?.id === socket?.id ? joystickInput : null
+                    isPracticeMode
+                      ? null
+                      : players[1]?.id === socket?.id
+                      ? joystickInput
+                      : null
                   }
-                  disabled={!isGameStarted}
+                  // optional: marking disabled is fine but not strictly required
+                  disabled={
+                    !isGameStarted /* || (isPracticeMode ? true : false) */
+                  }
                   position={[-1.2, 0, 0]}
-                  isPlayer1={players[1]?.id === socket?.id}
-                  color={0x2b2ba1}
-                  isPunching={
-                    players[1]?.id === socket?.id ? isPunching : false
+                  // ❌ BOT is not the driving player in practice
+                  isPlayer1={
+                    isPracticeMode ? false : players[1]?.id === socket?.id
                   }
-                  isKicking={players[1]?.id === socket?.id ? isKicking : false}
+                  color={0x2b2ba1}
+                  // ❌ No attack inputs for BOT in practice
+                  isPunching={
+                    isPracticeMode
+                      ? false
+                      : players[1]?.id === socket?.id
+                      ? isPunching
+                      : false
+                  }
+                  isKicking={
+                    isPracticeMode
+                      ? false
+                      : players[1]?.id === socket?.id
+                      ? isKicking
+                      : false
+                  }
                   health={health2}
                   opponentHealth={health1}
-                  isLocalPlayer={players[1]?.id === socket?.id}
+                  isLocalPlayer={
+                    isPracticeMode ? false : players[1]?.id === socket?.id
+                  }
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
                   audio={soundsRef.current}
+                  // 🟢 Practice mode flag (so it silences sockets etc.)
+                  practiceMode={isPracticeMode}
                 />
               </>
             )}
@@ -906,6 +1025,15 @@ const Experience = () => {
           </div>
         </div>
       )}
+      {isPracticeMode && isGameStarted && (
+        <button
+          onClick={resetPractice}
+          className="fixed top-4 right-4 px-4 py-2 bg-purple-600 text-white rounded-lg shadow z-[110]"
+        >
+          Restart Practice
+        </button>
+      )}
+
       {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
         <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
