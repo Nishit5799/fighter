@@ -85,15 +85,15 @@ const PlayerController = forwardRef(
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
-    const joystickRotationSpeed = 0.02;
+    const joystickRotationSpeed = 0.01;
 
     const { rotationSpeed } = useControls(
       {
         rotationSpeed: {
-          value: 7.0,
-          min: 5.0,
-          max: 18.0,
-          step: 1.0,
+          value: 7,
+          min: 5,
+          max: 23,
+          step: 1,
         },
       },
       { store: levaStore }
