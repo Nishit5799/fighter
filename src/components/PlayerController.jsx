@@ -90,10 +90,10 @@ const PlayerController = forwardRef(
     const { rotationSpeed } = useControls(
       {
         rotationSpeed: {
-          value: 5.0,
-          min: 3.0,
-          max: 13.0,
-          step: 0.5,
+          value: 7.0,
+          min: 5.0,
+          max: 18.0,
+          step: 1.0,
         },
       },
       { store: levaStore }
