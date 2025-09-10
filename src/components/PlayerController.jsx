@@ -490,9 +490,7 @@ const PlayerController = forwardRef(
 
         const swipeTurn =
           Math.abs(swipeRotationDelta) > 0.005
-            ? -joystickRotationSpeed *
-              swipeRotationDelta *
-              swipeRotationMultiplier
+            ? -joystickRotationSpeed * swipeRotationDelta * rotationSpeed
             : 0;
 
         rotationTarget.current += joystickTurn + swipeTurn;
