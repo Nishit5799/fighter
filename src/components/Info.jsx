@@ -23,7 +23,7 @@ const Info = ({
 
   return (
     <>
-      <div className="fixed right-[80%] top-[20%] transform -translate-x-1/2">
+      <div className="fixed right-[80%] top-[20%] sm:right-[100%] sm:top-[20%] transform -translate-x-1/2">
         <button
           ref={settingsButtonRef}
           onClick={toggleSettings}
