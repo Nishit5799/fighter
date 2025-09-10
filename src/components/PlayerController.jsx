@@ -85,15 +85,15 @@ const PlayerController = forwardRef(
 
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
-    const SWIPE_ROTATION_MULTIPLIER = 5.0;
+    const joystickRotationSpeed = 0.02;
+
     const { rotationSpeed } = useControls(
       {
         rotationSpeed: {
-          label: "Rotation speed", // 👈 readable label (prevents truncation of camelCase)
-          value: isSmallScreen ? 0.06 : 0.04,
-          min: 0.01,
-          max: 0.09,
-          step: 0.01,
+          value: 5.0,
+          min: 3.0,
+          max: 13.0,
+          step: 0.5,
         },
       },
       { store: levaStore }
@@ -483,15 +483,16 @@ const PlayerController = forwardRef(
           lastJoystickMagnitude.current = joystickMagnitude;
         }
 
-        // ✅ Blend joystick + swipe rotation
         const joystickTurn =
           joystickInput && Math.abs(joystickInput.x) > 0.1
-            ? rotationSpeed * joystickInput.x
+            ? joystickRotationSpeed * joystickInput.x
             : 0;
 
         const swipeTurn =
           Math.abs(swipeRotationDelta) > 0.005
-            ? -rotationSpeed * swipeRotationDelta * SWIPE_ROTATION_MULTIPLIER
+            ? -joystickRotationSpeed *
+              swipeRotationDelta *
+              swipeRotationMultiplier
             : 0;
 
         rotationTarget.current += joystickTurn + swipeTurn;
