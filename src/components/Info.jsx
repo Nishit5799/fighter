@@ -23,7 +23,7 @@ const Info = ({
 
   return (
     <>
-      <div className="fixed top-[30%] left-4 ">
+      <div className="fixed top-[20%] left-4 ">
         <button
           ref={settingsButtonRef}
           onClick={toggleSettings}
