@@ -9,17 +9,16 @@ const Info = ({
   settingsButtonRef,
 }) => {
   const infoMessage = `
-    Fight your opponent in the arena! Complete the round by eliminating them.
+Fight your opponent in the arena and win by knocking them out.
 
-    Controls:
-    - Desktop: 
-      * Movement: W, A, S, D or Arrow Keys
-      * Punch: J
-      * Kick: K
-    - Mobile: 
-      * Use the on-screen joystick for movement
-      * Use the attack buttons for punches and kicks
-  `;
+Mobile Controls:
+- Move using the on-screen joystick.
+- Rotate by swiping or using the joystick.
+- Tap punch and kick buttons to attack.
+- Change rotation speed from the settings (⚙️) after the game starts.
+- Switch between FPP and TPP using the button above the joystick.
+- Punch, kick, and run actions have cooldowns. Wait before using them again.
+`;
 
   return (
     <>
