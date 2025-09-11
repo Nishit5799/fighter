@@ -940,7 +940,7 @@ const Experience = () => {
             )}
             <div
               ref={welcomeTextRef}
-              className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
+              className="font-[Bangers] tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
             >
               {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
