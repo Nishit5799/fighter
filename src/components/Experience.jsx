@@ -920,7 +920,7 @@ const Experience = () => {
         </Canvas>
       </KeyboardControls>
       {showWelcomeScreen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/90 bg-opacity-80 z-50 start">
+        <div className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start">
           <div className="text-center">
             {hasJoinedRoom && (
               <button
@@ -940,7 +940,7 @@ const Experience = () => {
             )}
             <div
               ref={welcomeTextRef}
-              className="font-[Bangers] tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
+              className="font-[Bangers] tracking-wider text-3xl font-bold text-yellow-400 mb-8 flex"
             >
               {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
@@ -956,10 +956,10 @@ const Experience = () => {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 onPointerDown={unlockAllAudio}
-                className="px-4 py-2 mb-4 rounded-lg"
+                className="font-[Bebas] px-4 py-2 text-center mb-4 bg-white text-black rounded-lg"
               />
             </div>
-            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
+            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
               <button
                 ref={joinBtnRef}
                 onClick={handleJoinRoom}
@@ -969,7 +969,7 @@ const Experience = () => {
                   !isUsernameValid ||
                   playerName.trim().length === 0
                 }
-                className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                className={` px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
                   hasJoinedRoom ||
                   !isUsernameValid ||
                   playerName.trim().length === 0
@@ -988,7 +988,7 @@ const Experience = () => {
             </div>
             <div
               onClick={handleInfoClick}
-              className="mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              className="font-[Bebas] mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
             >
               HOW TO PLAY?
             </div>
@@ -996,7 +996,7 @@ const Experience = () => {
         </div>
       )}
       {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
-        <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
+        <div className="font-[Bebas] fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
           {players.map((player, index) => (
             <div key={index}>
@@ -1021,7 +1021,7 @@ const Experience = () => {
         </div>
       )}
       {isGameStarted && (
-        <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+        <div className="fixed font-[Bebas] top-0 left-0 right-0 flex justify-between p-4 z-50">
           {isPracticeMode && isGameStarted && (
             <button
               onClick={() => window.location.reload()}

@@ -55,6 +55,12 @@ body {
   font-weight: normal;
   font-style: normal;
 }
+@font-face {
+  font-family: "Bebas";
+  src: url("/BebasNeue-Regular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
 /* HTML: <div class="loader"></div> */
 .loader {
   width: 90px;

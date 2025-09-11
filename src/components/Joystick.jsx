@@ -149,7 +149,7 @@ const Joystick = forwardRef(
               setIsFpp(!isFpp);
               onToggleCamera();
             }}
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full left-2 bg-purple-500 text-white font-bold text-sm sm:text-xl"
+            className="font-[Bebas] w-14 h-14 sm:w-16 sm:h-16 rounded-full left-2 bg-purple-500 text-white font-bold text-sm sm:text-xl"
           >
             {isFpp ? "TPP" : "FPP"}
           </button>
@@ -203,7 +203,9 @@ const Joystick = forwardRef(
     active:bg-opacity-100 transition-all select-none user-select-none`}
               onClick={triggerRun}
             >
-              <span className="text-2xl font-bold">{renderRunLabel()}</span>
+              <span className="font-[Bebas] text-2xl font-bold">
+                {renderRunLabel()}
+              </span>
             </button>
           </div>
         </div>
