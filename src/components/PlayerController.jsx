@@ -550,11 +550,21 @@ const PlayerController = forwardRef(
       }
 
       if (isPlayer1) {
+        // Detect input source: prioritize swipe over joystick if both are active
+        const usingSwipe = Math.abs(swipeRotationDelta) > 0.005;
+        const usingJoystick = joystickInput && Math.abs(joystickInput.x) > 0.1;
+
+        let lerpFactor = 0.1; // default for joystick
+        if (usingSwipe && !usingJoystick) {
+          lerpFactor = 0.5; // snappier swipe rotation
+        }
+
         container.current.rotation.y = MathUtils.lerp(
           container.current.rotation.y,
           rotationTarget.current,
-          0.1
+          lerpFactor
         );
+
         cameraPosition.current.getWorldPosition(cameraworldPosition.current);
         camera.position.lerp(cameraworldPosition.current, 0.1);
         if (cameraTarget.current) {
