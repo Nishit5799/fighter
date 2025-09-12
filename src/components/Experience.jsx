@@ -920,27 +920,21 @@ const Experience = () => {
         </Canvas>
       </KeyboardControls>
       {showWelcomeScreen && (
-        <div className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start">
-          <div className="text-center">
-            {hasJoinedRoom && (
-              <button
-                onClick={() => {
-                  if (socket) {
-                    socket.emit("playerRestart", {
-                      playerId: socket.id,
-                      playerName,
-                    });
-                  }
-                  window.location.reload();
-                }}
-                className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
-              >
-                Exit
-              </button>
-            )}
+        <div
+          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start"
+          onClick={() => {
+            if (!hasTappedToBegin) {
+              setHasTappedToBegin(true);
+            }
+          }}
+        >
+          <div className="text-center pointer-events-none">
+            {" "}
+            {/* prevent double click issues */}
+            {/* Welcome Title */}
             <div
               ref={welcomeTextRef}
-              className="font-[Bangers] tracking-wider text-3xl font-bold text-yellow-400 mb-8 flex"
+              className="font-[Bangers] tracking-wider text-3xl font-bold text-yellow-400 mb-8 flex justify-center"
             >
               {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
@@ -948,53 +942,69 @@ const Experience = () => {
                 </span>
               ))}
             </div>
-            <div>
-              <input
-                ref={nameInputRef}
-                type="text"
-                placeholder="Enter your name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                onPointerDown={unlockAllAudio}
-                className="font-[Bebas] px-4 py-2 text-center mb-4 bg-white text-black rounded-lg"
-              />
-            </div>
-            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
-              <button
-                ref={joinBtnRef}
-                onClick={handleJoinRoom}
-                onPointerDown={unlockAllAudio}
-                disabled={
-                  hasJoinedRoom ||
-                  !isUsernameValid ||
-                  playerName.trim().length === 0
-                }
-                className={` px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
-                  hasJoinedRoom ||
-                  !isUsernameValid ||
-                  playerName.trim().length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-orange-600"
-                } transition-colors`}
-              >
-                JOIN ROOM
-              </button>
-              <button
-                onClick={startPracticeMode}
-                className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"
-              >
-                PRACTICE
-              </button>
-            </div>
+            {/* Tap to Begin */}
+            {!hasTappedToBegin && (
+              <div className="text-white text-xl animate-bounce mt-4">
+                Tap to Begin
+              </div>
+            )}
+            {/* Inputs and Buttons (Hidden until tap) */}
             <div
-              onClick={handleInfoClick}
-              className="font-[Bebas] mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              className={`mt-8 transition-all duration-700 ease-out ${
+                hasTappedToBegin
+                  ? "opacity-100 translate-y-0 animate-bounceInUp"
+                  : "opacity-0 translate-y-10 pointer-events-none"
+              }`}
             >
-              HOW TO PLAY?
+              <div>
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  onPointerDown={unlockAllAudio}
+                  className="font-[Bebas] px-4 py-2 text-center mb-4 bg-white text-black rounded-lg"
+                />
+              </div>
+              <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
+                <button
+                  ref={joinBtnRef}
+                  onClick={handleJoinRoom}
+                  onPointerDown={unlockAllAudio}
+                  disabled={
+                    hasJoinedRoom ||
+                    !isUsernameValid ||
+                    playerName.trim().length === 0
+                  }
+                  className={` px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                    hasJoinedRoom ||
+                    !isUsernameValid ||
+                    playerName.trim().length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-orange-600"
+                  } transition-colors`}
+                >
+                  JOIN ROOM
+                </button>
+                <button
+                  onClick={startPracticeMode}
+                  className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  PRACTICE
+                </button>
+              </div>
+              <div
+                onClick={handleInfoClick}
+                className="font-[Bebas] mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              >
+                HOW TO PLAY?
+              </div>
             </div>
           </div>
         </div>
       )}
+
       {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
         <div className="font-[Bebas] fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>

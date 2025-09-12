@@ -92,3 +92,24 @@ body {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes bounceInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(300px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-20px);
+  }
+  80% {
+    transform: translateY(10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-bounceInUp {
+  animation: bounceInUp 0.8s ease-out both;
+}
