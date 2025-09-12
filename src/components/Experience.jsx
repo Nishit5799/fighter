@@ -71,6 +71,7 @@ const Experience = () => {
   const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [hasTappedToBegin, setHasTappedToBegin] = useState(false);
+  const [showJoinWarning, setShowJoinWarning] = useState(false);
 
   const localPlayer = players.find((p) => p.id === socket?.id);
 
@@ -314,7 +315,12 @@ const Experience = () => {
     unlockAllAudio();
 
     const trimmedName = playerName.trim();
-    if (trimmedName !== "" && !hasJoinedRoom) {
+    if (trimmedName === "") {
+      setShowJoinWarning(true);
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (!hasJoinedRoom) {
       if (players.length >= 2) {
         setPopupMessage("Room is already full. Please try again later.");
         setShowPopup(true);
@@ -341,6 +347,12 @@ const Experience = () => {
     players.length,
     isUsernameUnique,
   ]);
+  useEffect(() => {
+    if (showJoinWarning) {
+      const timer = setTimeout(() => setShowJoinWarning(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showJoinWarning]);
 
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
@@ -984,6 +996,12 @@ const Experience = () => {
                 >
                   JOIN ROOM
                 </button>
+                {showJoinWarning && (
+                  <div className="text-yellow-300 text-center mt-2 text-lg animate-pulse">
+                    Please enter your name to join
+                  </div>
+                )}
+
                 <button
                   onClick={startPracticeMode}
                   className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"

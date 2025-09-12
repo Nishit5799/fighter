@@ -8,8 +8,10 @@ const Info = ({
   toggleSettings,
   settingsButtonRef,
 }) => {
-  const infoMessage = `
+ const infoMessage = `
 Fight your opponent in the arena and win by knocking them out.
+
+ "Join Room" is for multiplayer. Share the link with a friend to start.
 
 - Move using the on-screen joystick.
 - Rotate by swiping or using the joystick.
@@ -18,6 +20,7 @@ Fight your opponent in the arena and win by knocking them out.
 - Switch between FPP and TPP using the button above the joystick.
 - Punch, kick, and run actions have cooldowns. Wait before using them again.
 `;
+
 
   return (
     <>
