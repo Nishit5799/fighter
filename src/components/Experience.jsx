@@ -225,47 +225,32 @@ const Experience = () => {
     const warm = () => {
       const items = Object.values(soundsRef.current).filter(Boolean);
 
-      // 🔁 If sounds aren't created yet, retry a few times instead of marking unlocked
       if (items.length === 0) {
         unlockRetryRef.current += 1;
         if (unlockRetryRef.current <= 10) {
-          setTimeout(warm, 50); // try again in ~1 frame
+          setTimeout(warm, 50); // Try again
         }
-        return; // DO NOT flip audioUnlockedRef yet
+        return;
       }
 
-      const warmups = items.map((a) => {
-        const prevVol = a.volume;
-        a.muted = true; // hard mute
-        a.volume = 0; // belt-and-suspenders
-        a.currentTime = 0;
-
-        return a
-          .play()
-          .then(() => {
-            a.pause();
-            a.currentTime = 0;
-            a.muted = false; // restore after playback is fully stopped
-            a.volume = prevVol;
-            return true;
-          })
-          .catch(() => {
-            // If play is blocked, still restore safely and continue
-            a.muted = false;
-            a.volume = prevVol;
-            return false;
-          });
+      // ✅ Silent warmup logic
+      items.forEach((a) => {
+        try {
+          const silentClone = a.cloneNode(); // Clone each audio tag
+          silentClone.muted = true;
+          silentClone.volume = 0;
+          silentClone.currentTime = 0;
+          silentClone.play().catch(() => {});
+        } catch (err) {
+          console.warn("Silent warmup failed:", err);
+        }
       });
 
-      Promise.allSettled(warmups).finally(() => {
-        audioUnlockedRef.current = true;
-      });
+      audioUnlockedRef.current = true; // ✅ Prevent re-unlocking
     };
 
-    // 1) Make sure WebAudio is resumed (if present)
-    ensureAudioContext();
-    // 2) Warm the EXACT elements (with retry if not ready yet)
-    warm();
+    ensureAudioContext(); // Resume WebAudio if needed
+    warm(); // Perform silent warmup
   }, []);
 
   useEffect(() => {
@@ -1136,7 +1121,9 @@ const Experience = () => {
         popupMessage={popupMessage}
         showInfoPopup={showInfoPopup}
         setShowInfoPopup={setShowInfoPopup}
-        onInfoClick={handleInfoClick}
+        onInfoClick={
+          isPracticeMode ? () => setShowInfoPopup((prev) => !prev) : null // 🔒 don't show button outside practice
+        }
       />
     </>
   );

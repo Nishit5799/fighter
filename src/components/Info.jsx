@@ -21,7 +21,7 @@ Fight your opponent in the arena and win by knocking them out.
 
   return (
     <>
-      <div className="fixed top-[20%] left-4 ">
+      <div className="fixed top-[20%] left-4 z-[110] flex flex-col gap-2">
         <button
           ref={settingsButtonRef}
           onClick={toggleSettings}
@@ -29,11 +29,26 @@ Fight your opponent in the arena and win by knocking them out.
         >
           ⚙️
         </button>
+
+        {typeof onInfoClick === "function" && (
+          <button
+            onClick={onInfoClick}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md shadow-md hover:bg-blue-500 transition"
+          >
+            ℹ️
+          </button>
+        )}
       </div>
 
       {showInfoPopup && (
-        <div className="fixed inset-0 flex items-center justify-center text-center bg-black bg-opacity-50 z-[100]">
-          <div className="font-[Bebas] bg-white p-6 rounded-lg text-black max-w-md">
+        <div
+          className="fixed inset-0 flex items-center justify-center text-center bg-black bg-opacity-50 z-[100]"
+          onClick={() => setShowInfoPopup(false)} // ⬅️ close on background click
+        >
+          <div
+            className="font-[Bebas] bg-white p-6 rounded-lg text-black max-w-md"
+            onClick={(e) => e.stopPropagation()} // ⛔ stop bubbling
+          >
             <h2 className="text-xl font-bold mb-4">Game Information</h2>
             <p className="whitespace-pre-line">{infoMessage}</p>
             <button
