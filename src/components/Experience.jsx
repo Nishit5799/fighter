@@ -70,6 +70,8 @@ const Experience = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [hasTappedToBegin, setHasTappedToBegin] = useState(false);
+
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
