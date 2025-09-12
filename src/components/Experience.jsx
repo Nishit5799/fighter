@@ -924,13 +924,19 @@ const Experience = () => {
       {showWelcomeScreen && (
         <div
           className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start"
-          onClick={() => {
+          onClick={(e) => {
+            // Prevent event from bubbling to buttons
             if (!hasTappedToBegin) {
+              e.stopPropagation();
               setHasTappedToBegin(true);
             }
           }}
         >
-          <div className="text-center pointer-events-none">
+          <div
+            className={`text-center ${
+              !hasTappedToBegin ? "pointer-events-none" : ""
+            }`}
+          >
             {" "}
             {/* prevent double click issues */}
             {/* Welcome Title */}
@@ -946,7 +952,11 @@ const Experience = () => {
             </div>
             {/* Tap to Begin */}
             {!hasTappedToBegin && (
-              <div className="text-white text-xl animate-bounce mt-4">
+              <div
+                className={`text-white text-xl mt-4 ${
+                  hasTappedToBegin ? "fade-out" : "animate-blink"
+                }`}
+              >
                 Tap to Begin
               </div>
             )}
