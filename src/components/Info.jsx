@@ -21,7 +21,7 @@ Fight your opponent in the arena and win by knocking them out.
 
   return (
     <>
-      <div className="fixed top-[20%] left-4 z-[110] flex flex-col gap-2">
+      <div className="fixed top-[20%] left-4  flex flex-col gap-2">
         <button
           ref={settingsButtonRef}
           onClick={toggleSettings}
