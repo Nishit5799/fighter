@@ -979,14 +979,21 @@ const Experience = () => {
               <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
                 <button
                   ref={joinBtnRef}
-                  onClick={handleJoinRoom}
+                  onClick={() => {
+                    const trimmedName = playerName.trim();
+                    if (
+                      hasJoinedRoom ||
+                      !isUsernameValid ||
+                      trimmedName.length === 0
+                    ) {
+                      setShowJoinWarning(true);
+                      nameInputRef.current?.focus();
+                      return;
+                    }
+                    handleJoinRoom();
+                  }}
                   onPointerDown={unlockAllAudio}
-                  disabled={
-                    hasJoinedRoom ||
-                    !isUsernameValid ||
-                    playerName.trim().length === 0
-                  }
-                  className={` px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                  className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
                     hasJoinedRoom ||
                     !isUsernameValid ||
                     playerName.trim().length === 0
@@ -996,6 +1003,7 @@ const Experience = () => {
                 >
                   JOIN ROOM
                 </button>
+
                 {showJoinWarning && (
                   <div className="text-yellow-300 text-center mt-2 text-lg animate-pulse">
                     Please enter your name to join
