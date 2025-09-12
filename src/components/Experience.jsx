@@ -349,7 +349,7 @@ const Experience = () => {
   ]);
   useEffect(() => {
     if (showJoinWarning) {
-      const timer = setTimeout(() => setShowJoinWarning(false), 2000);
+      const timer = setTimeout(() => setShowJoinWarning(false), 4000);
       return () => clearTimeout(timer);
     }
   }, [showJoinWarning]);
