@@ -147,22 +147,6 @@ const PlayerController = forwardRef(
 
     // Init / teardown sounds
     useEffect(() => {
-      // If Experience provided shared, unlocked audio, use it
-      if (
-        audio?.punch &&
-        audio?.kick &&
-        audio?.hit &&
-        audio?.victory &&
-        audio?.lost
-      ) {
-        punchSound.current = audio.punch;
-        kickSound.current = audio.kick;
-        hitSound.current = audio.hit;
-        victorySound.current = audio.victory;
-        lostSound.current = audio.lost;
-        return; // Experience owns lifecycle; no teardown here
-      }
-
       // Fallback (only if audio prop is missing)
       const make = (src, vol = 0.8) => {
         const a = new Audio(src);
