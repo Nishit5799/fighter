@@ -17,24 +17,6 @@ import Stone from "./Stone";
 import Cenaa from "./Cenaa";
 import { Leva, useControls } from "leva";
 
-const createAudioPool = (src, size = 5, volume = 1) => {
-  const pool = Array.from({ length: size }, () => {
-    const a = new Audio(src);
-    a.volume = volume;
-    a.preload = "auto";
-    a.playsInline = true;
-    return a;
-  });
-
-  let index = 0;
-  return () => {
-    const sound = pool[index];
-    index = (index + 1) % size;
-    sound.currentTime = 0;
-    sound.play().catch(() => {});
-  };
-};
-
 const SOUNDS = {
   punch: "/punch.mp3",
   kick: "/punch.mp3",
@@ -147,6 +129,22 @@ const PlayerController = forwardRef(
 
     // Init / teardown sounds
     useEffect(() => {
+      // If Experience provided shared, unlocked audio, use it
+      if (
+        audio?.punch &&
+        audio?.kick &&
+        audio?.hit &&
+        audio?.victory &&
+        audio?.lost
+      ) {
+        punchSound.current = audio.punch;
+        kickSound.current = audio.kick;
+        hitSound.current = audio.hit;
+        victorySound.current = audio.victory;
+        lostSound.current = audio.lost;
+        return; // Experience owns lifecycle; no teardown here
+      }
+
       // Fallback (only if audio prop is missing)
       const make = (src, vol = 0.8) => {
         const a = new Audio(src);
@@ -157,11 +155,11 @@ const PlayerController = forwardRef(
         return a;
       };
 
-      punchSound.current = createAudioPool("/punch.mp3", 5, 0.7);
-      kickSound.current = createAudioPool("/kick.mp3", 5, 0.7);
-      hitSound.current = createAudioPool("/hit.mp3", 5, 0.4);
-      victorySound.current = createAudioPool("/win.mp3", 3, 0.5);
-      lostSound.current = createAudioPool("/lost.mp3", 3, 0.5);
+      punchSound.current = make("/punch.mp3", 0.7);
+      kickSound.current = make("/kick.mp3", 0.7);
+      hitSound.current = make("/hit.mp3", 0.4);
+      victorySound.current = make("/victory.mp3", 0.85);
+      lostSound.current = make("/lost.mp3", 0.85);
 
       return () => {
         // clean up only if we created local elements
@@ -182,30 +180,6 @@ const PlayerController = forwardRef(
         );
       };
     }, [audio]);
-
-    useEffect(() => {
-      const warmup = () => {
-        try {
-          punchSound.current?.();
-          kickSound.current?.();
-          hitSound.current?.();
-          victorySound.current?.();
-          lostSound.current?.();
-        } catch (e) {
-          console.warn("Warmup failed:", e);
-        }
-      };
-
-      document.addEventListener("pointerdown", warmup, { once: true });
-      document.addEventListener("touchstart", warmup, { once: true });
-      document.addEventListener("keydown", warmup, { once: true });
-
-      return () => {
-        document.removeEventListener("pointerdown", warmup);
-        document.removeEventListener("touchstart", warmup);
-        document.removeEventListener("keydown", warmup);
-      };
-    }, []);
 
     // Responsive screen check
     useEffect(() => {
@@ -284,10 +258,10 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      if (type === "kick") {
-        kickSound.current?.();
-      } else {
-        punchSound.current?.();
+      const sound = type === "kick" ? kickSound.current : punchSound.current;
+      if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch((e) => console.log("Audio play failed:", e));
       }
 
       setIsAttacking(true);
@@ -348,7 +322,12 @@ const PlayerController = forwardRef(
       // Accept the hit; timestamp is for attribution/logging only
       opponentAttackTime.current = attackTime ?? Date.now();
 
-      hitSound.current?.();
+      if (hitSound.current) {
+        hitSound.current.currentTime = 0;
+        hitSound.current.play().catch(() => {
+          // iOS can block audio the first time; animation still runs
+        });
+      }
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
