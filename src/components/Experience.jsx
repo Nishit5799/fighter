@@ -20,6 +20,23 @@ import Ring from "./Ring";
 import Background from "./Background";
 import { Leva, useCreateStore } from "leva";
 
+const unlockAudio = (audio) => {
+  if (!audio) return;
+
+  Object.values(audio).forEach((sound) => {
+    try {
+      sound.volume = 0;
+      sound.play().then(() => {
+        sound.pause();
+        sound.currentTime = 0;
+        sound.volume = 1;
+      });
+    } catch (err) {
+      console.warn("Audio unlock failed:", err);
+    }
+  });
+};
+
 // (near the top, after other imports)
 const SOUND_FILES = {
   punch: "/punch.mp3",
@@ -702,6 +719,11 @@ const Experience = () => {
     }
   }, [restartCountdown, handleReset]);
 
+  const handleStart = () => {
+    unlockAudio(soundsRef.current); // 🔓 Unlock sounds
+    setHasTappedToBegin(true); // ✅ Start the welcome screen
+  };
+
   // --- Render ---
   return (
     <>
@@ -922,10 +944,9 @@ const Experience = () => {
         <div
           className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start"
           onClick={(e) => {
-            // Prevent event from bubbling to buttons
             if (!hasTappedToBegin) {
               e.stopPropagation();
-              setHasTappedToBegin(true);
+              handleStart();
             }
           }}
         >
