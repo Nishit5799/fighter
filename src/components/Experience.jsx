@@ -634,7 +634,7 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      unlockAllAudio();
+      unlockAllAudio(); // 🔑 ensure audio is warmed
       let count = 3;
       setCountdown(count);
 
@@ -725,23 +725,28 @@ const Experience = () => {
     setHasTappedToBegin(true);
   };
 
+  // 🔊 Global unlock for audio on any interaction
   useEffect(() => {
     const tryUnlock = () => {
-      if (!hasTappedToBegin) {
-        unlockAllAudio(); // safely warms up all sounds
-      }
+      unlockAllAudio(); // Warm up all sounds once
       window.removeEventListener("click", tryUnlock);
       window.removeEventListener("touchstart", tryUnlock);
+      window.removeEventListener("pointerdown", tryUnlock);
+      window.removeEventListener("keydown", tryUnlock);
     };
 
     window.addEventListener("click", tryUnlock);
     window.addEventListener("touchstart", tryUnlock);
+    window.addEventListener("pointerdown", tryUnlock);
+    window.addEventListener("keydown", tryUnlock);
 
     return () => {
       window.removeEventListener("click", tryUnlock);
       window.removeEventListener("touchstart", tryUnlock);
+      window.removeEventListener("pointerdown", tryUnlock);
+      window.removeEventListener("keydown", tryUnlock);
     };
-  }, [hasTappedToBegin]);
+  }, []);
 
   // --- Render ---
   return (
