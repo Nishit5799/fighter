@@ -258,10 +258,16 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      const sound = type === "kick" ? kickSound.current : punchSound.current;
-      if (sound) {
-        sound.currentTime = 0;
-        sound.play().catch((e) => console.log("Audio play failed:", e));
+      const originalSound =
+        type === "kick" ? kickSound.current : punchSound.current;
+      if (originalSound) {
+        try {
+          const clone = originalSound.cloneNode();
+          clone.volume = originalSound.volume;
+          clone.play().catch((e) => console.log("Attack sound error:", e));
+        } catch (e) {
+          console.warn("Failed to play attack sound:", e);
+        }
       }
 
       setIsAttacking(true);
@@ -323,10 +329,13 @@ const PlayerController = forwardRef(
       opponentAttackTime.current = attackTime ?? Date.now();
 
       if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          // iOS can block audio the first time; animation still runs
-        });
+        try {
+          const clone = hitSound.current.cloneNode();
+          clone.volume = hitSound.current.volume;
+          clone.play().catch((e) => console.log("Hit sound error:", e));
+        } catch (e) {
+          console.warn("Failed to play hit sound:", e);
+        }
       }
 
       if (hitTimer.current) {
