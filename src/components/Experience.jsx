@@ -939,7 +939,13 @@ const Experience = () => {
             {/* Welcome Title */}
             <div
               ref={welcomeTextRef}
-              className="font-[Bangers] tracking-wider text-3xl font-bold text-yellow-400 mb-8 flex justify-center"
+              className={`font-[Bangers] tracking-wider font-bold text-yellow-400 mb-8 flex justify-center transition-transform duration-700 ease-out ${
+                hasTappedToBegin ? "translate-y-6 sm:translate-y-8" : ""
+              } ${
+                hasTappedToBegin
+                  ? "text-3xl sm:text-5xl md:text-6xl"
+                  : "text-3xl sm:text-4xl"
+              }`}
             >
               {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
