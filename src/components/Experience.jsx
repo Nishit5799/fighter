@@ -19,17 +19,21 @@ import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 import { Leva, useCreateStore } from "leva";
+
 const unlockAudio = (audio) => {
   if (!audio) return;
 
   Object.values(audio).forEach((sound) => {
     try {
-      const silentClone = sound.cloneNode(); // create a clone
-      silentClone.muted = true; // ensure it's muted
-      silentClone.volume = 0; // double safety
-      silentClone.play().catch(() => {});
+      const clone = sound.cloneNode?.();
+      clone.muted = true;
+      clone.volume = 0;
+      clone.play().then(() => {
+        clone.pause();
+        clone.currentTime = 0;
+      });
     } catch (err) {
-      console.warn("Silent audio unlock failed:", err);
+      console.warn("Audio unlock failed:", err);
     }
   });
 };
@@ -717,8 +721,8 @@ const Experience = () => {
   }, [restartCountdown, handleReset]);
 
   const handleStart = () => {
-    unlockAudio(soundsRef.current); // 🔓 Unlock sounds
-    setHasTappedToBegin(true); // ✅ Start the welcome screen
+    unlockAllAudio(); // uses soundsRef correctly and safely
+    setHasTappedToBegin(true);
   };
 
   // --- Render ---
