@@ -163,6 +163,41 @@ const PlayerController = forwardRef(
       victorySound.current = createAudioPool("/win.mp3", 3, 0.5);
       lostSound.current = createAudioPool("/lost.mp3", 3, 0.5);
 
+      // inside PlayerController component...
+
+      // 🎵 AUDIO SETUP
+      punchSound.current = createAudioPool("/punch.mp3", 5, 0.7);
+      kickSound.current = createAudioPool("/kick.mp3", 5, 0.7);
+      hitSound.current = createAudioPool("/hit.mp3", 5, 0.4);
+      victorySound.current = createAudioPool("/win.mp3", 3, 0.5);
+      lostSound.current = createAudioPool("/lost.mp3", 3, 0.5);
+
+      // 🔊 Warm up audio pools on first user interaction (important for iPad/tablets)
+      useEffect(() => {
+        const warmup = () => {
+          try {
+            punchSound.current?.();
+            kickSound.current?.();
+            hitSound.current?.();
+            victorySound.current?.();
+            lostSound.current?.();
+          } catch (e) {
+            console.warn("Warmup failed:", e);
+          }
+        };
+
+        // Listen for the very first interaction
+        document.addEventListener("pointerdown", warmup, { once: true });
+        document.addEventListener("touchstart", warmup, { once: true });
+        document.addEventListener("keydown", warmup, { once: true });
+
+        return () => {
+          document.removeEventListener("pointerdown", warmup);
+          document.removeEventListener("touchstart", warmup);
+          document.removeEventListener("keydown", warmup);
+        };
+      }, []);
+
       return () => {
         // clean up only if we created local elements
         [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
