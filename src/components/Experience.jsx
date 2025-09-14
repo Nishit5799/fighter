@@ -19,20 +19,17 @@ import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 import { Leva, useCreateStore } from "leva";
-
 const unlockAudio = (audio) => {
   if (!audio) return;
 
   Object.values(audio).forEach((sound) => {
     try {
-      sound.volume = 0;
-      sound.play().then(() => {
-        sound.pause();
-        sound.currentTime = 0;
-        sound.volume = 1;
-      });
+      const silentClone = sound.cloneNode(); // create a clone
+      silentClone.muted = true; // ensure it's muted
+      silentClone.volume = 0; // double safety
+      silentClone.play().catch(() => {});
     } catch (err) {
-      console.warn("Audio unlock failed:", err);
+      console.warn("Silent audio unlock failed:", err);
     }
   });
 };
