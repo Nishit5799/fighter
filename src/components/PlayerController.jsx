@@ -17,6 +17,24 @@ import Stone from "./Stone";
 import Cenaa from "./Cenaa";
 import { Leva, useControls } from "leva";
 
+const createAudioPool = (src, size = 5, volume = 1) => {
+  const pool = Array.from({ length: size }, () => {
+    const a = new Audio(src);
+    a.volume = volume;
+    a.preload = "auto";
+    a.playsInline = true;
+    return a;
+  });
+
+  let index = 0;
+  return () => {
+    const sound = pool[index];
+    index = (index + 1) % size;
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
+  };
+};
+
 const SOUNDS = {
   punch: "/punch.mp3",
   kick: "/punch.mp3",
@@ -155,9 +173,10 @@ const PlayerController = forwardRef(
         return a;
       };
 
-      punchSound.current = make("/punch.mp3", 0.7);
-      kickSound.current = make("/kick.mp3", 0.7);
-      hitSound.current = make("/hit.mp3", 0.4);
+      punchSound.current = createAudioPool("/punch.mp3", 5, 0.7);
+      kickSound.current = createAudioPool("/kick.mp3", 5, 0.7);
+      hitSound.current = createAudioPool("/hit.mp3", 5, 0.4);
+
       victorySound.current = make("/victory.mp3", 0.85);
       lostSound.current = make("/lost.mp3", 0.85);
 
@@ -258,16 +277,10 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      const originalSound =
-        type === "kick" ? kickSound.current : punchSound.current;
-      if (originalSound) {
-        try {
-          const clone = originalSound.cloneNode();
-          clone.volume = originalSound.volume;
-          clone.play().catch((e) => console.log("Attack sound error:", e));
-        } catch (e) {
-          console.warn("Failed to play attack sound:", e);
-        }
+      if (type === "kick") {
+        kickSound.current?.();
+      } else {
+        punchSound.current?.();
       }
 
       setIsAttacking(true);
@@ -328,15 +341,7 @@ const PlayerController = forwardRef(
       // Accept the hit; timestamp is for attribution/logging only
       opponentAttackTime.current = attackTime ?? Date.now();
 
-      if (hitSound.current) {
-        try {
-          const clone = hitSound.current.cloneNode();
-          clone.volume = hitSound.current.volume;
-          clone.play().catch((e) => console.log("Hit sound error:", e));
-        } catch (e) {
-          console.warn("Failed to play hit sound:", e);
-        }
-      }
+      hitSound.current?.();
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
