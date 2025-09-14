@@ -160,9 +160,8 @@ const PlayerController = forwardRef(
       punchSound.current = createAudioPool("/punch.mp3", 5, 0.7);
       kickSound.current = createAudioPool("/kick.mp3", 5, 0.7);
       hitSound.current = createAudioPool("/hit.mp3", 5, 0.4);
-
-      victorySound.current = make("/victory.mp3", 0.85);
-      lostSound.current = make("/lost.mp3", 0.85);
+      victorySound.current = createAudioPool("/win.mp3", 3, 0.5);
+      lostSound.current = createAudioPool("/lost.mp3", 3, 0.5);
 
       return () => {
         // clean up only if we created local elements

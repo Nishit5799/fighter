@@ -721,9 +721,27 @@ const Experience = () => {
   }, [restartCountdown, handleReset]);
 
   const handleStart = () => {
-    unlockAllAudio(); // uses soundsRef correctly and safely
+    unlockAllAudio();
     setHasTappedToBegin(true);
   };
+
+  useEffect(() => {
+    const tryUnlock = () => {
+      if (!hasTappedToBegin) {
+        unlockAllAudio(); // safely warms up all sounds
+      }
+      window.removeEventListener("click", tryUnlock);
+      window.removeEventListener("touchstart", tryUnlock);
+    };
+
+    window.addEventListener("click", tryUnlock);
+    window.addEventListener("touchstart", tryUnlock);
+
+    return () => {
+      window.removeEventListener("click", tryUnlock);
+      window.removeEventListener("touchstart", tryUnlock);
+    };
+  }, [hasTappedToBegin]);
 
   // --- Render ---
   return (
