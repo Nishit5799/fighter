@@ -19,6 +19,8 @@ import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 import { Leva, useCreateStore } from "leva";
+import audioPool from "@/utils/audioPool";
+
 const unlockAudio = (audio) => {
   if (!audio) return;
 
@@ -405,7 +407,8 @@ const Experience = () => {
   }, [socket, playerName]);
 
   const startPracticeMode = () => {
-    unlockAllAudio();
+    audioPool.unlockAll(); // ✅ Unlock all sounds
+    audioPool.play("begin"); // ✅ Play "begin" sound
     setIsPracticeMode(true);
     setPlayers([
       { id: "practice-player", name: "You" },
@@ -488,6 +491,11 @@ const Experience = () => {
 
         setWinner(winnerPlayer);
         setLoser(loserPlayer);
+        if (socket?.id === data.winnerId) {
+          audioPool.play("victory");
+        } else {
+          audioPool.play("lost");
+        }
 
         hasLoggedResult.current = true;
 
@@ -628,14 +636,11 @@ const Experience = () => {
         handleReset();
       }
     };
-
     const startGameHandler = () => {
-      // ⛔ Prevent countdown if player hasn't joined the room or is not in the list
       const isParticipant = players.some((p) => p.id === socket?.id);
-      if (!hasJoinedRoom || !isParticipant) {
-        return;
-      }
-      unlockAllAudio();
+      if (!hasJoinedRoom || !isParticipant) return;
+
+      audioPool.unlockAll();
       let count = 3;
       setCountdown(count);
 
@@ -646,12 +651,7 @@ const Experience = () => {
           clearInterval(interval);
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
-
-          const begin = soundsRef.current.begin;
-          if (begin) {
-            begin.currentTime = 0;
-            begin.play().catch((e) => console.log("Begin sound failed:", e));
-          }
+          audioPool.play("begin"); // ✅ Sound
         }
       }, 1000);
     };

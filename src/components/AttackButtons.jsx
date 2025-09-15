@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useSocket } from "../context/SocketContext";
+import audioPool from "@/utils/audioPool";
 
 const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
@@ -26,11 +27,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
     }
 
     if (type === "punch") {
+      audioPool.play("punch");
       setPunchCooldown(true);
       onPunch(true);
       setTimeout(() => onPunch(false), 1000);
       setTimeout(() => setPunchCooldown(false), 2500);
     } else {
+      audioPool.play("kick");
       setKickCooldown(true);
       onKick(true);
       setTimeout(() => onKick(false), 1000);
