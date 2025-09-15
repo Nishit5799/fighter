@@ -256,13 +256,7 @@ const PlayerController = forwardRef(
 
       // Accept the hit; timestamp is for attribution/logging only
       opponentAttackTime.current = attackTime ?? Date.now();
-
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          // iOS can block audio the first time; animation still runs
-        });
-      }
+      audioPool.play("hit");
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
