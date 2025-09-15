@@ -1,4 +1,5 @@
 // utils/audioPool.js
+
 const soundFiles = {
   punch: "/punch.mp3",
   kick: "/kick.mp3",
@@ -10,18 +11,29 @@ const soundFiles = {
 
 class AudioPool {
   constructor(files) {
+    this.files = files;
     this.pool = {};
+    this.isInitialized = false;
+  }
 
-    for (const key in files) {
-      const audio = new Audio(files[key]);
+  init() {
+    if (typeof window === "undefined" || this.isInitialized) return;
+
+    for (const key in this.files) {
+      const audio = new Audio(this.files[key]);
       audio.preload = "auto";
       audio.crossOrigin = "anonymous";
       audio.volume = 0.8;
       this.pool[key] = audio;
     }
+
+    this.isInitialized = true;
   }
 
   play(name, allowOverlap = true) {
+    if (typeof window === "undefined") return;
+    this.init();
+
     const baseAudio = this.pool[name];
     if (!baseAudio) return;
 
@@ -39,6 +51,9 @@ class AudioPool {
   }
 
   unlockAll() {
+    if (typeof window === "undefined") return;
+    this.init();
+
     for (const key in this.pool) {
       try {
         const audio = this.pool[key];
@@ -54,5 +69,4 @@ class AudioPool {
 }
 
 const audioPool = new AudioPool(soundFiles);
-
 export default audioPool;
