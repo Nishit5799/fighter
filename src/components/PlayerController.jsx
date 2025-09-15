@@ -649,21 +649,11 @@ const PlayerController = forwardRef(
       isDefeated,
     };
 
-    // Cleanup timeouts and audio refs on unmount
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
         if (hitTimer.current) clearTimeout(hitTimer.current);
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
-
-        [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (sound) => {
-            if (sound.current) {
-              sound.current.pause();
-              sound.current = null;
-            }
-          }
-        );
       };
     }, []);
 
