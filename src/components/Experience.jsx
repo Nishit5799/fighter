@@ -375,6 +375,8 @@ const Experience = () => {
       if (!isPracticeMode) {
         socket.emit("playerReady", playerName);
       }
+      audioPool.unlockAll();
+      audioUnlockedRef.current = true;
       setIsReady(true);
     }
   }, [socket, playerName]);
@@ -631,7 +633,12 @@ const Experience = () => {
           setTimeout(() => {
             try {
               audioPool.unlockAll(); // unlock audio here, not before
-              audioPool.play("begin"); // play start sound
+              setTimeout(() => {
+                if (typeof window !== "undefined") {
+                  audioPool.unlockAll(); // Ensure iOS context is active
+                  audioPool.play("begin");
+                }
+              }, 100); // delay helps avoid race conditions
             } catch (err) {
               console.warn("Audio unlock/play error on startGame", err);
             }

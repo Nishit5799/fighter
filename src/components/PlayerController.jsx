@@ -256,7 +256,10 @@ const PlayerController = forwardRef(
 
       // Accept the hit; timestamp is for attribution/logging only
       opponentAttackTime.current = attackTime ?? Date.now();
-      audioPool.play("hit");
+      if (typeof window !== "undefined") {
+        audioPool.unlockAll();
+        setTimeout(() => audioPool.play("hit"), 100); // optional delay
+      }
 
       if (hitTimer.current) {
         clearTimeout(hitTimer.current);
@@ -620,7 +623,12 @@ const PlayerController = forwardRef(
 
         setTimeout(() => {
           if (isLocalPlayerWinner) {
-            audioPool.play("victory");
+            setTimeout(() => {
+              if (typeof window !== "undefined") {
+                audioPool.unlockAll();
+                audioPool.play("victory");
+              }
+            }, 100); // ✅ allows unlock to complete
           }
         }, 100);
       },
@@ -632,7 +640,12 @@ const PlayerController = forwardRef(
 
         setTimeout(() => {
           if (isLocalPlayerLoser) {
-            audioPool.play("lost");
+            setTimeout(() => {
+              if (typeof window !== "undefined") {
+                audioPool.unlockAll();
+                audioPool.play("lost");
+              }
+            }, 100);
           }
         }, 200);
       },
