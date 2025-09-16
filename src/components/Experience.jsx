@@ -609,7 +609,12 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      if (hasStartedGameRef.current) return; // prevent double execution
+      if (!hasJoinedRoom) {
+        console.log("Ignoring startGame — not joined");
+        return;
+      }
+
+      if (hasStartedGameRef.current) return;
       hasStartedGameRef.current = true;
 
       console.log("[Socket] startGame event received at", Date.now());
@@ -625,20 +630,20 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
-          // Defer unlock slightly to let UI transition
+          // Play start sound
           setTimeout(() => {
             try {
-              audioPool.unlockAll(); // unlock audio here, not before
+              audioPool.unlockAll();
               setTimeout(() => {
                 if (typeof window !== "undefined") {
-                  audioPool.unlockAll(); // Ensure iOS context is active
+                  audioPool.unlockAll();
                   audioPool.play("begin");
                 }
-              }, 100); // delay helps avoid race conditions
+              }, 100);
             } catch (err) {
               console.warn("Audio unlock/play error on startGame", err);
             }
-          }, 100); // short delay
+          }, 100);
         }
       }, 1000);
     };
