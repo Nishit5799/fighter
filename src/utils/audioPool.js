@@ -2,7 +2,7 @@
 
 const soundFiles = {
   punch: "/punch.mp3",
-  kick: "/kick.mp3",
+  kick: "/punch.mp3",
   hit: "/hit.mp3",
   victory: "/victory.mp3",
   lost: "/lost.mp3",
@@ -51,6 +51,19 @@ class AudioPool {
   }
 
   unlockAll() {
+    // Add this in audioPool.js inside unlockAll()
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn("AudioContext resume failed", e);
+    }
+
     if (typeof window === "undefined") return;
     this.init();
 

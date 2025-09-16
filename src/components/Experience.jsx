@@ -95,6 +95,7 @@ const Experience = () => {
   const settingsRef = useRef();
   const settingsPanelRef = useRef(null); // for Leva panel container
   const settingsButtonRef = useRef(null); // for settings icon button
+  const hasStartedGameRef = useRef(false); // put this above useEffect if not already there
 
   const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
@@ -285,34 +286,6 @@ const Experience = () => {
     return () =>
       events.forEach((ev) => document.removeEventListener(ev, handler, opts));
   }, [unlockAllAudio]);
-
-  useEffect(() => {
-    const make = (src, vol = 0.8) => {
-      const a = new Audio(src);
-      a.preload = "auto";
-      // @ts-ignore
-      a.playsInline = true;
-      a.crossOrigin = "anonymous";
-      a.volume = vol;
-      return a;
-    };
-
-    soundsRef.current.punch = make(SOUND_FILES.punch, 0.7);
-    soundsRef.current.kick = make(SOUND_FILES.kick, 0.7);
-    soundsRef.current.hit = make(SOUND_FILES.hit, 0.4);
-    soundsRef.current.victory = make(SOUND_FILES.victory, 0.85);
-    soundsRef.current.lost = make(SOUND_FILES.lost, 0.85);
-    soundsRef.current.begin = make(SOUND_FILES.begin, 0.75);
-
-    return () => {
-      Object.values(soundsRef.current).forEach((a) => {
-        try {
-          a?.pause();
-          a?.remove?.();
-        } catch {}
-      });
-    };
-  }, []);
 
   const isUsernameUnique = useCallback(
     (name) => !players.some((player) => player.name === name),
@@ -636,11 +609,13 @@ const Experience = () => {
         handleReset();
       }
     };
-    const startGameHandler = () => {
-      const isParticipant = players.some((p) => p.id === socket?.id);
-      if (!hasJoinedRoom || !isParticipant) return;
 
-      audioPool.unlockAll();
+    const startGameHandler = () => {
+      if (hasStartedGameRef.current) return; // prevent double execution
+      hasStartedGameRef.current = true;
+
+      console.log("[Socket] startGame event received at", Date.now());
+
       let count = 3;
       setCountdown(count);
 
@@ -651,7 +626,16 @@ const Experience = () => {
           clearInterval(interval);
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
-          audioPool.play("begin"); // ✅ Sound
+
+          // Defer unlock slightly to let UI transition
+          setTimeout(() => {
+            try {
+              audioPool.unlockAll(); // unlock audio here, not before
+              audioPool.play("begin"); // play start sound
+            } catch (err) {
+              console.warn("Audio unlock/play error on startGame", err);
+            }
+          }, 100); // short delay
         }
       }, 1000);
     };
@@ -722,7 +706,7 @@ const Experience = () => {
   }, [restartCountdown, handleReset]);
 
   const handleStart = () => {
-    unlockAudio(soundsRef.current); // 🔓 Unlock sounds
+    audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
     setHasTappedToBegin(true); // ✅ Start the welcome screen
   };
 
