@@ -466,22 +466,26 @@ const Experience = () => {
 
         setWinner(winnerPlayer);
         setLoser(loserPlayer);
-        if (socket?.id === data.winnerId) {
-          audioPool.play("victory");
-        } else {
-          audioPool.play("lost");
-        }
 
         hasLoggedResult.current = true;
 
         if (carControllerRef1.current && carControllerRef2.current) {
-          if (players[0]?.id === data.winnerId) {
-            carControllerRef1.current.setVictory(players[0]?.id === socket?.id);
-            carControllerRef2.current.setDefeat(players[1]?.id === socket?.id);
-          } else {
-            carControllerRef1.current.setDefeat(players[0]?.id === socket?.id);
-            carControllerRef2.current.setVictory(players[1]?.id === socket?.id);
-          }
+          const isP1Winner = players[0]?.id === data.winnerId;
+          const isP1Loser = players[0]?.id === data.loserId;
+
+          carControllerRef1.current.setVictory(
+            isP1Winner && socket?.id === data.winnerId
+          );
+          carControllerRef1.current.setDefeat(
+            isP1Loser && socket?.id === data.loserId
+          );
+
+          carControllerRef2.current.setVictory(
+            !isP1Winner && socket?.id === data.winnerId
+          );
+          carControllerRef2.current.setDefeat(
+            !isP1Loser && socket?.id === data.loserId
+          );
         }
       }
 
