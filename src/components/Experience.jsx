@@ -88,6 +88,7 @@ const Experience = () => {
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [hasTappedToBegin, setHasTappedToBegin] = useState(false);
   const [showJoinWarning, setShowJoinWarning] = useState(false);
+  const [roomId, setRoomId] = useState(null);
 
   const localPlayer = players.find((p) => p.id === socket?.id);
 
@@ -395,6 +396,7 @@ const Experience = () => {
 
   const onPlayerHit = useCallback(
     (data) => {
+      if (data?.roomId !== roomId) return; // 🛡 Guard by room ID
       if (winner || loser) return;
       if (!isPracticeMode) {
         socket.emit("updateHealth", {
@@ -448,6 +450,7 @@ const Experience = () => {
 
   const onPlayerDefeated = useCallback(
     (data) => {
+      if (data?.roomId !== roomId) return; // 🛡 Guard by room ID
       if (!hasLoggedResult.current) {
         if (!data || typeof data !== "object") return;
         if (data.winnerId === data.loserId) return;
@@ -607,7 +610,8 @@ const Experience = () => {
       }
     };
 
-    const startGameHandler = () => {
+    const startGameHandler = (data) => {
+      if (data?.roomId !== roomId) return; // 🛡 Guard by room ID
       if (hasStartedGameRef.current) return; // prevent double execution
       hasStartedGameRef.current = true;
 
@@ -652,6 +656,7 @@ const Experience = () => {
 
     socket.on("updatePlayers", updatePlayersHandler);
     socket.on("startGame", startGameHandler);
+
     socket.on("restartGame", restartGameHandler);
     socket.on("usernameTaken", usernameTakenHandler);
     socket.on("playerHit", onPlayerHit);
@@ -666,6 +671,30 @@ const Experience = () => {
       socket.off("playerDefeated", onPlayerDefeated);
     };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
+
+  useEffect(() => {
+    if (!socket || isPracticeMode) return;
+
+    const roomStateHandler = (state) => {
+      if (state?.roomId) {
+        setRoomId(state.roomId); // ✅ Save the current room ID
+      }
+
+      if (Array.isArray(state.players)) {
+        setPlayers(state.players);
+      }
+
+      if (typeof state.gameStarted === "boolean") {
+        setIsGameStarted(state.gameStarted);
+      }
+    };
+
+    socket.on("roomState", roomStateHandler);
+
+    return () => {
+      socket.off("roomState", roomStateHandler);
+    };
+  }, [socket, isPracticeMode]);
 
   // Cross-link player controllers when game starts
   useEffect(() => {

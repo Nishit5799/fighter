@@ -93,6 +93,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
         const roomState = roomStates.get(roomId);
 
         socket.emit("roomState", {
+          roomId, // ✅ NEW!
           players: Array.from(roomState.players.values()),
           gameStarted: roomState.gameStarted,
         });
@@ -133,7 +134,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
               Array.from(roomState.players.values()).every((p) => p.isReady)
             ) {
               roomState.gameStarted = true;
-              io.to(roomId).emit("startGame");
+              io.to(roomId).emit("startGame", { roomId });
             }
           }
         });
@@ -150,9 +151,10 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
           const hitData = {
             ...data,
-            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
+            victimId: otherPlayerId,
             attackTime: data.attackTime ?? serverTime,
             serverTime,
+            roomId, // ✅ Include this here
           };
 
           if (otherPlayerId) {
@@ -218,7 +220,10 @@ Promise.all([pubClient.connect(), subClient.connect()])
             winningAttackTime: data.winningAttackTime || Date.now(),
           };
 
-          io.to(roomId).emit("playerDefeated", defeatData);
+          io.to(roomId).emit("playerDefeated", {
+            ...data,
+            roomId,
+          });
           console.log(`Verified Match Result - 
     Winner: ${winner.name} (${winner.id}), 
     Loser: ${loser.name} (${loser.id})`);
