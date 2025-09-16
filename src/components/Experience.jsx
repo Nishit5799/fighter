@@ -704,6 +704,13 @@ const Experience = () => {
       handleReset();
     }
   }, [restartCountdown, handleReset]);
+  // 🔁 Reset audio unlock flag so it can retry next match
+  useEffect(() => {
+    if (restartCountdown === 0) {
+      audioUnlockedRef.current = false;
+      console.log("[Audio] Unlock state reset for new match");
+    }
+  }, [restartCountdown]);
 
   const handleStart = () => {
     audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
