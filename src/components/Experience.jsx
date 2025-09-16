@@ -609,10 +609,11 @@ const Experience = () => {
         handleReset();
       }
     };
-
     const startGameHandler = (data) => {
-      if (data?.roomId !== roomId) return; // 🛡 Guard by room ID
-      if (hasStartedGameRef.current) return; // prevent double execution
+      if (data?.roomId !== roomId) return; // 🛡 Guard: Ignore if not my room
+
+      if (hasStartedGameRef.current) return; // Already started
+
       hasStartedGameRef.current = true;
 
       console.log("[Socket] startGame event received at", Date.now());
@@ -631,17 +632,17 @@ const Experience = () => {
           // Defer unlock slightly to let UI transition
           setTimeout(() => {
             try {
-              audioPool.unlockAll(); // unlock audio here, not before
+              audioPool.unlockAll();
               setTimeout(() => {
                 if (typeof window !== "undefined") {
-                  audioPool.unlockAll(); // Ensure iOS context is active
+                  audioPool.unlockAll();
                   audioPool.play("begin");
                 }
-              }, 100); // delay helps avoid race conditions
+              }, 100);
             } catch (err) {
               console.warn("Audio unlock/play error on startGame", err);
             }
-          }, 100); // short delay
+          }, 100);
         }
       }, 1000);
     };
@@ -656,7 +657,6 @@ const Experience = () => {
 
     socket.on("updatePlayers", updatePlayersHandler);
     socket.on("startGame", startGameHandler);
-
     socket.on("restartGame", restartGameHandler);
     socket.on("usernameTaken", usernameTakenHandler);
     socket.on("playerHit", onPlayerHit);
