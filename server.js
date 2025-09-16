@@ -93,6 +93,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
         const roomState = roomStates.get(roomId);
 
         socket.emit("roomState", {
+          roomId, // ✅ NEW!
           players: Array.from(roomState.players.values()),
           gameStarted: roomState.gameStarted,
         });
@@ -133,7 +134,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
               Array.from(roomState.players.values()).every((p) => p.isReady)
             ) {
               roomState.gameStarted = true;
-              io.to(roomId).emit("startGame");
+              io.to(roomId).emit("startGame", { roomId }); // ✅ include roomId
             }
           }
         });

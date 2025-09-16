@@ -19,6 +19,22 @@ import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
 import { Leva, useCreateStore } from "leva";
+import audioPool from "@/utils/audioPool";
+
+const unlockAudio = (audio) => {
+  if (!audio) return;
+
+  Object.values(audio).forEach((sound) => {
+    try {
+      const silentClone = sound.cloneNode(); // create a clone
+      silentClone.muted = true; // ensure it's muted
+      silentClone.volume = 0; // double safety
+      silentClone.play().catch(() => {});
+    } catch (err) {
+      console.warn("Silent audio unlock failed:", err);
+    }
+  });
+};
 
 // (near the top, after other imports)
 const SOUND_FILES = {
@@ -70,12 +86,17 @@ const Experience = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [hasTappedToBegin, setHasTappedToBegin] = useState(false);
+  const [showJoinWarning, setShowJoinWarning] = useState(false);
+  const [roomId, setRoomId] = useState(null);
+
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
   const settingsRef = useRef();
   const settingsPanelRef = useRef(null); // for Leva panel container
   const settingsButtonRef = useRef(null); // for settings icon button
+  const hasStartedGameRef = useRef(false); // put this above useEffect if not already there
 
   const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
@@ -223,47 +244,32 @@ const Experience = () => {
     const warm = () => {
       const items = Object.values(soundsRef.current).filter(Boolean);
 
-      // 🔁 If sounds aren't created yet, retry a few times instead of marking unlocked
       if (items.length === 0) {
         unlockRetryRef.current += 1;
         if (unlockRetryRef.current <= 10) {
-          setTimeout(warm, 50); // try again in ~1 frame
+          setTimeout(warm, 50); // Try again
         }
-        return; // DO NOT flip audioUnlockedRef yet
+        return;
       }
 
-      const warmups = items.map((a) => {
-        const prevVol = a.volume;
-        a.muted = true; // hard mute
-        a.volume = 0; // belt-and-suspenders
-        a.currentTime = 0;
-
-        return a
-          .play()
-          .then(() => {
-            a.pause();
-            a.currentTime = 0;
-            a.muted = false; // restore after playback is fully stopped
-            a.volume = prevVol;
-            return true;
-          })
-          .catch(() => {
-            // If play is blocked, still restore safely and continue
-            a.muted = false;
-            a.volume = prevVol;
-            return false;
-          });
+      // ✅ Silent warmup logic
+      items.forEach((a) => {
+        try {
+          const silentClone = a.cloneNode(); // Clone each audio tag
+          silentClone.muted = true;
+          silentClone.volume = 0;
+          silentClone.currentTime = 0;
+          silentClone.play().catch(() => {});
+        } catch (err) {
+          console.warn("Silent warmup failed:", err);
+        }
       });
 
-      Promise.allSettled(warmups).finally(() => {
-        audioUnlockedRef.current = true;
-      });
+      audioUnlockedRef.current = true; // ✅ Prevent re-unlocking
     };
 
-    // 1) Make sure WebAudio is resumed (if present)
-    ensureAudioContext();
-    // 2) Warm the EXACT elements (with retry if not ready yet)
-    warm();
+    ensureAudioContext(); // Resume WebAudio if needed
+    warm(); // Perform silent warmup
   }, []);
 
   useEffect(() => {
@@ -282,34 +288,6 @@ const Experience = () => {
       events.forEach((ev) => document.removeEventListener(ev, handler, opts));
   }, [unlockAllAudio]);
 
-  useEffect(() => {
-    const make = (src, vol = 0.8) => {
-      const a = new Audio(src);
-      a.preload = "auto";
-      // @ts-ignore
-      a.playsInline = true;
-      a.crossOrigin = "anonymous";
-      a.volume = vol;
-      return a;
-    };
-
-    soundsRef.current.punch = make(SOUND_FILES.punch, 0.7);
-    soundsRef.current.kick = make(SOUND_FILES.kick, 0.7);
-    soundsRef.current.hit = make(SOUND_FILES.hit, 0.4);
-    soundsRef.current.victory = make(SOUND_FILES.victory, 0.85);
-    soundsRef.current.lost = make(SOUND_FILES.lost, 0.85);
-    soundsRef.current.begin = make(SOUND_FILES.begin, 0.75);
-
-    return () => {
-      Object.values(soundsRef.current).forEach((a) => {
-        try {
-          a?.pause();
-          a?.remove?.();
-        } catch {}
-      });
-    };
-  }, []);
-
   const isUsernameUnique = useCallback(
     (name) => !players.some((player) => player.name === name),
     [players]
@@ -327,7 +305,12 @@ const Experience = () => {
     unlockAllAudio();
 
     const trimmedName = playerName.trim();
-    if (trimmedName !== "" && !hasJoinedRoom) {
+    if (trimmedName === "") {
+      setShowJoinWarning(true);
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (!hasJoinedRoom) {
       if (players.length >= 2) {
         setPopupMessage("Room is already full. Please try again later.");
         setShowPopup(true);
@@ -354,6 +337,12 @@ const Experience = () => {
     players.length,
     isUsernameUnique,
   ]);
+  useEffect(() => {
+    if (showJoinWarning) {
+      const timer = setTimeout(() => setShowJoinWarning(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [showJoinWarning]);
 
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
@@ -387,12 +376,15 @@ const Experience = () => {
       if (!isPracticeMode) {
         socket.emit("playerReady", playerName);
       }
+      audioPool.unlockAll();
+      audioUnlockedRef.current = true;
       setIsReady(true);
     }
   }, [socket, playerName]);
 
   const startPracticeMode = () => {
-    unlockAllAudio();
+    audioPool.unlockAll(); // ✅ Unlock all sounds
+    audioPool.play("begin"); // ✅ Play "begin" sound
     setIsPracticeMode(true);
     setPlayers([
       { id: "practice-player", name: "You" },
@@ -617,12 +609,11 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      // ⛔ Prevent countdown if player hasn't joined the room or is not in the list
-      const isParticipant = players.some((p) => p.id === socket?.id);
-      if (!hasJoinedRoom || !isParticipant) {
-        return;
-      }
-      unlockAllAudio();
+      if (hasStartedGameRef.current) return; // prevent double execution
+      hasStartedGameRef.current = true;
+
+      console.log("[Socket] startGame event received at", Date.now());
+
       let count = 3;
       setCountdown(count);
 
@@ -634,11 +625,20 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
-          const begin = soundsRef.current.begin;
-          if (begin) {
-            begin.currentTime = 0;
-            begin.play().catch((e) => console.log("Begin sound failed:", e));
-          }
+          // Defer unlock slightly to let UI transition
+          setTimeout(() => {
+            try {
+              audioPool.unlockAll(); // unlock audio here, not before
+              setTimeout(() => {
+                if (typeof window !== "undefined") {
+                  audioPool.unlockAll(); // Ensure iOS context is active
+                  audioPool.play("begin");
+                }
+              }, 100); // delay helps avoid race conditions
+            } catch (err) {
+              console.warn("Audio unlock/play error on startGame", err);
+            }
+          }, 100); // short delay
         }
       }, 1000);
     };
@@ -667,6 +667,30 @@ const Experience = () => {
       socket.off("playerDefeated", onPlayerDefeated);
     };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
+
+  useEffect(() => {
+    if (!socket || isPracticeMode) return;
+
+    const roomStateHandler = (state) => {
+      if (state?.roomId) {
+        setRoomId(state.roomId); // ✅ Save the current room ID
+      }
+
+      if (Array.isArray(state.players)) {
+        setPlayers(state.players);
+      }
+
+      if (typeof state.gameStarted === "boolean") {
+        setIsGameStarted(state.gameStarted);
+      }
+    };
+
+    socket.on("roomState", roomStateHandler);
+
+    return () => {
+      socket.off("roomState", roomStateHandler);
+    };
+  }, [socket, isPracticeMode]);
 
   // Cross-link player controllers when game starts
   useEffect(() => {
@@ -707,6 +731,18 @@ const Experience = () => {
       handleReset();
     }
   }, [restartCountdown, handleReset]);
+  // 🔁 Reset audio unlock flag so it can retry next match
+  useEffect(() => {
+    if (restartCountdown === 0) {
+      audioUnlockedRef.current = false;
+      console.log("[Audio] Unlock state reset for new match");
+    }
+  }, [restartCountdown]);
+
+  const handleStart = () => {
+    audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
+    setHasTappedToBegin(true); // ✅ Start the welcome screen
+  };
 
   // --- Render ---
   return (
@@ -925,27 +961,26 @@ const Experience = () => {
         </Canvas>
       </KeyboardControls>
       {showWelcomeScreen && (
-        <div className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start">
-          <div className="text-center">
-            {hasJoinedRoom && (
-              <button
-                onClick={() => {
-                  if (socket) {
-                    socket.emit("playerRestart", {
-                      playerId: socket.id,
-                      playerName,
-                    });
-                  }
-                  window.location.reload();
-                }}
-                className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
-              >
-                Exit
-              </button>
-            )}
+        <div
+          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/80 bg-opacity-80 z-50 start"
+          onClick={(e) => {
+            if (!hasTappedToBegin) {
+              e.stopPropagation();
+              handleStart();
+            }
+          }}
+        >
+          <div
+            className={`text-center ${
+              !hasTappedToBegin ? "pointer-events-none" : ""
+            }`}
+          >
+            {" "}
+            {/* prevent double click issues */}
+            {/* Welcome Title */}
             <div
               ref={welcomeTextRef}
-              className="font-[Bangers] tracking-wider text-3xl font-bold text-yellow-400 mb-8 flex"
+              className="font-[Bangers] tracking-wide sm:tracking-wider md:tracking-widest text-3xl sm:text-5xl md:text-6xl font-bold text-yellow-400 mb-8 flex justify-center transition-all duration-500"
             >
               {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
@@ -953,53 +988,87 @@ const Experience = () => {
                 </span>
               ))}
             </div>
-            <div>
-              <input
-                ref={nameInputRef}
-                type="text"
-                placeholder="Enter your name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                onPointerDown={unlockAllAudio}
-                className="font-[Bebas] px-4 py-2 text-center mb-4 bg-white text-black rounded-lg"
-              />
-            </div>
-            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
-              <button
-                ref={joinBtnRef}
-                onClick={handleJoinRoom}
-                onPointerDown={unlockAllAudio}
-                disabled={
-                  hasJoinedRoom ||
-                  !isUsernameValid ||
-                  playerName.trim().length === 0
-                }
-                className={` px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
-                  hasJoinedRoom ||
-                  !isUsernameValid ||
-                  playerName.trim().length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-orange-600"
-                } transition-colors`}
+            {/* Tap to Begin */}
+            {!hasTappedToBegin && (
+              <div
+                className={`text-white text-xl mt-4 ${
+                  hasTappedToBegin ? "fade-out" : "animate-blink"
+                }`}
               >
-                JOIN ROOM
-              </button>
-              <button
-                onClick={startPracticeMode}
-                className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"
-              >
-                PRACTICE
-              </button>
-            </div>
+                Tap to Begin
+              </div>
+            )}
+            {/* Inputs and Buttons (Hidden until tap) */}
             <div
-              onClick={handleInfoClick}
-              className="font-[Bebas] mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              className={`mt-8 transition-all duration-700 ease-out ${
+                hasTappedToBegin
+                  ? "opacity-100 translate-y-0 animate-bounceInUp"
+                  : "opacity-0 translate-y-10 pointer-events-none"
+              }`}
             >
-              HOW TO PLAY?
+              <div>
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  onPointerDown={unlockAllAudio}
+                  className="font-[Bebas] px-4 py-2 text-center mb-4 bg-white text-black rounded-lg"
+                />
+              </div>
+              <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
+                <button
+                  ref={joinBtnRef}
+                  onClick={() => {
+                    const trimmedName = playerName.trim();
+                    if (
+                      hasJoinedRoom ||
+                      !isUsernameValid ||
+                      trimmedName.length === 0
+                    ) {
+                      setShowJoinWarning(true);
+                      nameInputRef.current?.focus();
+                      return;
+                    }
+                    handleJoinRoom();
+                  }}
+                  onPointerDown={unlockAllAudio}
+                  className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                    hasJoinedRoom ||
+                    !isUsernameValid ||
+                    playerName.trim().length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-orange-600"
+                  } transition-colors`}
+                >
+                  JOIN ROOM
+                </button>
+
+                {showJoinWarning && (
+                  <div className="text-yellow-300 text-center mt-2 text-lg animate-pulse">
+                    Please enter your name to join
+                  </div>
+                )}
+
+                <button
+                  onClick={startPracticeMode}
+                  className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  PRACTICE
+                </button>
+              </div>
+              <div
+                onClick={handleInfoClick}
+                className="font-[Bebas] mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              >
+                HOW TO PLAY?
+              </div>
             </div>
           </div>
         </div>
       )}
+
       {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
         <div className="font-[Bebas] fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
@@ -1119,7 +1188,9 @@ const Experience = () => {
         popupMessage={popupMessage}
         showInfoPopup={showInfoPopup}
         setShowInfoPopup={setShowInfoPopup}
-        onInfoClick={handleInfoClick}
+        onInfoClick={
+          isPracticeMode ? () => setShowInfoPopup((prev) => !prev) : null // 🔒 don't show button outside practice
+        }
       />
     </>
   );

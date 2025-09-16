@@ -16,6 +16,7 @@ import { useSocket } from "../context/SocketContext";
 import Stone from "./Stone";
 import Cenaa from "./Cenaa";
 import { Leva, useControls } from "leva";
+import audioPool from "@/utils/audioPool";
 
 const SOUNDS = {
   punch: "/punch.mp3",
@@ -77,12 +78,6 @@ const PlayerController = forwardRef(
     const lastJoystickMagnitude = useRef(0);
     const joystickChangeThreshold = 0.05;
 
-    const punchSound = useRef(null);
-    const kickSound = useRef(null);
-    const hitSound = useRef(null);
-    const victorySound = useRef(null);
-    const lostSound = useRef(null);
-
     const WALK_SPEED = 1.5;
     const RUN_SPEED = 2.5;
     const SWIPE_ROTATION_MULTIPLIER = 4.0;
@@ -126,60 +121,6 @@ const PlayerController = forwardRef(
     useEffect(() => {
       opponentIdRef.current = opponentRef.current?.id;
     }, [opponentRef.current?.id]);
-
-    // Init / teardown sounds
-    useEffect(() => {
-      // If Experience provided shared, unlocked audio, use it
-      if (
-        audio?.punch &&
-        audio?.kick &&
-        audio?.hit &&
-        audio?.victory &&
-        audio?.lost
-      ) {
-        punchSound.current = audio.punch;
-        kickSound.current = audio.kick;
-        hitSound.current = audio.hit;
-        victorySound.current = audio.victory;
-        lostSound.current = audio.lost;
-        return; // Experience owns lifecycle; no teardown here
-      }
-
-      // Fallback (only if audio prop is missing)
-      const make = (src, vol = 0.8) => {
-        const a = new Audio(src);
-        // @ts-ignore
-        a.playsInline = true;
-        a.preload = "auto";
-        a.volume = vol;
-        return a;
-      };
-
-      punchSound.current = make("/punch.mp3", 0.7);
-      kickSound.current = make("/kick.mp3", 0.7);
-      hitSound.current = make("/hit.mp3", 0.4);
-      victorySound.current = make("/victory.mp3", 0.85);
-      lostSound.current = make("/lost.mp3", 0.85);
-
-      return () => {
-        // clean up only if we created local elements
-        [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (r) => {
-            try {
-              if (
-                r.current &&
-                (!audio || !Object.values(audio).includes(r.current))
-              ) {
-                r.current.pause();
-                r.current.src = "";
-                r.current.remove?.();
-              }
-            } catch {}
-            r.current = null;
-          }
-        );
-      };
-    }, [audio]);
 
     // Responsive screen check
     useEffect(() => {
@@ -258,12 +199,6 @@ const PlayerController = forwardRef(
         clearTimeout(attackTimer.current);
       }
 
-      const sound = type === "kick" ? kickSound.current : punchSound.current;
-      if (sound) {
-        sound.currentTime = 0;
-        sound.play().catch((e) => console.log("Audio play failed:", e));
-      }
-
       setIsAttacking(true);
       movementEnabled.current = false;
       setCurrentAnimation(type);
@@ -321,12 +256,9 @@ const PlayerController = forwardRef(
 
       // Accept the hit; timestamp is for attribution/logging only
       opponentAttackTime.current = attackTime ?? Date.now();
-
-      if (hitSound.current) {
-        hitSound.current.currentTime = 0;
-        hitSound.current.play().catch(() => {
-          // iOS can block audio the first time; animation still runs
-        });
+      if (typeof window !== "undefined") {
+        audioPool.unlockAll();
+        setTimeout(() => audioPool.play("hit"), 100); // optional delay
       }
 
       if (hitTimer.current) {
@@ -690,11 +622,13 @@ const PlayerController = forwardRef(
         movementEnabled.current = false;
 
         setTimeout(() => {
-          if (isLocalPlayerWinner && victorySound.current) {
-            victorySound.current.currentTime = 0;
-            victorySound.current
-              .play()
-              .catch((e) => console.log("Victory sound error:", e));
+          if (isLocalPlayerWinner) {
+            setTimeout(() => {
+              if (typeof window !== "undefined") {
+                audioPool.unlockAll();
+                audioPool.play("victory");
+              }
+            }, 100); // ✅ allows unlock to complete
           }
         }, 100);
       },
@@ -705,35 +639,28 @@ const PlayerController = forwardRef(
         movementEnabled.current = false;
 
         setTimeout(() => {
-          if (isLocalPlayerLoser && lostSound.current) {
-            lostSound.current.currentTime = 0;
-            lostSound.current
-              .play()
-              .catch((e) => console.log("Lost sound error:", e));
+          if (isLocalPlayerLoser) {
+            setTimeout(() => {
+              if (typeof window !== "undefined") {
+                audioPool.unlockAll();
+                audioPool.play("lost");
+              }
+            }, 100);
           }
         }, 200);
       },
+
       translation: () => rb.current?.translation(),
       id: socket?.id,
       rigidBody: rb.current,
       isDefeated,
     };
 
-    // Cleanup timeouts and audio refs on unmount
     useEffect(() => {
       return () => {
         if (attackTimer.current) clearTimeout(attackTimer.current);
         if (hitTimer.current) clearTimeout(hitTimer.current);
         if (contactTimeout.current) clearTimeout(contactTimeout.current);
-
-        [punchSound, kickSound, hitSound, victorySound, lostSound].forEach(
-          (sound) => {
-            if (sound.current) {
-              sound.current.pause();
-              sound.current = null;
-            }
-          }
-        );
       };
     }, []);
 
