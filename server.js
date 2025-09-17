@@ -219,7 +219,10 @@ Promise.all([pubClient.connect(), subClient.connect()])
             winningAttackTime: data.winningAttackTime || Date.now(),
           };
 
-          io.to(roomId).emit("playerDefeated", defeatData);
+          for (const [id] of roomState.players.entries()) {
+            io.to(id).emit("playerDefeated", defeatData);
+          }
+
           console.log(`Verified Match Result - 
     Winner: ${winner.name} (${winner.id}), 
     Loser: ${loser.name} (${loser.id})`);
@@ -235,7 +238,9 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("restartGame", () => {
           roomState.players.clear();
           roomState.gameStarted = false;
-          io.to(roomId).emit("restartGame");
+          for (const [id] of roomState.players.entries()) {
+            io.to(id).emit("restartGame");
+          }
         });
 
         socket.on("disconnect", () => {
