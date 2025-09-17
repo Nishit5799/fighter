@@ -2,7 +2,10 @@ const next = require("next");
 const http = require("http");
 const { Server } = require("socket.io");
 const { createClient } = require("redis");
+
 const { createAdapter } = require("@socket.io/redis-adapter");
+const { nanoid } = require("nanoid");
+
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
