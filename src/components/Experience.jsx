@@ -652,13 +652,16 @@ const Experience = () => {
       }, 1000);
     };
 
-    const restartGameHandler = () => {
-      if (!hasJoinedRoom) {
-        console.log("Ignoring restartGame — not joined");
-        return;
-      }
-      window.location.reload();
-    };
+    useEffect(() => {
+      if (!socket || !hasJoinedRoom) return;
+
+      const onRestart = () => {
+        window.location.reload();
+      };
+
+      socket.on("restartGame", onRestart);
+      return () => socket.off("restartGame", onRestart);
+    }, [socket, hasJoinedRoom]);
 
     const usernameTakenHandler = () => {
       setIsUsernameValid(false);
@@ -666,7 +669,7 @@ const Experience = () => {
 
     socket.on("updatePlayers", updatePlayersHandler);
     socket.on("startGame", startGameHandler);
-    socket.on("restartGame", restartGameHandler);
+
     socket.on("usernameTaken", usernameTakenHandler);
     socket.on("playerHit", onPlayerHit);
     socket.on("playerDefeated", onPlayerDefeated);
@@ -674,7 +677,7 @@ const Experience = () => {
     return () => {
       socket.off("updatePlayers", updatePlayersHandler);
       socket.off("startGame", startGameHandler);
-      socket.off("restartGame", restartGameHandler);
+
       socket.off("usernameTaken", usernameTakenHandler);
       socket.off("playerHit", onPlayerHit);
       socket.off("playerDefeated", onPlayerDefeated);
@@ -763,6 +766,17 @@ const Experience = () => {
     audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
     setHasTappedToBegin(true); // ✅ Start the welcome screen
   };
+
+  useEffect(() => {
+    if (!socket || !hasJoinedRoom) return;
+
+    const onRestart = () => {
+      window.location.reload();
+    };
+
+    socket.on("restartGame", onRestart);
+    return () => socket.off("restartGame", onRestart);
+  }, [socket, hasJoinedRoom]);
 
   // --- Render ---
   return (

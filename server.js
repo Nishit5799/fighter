@@ -53,11 +53,12 @@ Promise.all([pubClient.connect(), subClient.connect()])
           }
         }
 
-        // No room with available slots, create a new one
         const newRoomId = nanoid(6);
         rooms.set(newRoomId, {
           players: new Map(),
           gameStarted: false,
+          createdAt: Date.now(),
+          lastAttacks: {},
         });
         return newRoomId;
       };
@@ -92,7 +93,9 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         const roomId = findAvailableRoom();
         socket.join(roomId);
-        const roomState = roomStates.get(roomId);
+        const rooms = new Map();
+
+        const roomState = rooms.get(roomId);
 
         socket.emit("roomState", {
           roomId, // ✅ NEW!
@@ -101,15 +104,33 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("joinRoom", (playerName) => {
-          if (roomState.players.has(socket.id)) return;
+          if (roomState.players.size >= 2) {
+            // Redirect to another room
+            const newRoomId = findAvailableRoom();
+            socket.leave(roomId);
+            socket.join(newRoomId);
 
-          for (const player of roomState.players.values()) {
-            if (player.name === playerName) {
-              socket.emit("usernameTaken");
-              return;
-            }
+            const newState = rooms.get(newRoomId);
+            newState.players.set(socket.id, {
+              id: socket.id,
+              name: playerName,
+              isReady: false,
+            });
+
+            io.to(newRoomId).emit(
+              "updatePlayers",
+              Array.from(newState.players.values())
+            );
+            socket.emit("roomState", {
+              roomId: newRoomId,
+              players: Array.from(newState.players.values()),
+              gameStarted: newState.gameStarted,
+            });
+
+            return;
           }
 
+          // Normal join flow
           roomState.players.set(socket.id, {
             id: socket.id,
             name: playerName,
@@ -233,7 +254,9 @@ Promise.all([pubClient.connect(), subClient.connect()])
             roomState.matchResult = null;
             roomState.players.forEach((player) => (player.isReady = false));
             roomState.gameStarted = false;
-            io.to(roomId).emit("restartGame");
+            for (const [id] of roomState.players.entries()) {
+              io.to(id).emit("restartGame");
+            }
           });
         });
 
