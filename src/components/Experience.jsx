@@ -449,6 +449,10 @@ const Experience = () => {
 
   const onPlayerDefeated = useCallback(
     (data) => {
+      if (!hasJoinedRoom) {
+        console.log("Ignoring playerDefeated — not joined");
+        return;
+      }
       if (!hasLoggedResult.current) {
         if (!data || typeof data !== "object") return;
         if (data.winnerId === data.loserId) return;
@@ -488,7 +492,7 @@ const Experience = () => {
         setRestartCountdown(5);
       }, 2000);
     },
-    [players, socket?.id]
+    [players, socket?.id, hasJoinedRoom]
   );
 
   // --- Effects (that rely on the helpers/handlers above) ---
@@ -649,6 +653,10 @@ const Experience = () => {
     };
 
     const restartGameHandler = () => {
+      if (!hasJoinedRoom) {
+        console.log("Ignoring restartGame — not joined");
+        return;
+      }
       window.location.reload();
     };
 
@@ -671,7 +679,14 @@ const Experience = () => {
       socket.off("playerHit", onPlayerHit);
       socket.off("playerDefeated", onPlayerDefeated);
     };
-  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
+  }, [
+    socket,
+    isGameStarted,
+    handleReset,
+    onPlayerHit,
+    onPlayerDefeated,
+    hasJoinedRoom,
+  ]);
 
   useEffect(() => {
     if (!socket || isPracticeMode) return;
