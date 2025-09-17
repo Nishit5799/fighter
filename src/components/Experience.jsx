@@ -449,10 +449,6 @@ const Experience = () => {
 
   const onPlayerDefeated = useCallback(
     (data) => {
-      if (!hasJoinedRoom) {
-        console.log("Ignoring playerDefeated — not joined");
-        return;
-      }
       if (!hasLoggedResult.current) {
         if (!data || typeof data !== "object") return;
         if (data.winnerId === data.loserId) return;
@@ -492,7 +488,7 @@ const Experience = () => {
         setRestartCountdown(5);
       }, 2000);
     },
-    [players, socket?.id, hasJoinedRoom]
+    [players, socket?.id]
   );
 
   // --- Effects (that rely on the helpers/handlers above) ---
@@ -652,13 +648,17 @@ const Experience = () => {
       }, 1000);
     };
 
+    const restartGameHandler = () => {
+      window.location.reload();
+    };
+
     const usernameTakenHandler = () => {
       setIsUsernameValid(false);
     };
 
     socket.on("updatePlayers", updatePlayersHandler);
     socket.on("startGame", startGameHandler);
-
+    socket.on("restartGame", restartGameHandler);
     socket.on("usernameTaken", usernameTakenHandler);
     socket.on("playerHit", onPlayerHit);
     socket.on("playerDefeated", onPlayerDefeated);
@@ -666,19 +666,12 @@ const Experience = () => {
     return () => {
       socket.off("updatePlayers", updatePlayersHandler);
       socket.off("startGame", startGameHandler);
-
+      socket.off("restartGame", restartGameHandler);
       socket.off("usernameTaken", usernameTakenHandler);
       socket.off("playerHit", onPlayerHit);
       socket.off("playerDefeated", onPlayerDefeated);
     };
-  }, [
-    socket,
-    isGameStarted,
-    handleReset,
-    onPlayerHit,
-    onPlayerDefeated,
-    hasJoinedRoom,
-  ]);
+  }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
 
   useEffect(() => {
     if (!socket || isPracticeMode) return;
@@ -755,17 +748,6 @@ const Experience = () => {
     audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
     setHasTappedToBegin(true); // ✅ Start the welcome screen
   };
-
-  useEffect(() => {
-    if (!socket || !hasJoinedRoom) return;
-
-    const onRestart = () => {
-      window.location.reload();
-    };
-
-    socket.on("restartGame", onRestart);
-    return () => socket.off("restartGame", onRestart);
-  }, [socket, hasJoinedRoom]);
 
   // --- Render ---
   return (
@@ -1198,7 +1180,7 @@ const Experience = () => {
       />
       {isGameStarted && (
         <AttackButtons
-          key={localPlayer?.id || playerName || "guest"}
+          key={localPlayer?.id || playerName} // 👈 unique per match or player
           onPunch={setIsPunching}
           onKick={setIsKicking}
         />

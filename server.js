@@ -2,10 +2,7 @@ const next = require("next");
 const http = require("http");
 const { Server } = require("socket.io");
 const { createClient } = require("redis");
-
 const { createAdapter } = require("@socket.io/redis-adapter");
-const { nanoid } = require("nanoid");
-
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -19,8 +16,6 @@ const pubClient = createClient({
 });
 
 const subClient = pubClient.duplicate();
-
-const rooms = new Map(); // move this line here
 
 Promise.all([pubClient.connect(), subClient.connect()])
   .then(() => {
@@ -49,20 +44,17 @@ Promise.all([pubClient.connect(), subClient.connect()])
       };
 
       const findAvailableRoom = () => {
-        for (const [roomId, state] of rooms.entries()) {
-          const joinedPlayers = Array.from(state.players.values()).filter(
-            (p) => !!p.name
-          );
-          if (joinedPlayers.length < 2 && !state.gameStarted) {
+        for (const [roomId, state] of roomStates) {
+          if (state.players.size < 2 && !state.gameStarted) {
             return roomId;
           }
         }
-
-        const newRoomId = nanoid(6);
-        rooms.set(newRoomId, {
+        const newRoomId = generateRoomId();
+        roomStates.set(newRoomId, {
           players: new Map(),
           gameStarted: false,
           createdAt: Date.now(),
+          // kept for potential future use, but no longer used to filter hits
           lastAttacks: {},
         });
         return newRoomId;
@@ -98,8 +90,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         const roomId = findAvailableRoom();
         socket.join(roomId);
-
-        const roomState = rooms.get(roomId);
+        const roomState = roomStates.get(roomId);
 
         socket.emit("roomState", {
           roomId, // ✅ NEW!
@@ -108,33 +99,15 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("joinRoom", (playerName) => {
-          if (roomState.players.size >= 2) {
-            // Redirect to another room
-            const newRoomId = findAvailableRoom();
-            socket.leave(roomId);
-            socket.join(newRoomId);
+          if (roomState.players.has(socket.id)) return;
 
-            const newState = rooms.get(newRoomId);
-            newState.players.set(socket.id, {
-              id: socket.id,
-              name: playerName,
-              isReady: false,
-            });
-
-            io.to(newRoomId).emit(
-              "updatePlayers",
-              Array.from(newState.players.values())
-            );
-            socket.emit("roomState", {
-              roomId: newRoomId,
-              players: Array.from(newState.players.values()),
-              gameStarted: newState.gameStarted,
-            });
-
-            return;
+          for (const player of roomState.players.values()) {
+            if (player.name === playerName) {
+              socket.emit("usernameTaken");
+              return;
+            }
           }
 
-          // Normal join flow
           roomState.players.set(socket.id, {
             id: socket.id,
             name: playerName,
@@ -246,10 +219,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             winningAttackTime: data.winningAttackTime || Date.now(),
           };
 
-          for (const [id] of roomState.players.entries()) {
-            io.to(id).emit("playerDefeated", defeatData);
-          }
-
+          io.to(roomId).emit("playerDefeated", defeatData);
           console.log(`Verified Match Result - 
     Winner: ${winner.name} (${winner.id}), 
     Loser: ${loser.name} (${loser.id})`);
@@ -258,20 +228,14 @@ Promise.all([pubClient.connect(), subClient.connect()])
             roomState.matchResult = null;
             roomState.players.forEach((player) => (player.isReady = false));
             roomState.gameStarted = false;
-            for (const [id] of roomState.players.entries()) {
-              io.to(id).emit("restartGame");
-            }
+            io.to(roomId).emit("restartGame");
           });
         });
 
         socket.on("restartGame", () => {
-          // Emit to joined players *before* clearing them
-          for (const [id] of roomState.players.entries()) {
-            io.to(id).emit("restartGame");
-          }
-
-          roomState.players.clear(); // ✅ clear after emitting
+          roomState.players.clear();
           roomState.gameStarted = false;
+          io.to(roomId).emit("restartGame");
         });
 
         socket.on("disconnect", () => {
