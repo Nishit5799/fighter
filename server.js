@@ -17,6 +17,8 @@ const pubClient = createClient({
 
 const subClient = pubClient.duplicate();
 
+const rooms = new Map(); // move this line here
+
 Promise.all([pubClient.connect(), subClient.connect()])
   .then(() => {
     app.prepare().then(() => {
@@ -93,7 +95,6 @@ Promise.all([pubClient.connect(), subClient.connect()])
 
         const roomId = findAvailableRoom();
         socket.join(roomId);
-        const rooms = new Map();
 
         const roomState = rooms.get(roomId);
 
