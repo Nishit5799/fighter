@@ -44,18 +44,20 @@ Promise.all([pubClient.connect(), subClient.connect()])
       };
 
       const findAvailableRoom = () => {
-        for (const [roomId, state] of roomStates) {
-          if (state.players.size < 2 && !state.gameStarted) {
+        for (const [roomId, state] of rooms.entries()) {
+          const joinedPlayers = Array.from(state.players.values()).filter(
+            (p) => !!p.name
+          );
+          if (joinedPlayers.length < 2 && !state.gameStarted) {
             return roomId;
           }
         }
-        const newRoomId = generateRoomId();
-        roomStates.set(newRoomId, {
+
+        // No room with available slots, create a new one
+        const newRoomId = nanoid(6);
+        rooms.set(newRoomId, {
           players: new Map(),
           gameStarted: false,
-          createdAt: Date.now(),
-          // kept for potential future use, but no longer used to filter hits
-          lastAttacks: {},
         });
         return newRoomId;
       };
@@ -236,11 +238,13 @@ Promise.all([pubClient.connect(), subClient.connect()])
         });
 
         socket.on("restartGame", () => {
-          roomState.players.clear();
-          roomState.gameStarted = false;
+          // Emit to joined players *before* clearing them
           for (const [id] of roomState.players.entries()) {
             io.to(id).emit("restartGame");
           }
+
+          roomState.players.clear(); // ✅ clear after emitting
+          roomState.gameStarted = false;
         });
 
         socket.on("disconnect", () => {
