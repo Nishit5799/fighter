@@ -1209,7 +1209,7 @@ const Experience = () => {
       />
       {isGameStarted && (
         <AttackButtons
-          key={localPlayer?.id || playerName} // 👈 unique per match or player
+          key={localPlayer?.id || playerName || "guest"}
           onPunch={setIsPunching}
           onKick={setIsKicking}
         />
