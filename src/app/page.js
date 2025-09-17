@@ -1,3 +1,4 @@
+"use client";
 import React, { Suspense } from "react";
 
 import Loading from "./loading"; // Import the loading component
