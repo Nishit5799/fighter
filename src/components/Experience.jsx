@@ -652,17 +652,6 @@ const Experience = () => {
       }, 1000);
     };
 
-    useEffect(() => {
-      if (!socket || !hasJoinedRoom) return;
-
-      const onRestart = () => {
-        window.location.reload();
-      };
-
-      socket.on("restartGame", onRestart);
-      return () => socket.off("restartGame", onRestart);
-    }, [socket, hasJoinedRoom]);
-
     const usernameTakenHandler = () => {
       setIsUsernameValid(false);
     };
