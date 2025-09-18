@@ -139,3 +139,18 @@ body {
 .fade-out {
   animation: fadeOut 0.6s forwards ease-in-out;
 }
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fade-in-slide {
+  animation: fadeInSlide 0.5s ease-out forwards;
+}

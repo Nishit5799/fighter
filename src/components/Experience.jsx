@@ -1099,6 +1099,25 @@ const Experience = () => {
           </div>
         </div>
       )}
+
+      {isGameStarted && !isPracticeMode && hasJoinedRoom && (
+        <div className="fixed top-5 left-5 z-[999] fade-in-slide">
+          <button
+            onClick={() => {
+              const confirmQuit = window.confirm(
+                "Are you sure you want to quit the game?"
+              );
+              if (confirmQuit) {
+                window.location.reload();
+              }
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+          >
+            Exit
+          </button>
+        </div>
+      )}
+
       {isGameStarted && (
         <div className="fixed font-[Bebas] top-0 left-0 right-0 flex justify-between p-4 z-50">
           {isPracticeMode && isGameStarted && (
