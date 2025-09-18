@@ -1100,8 +1100,8 @@ const Experience = () => {
         </div>
       )}
 
-      {hasJoinedRoom && !isPracticeMode && (
-        <div className="fixed top-[40%] left-5 z-[999] fade-in-slide">
+      {hasJoinedRoom && !isPracticeMode && !countdownStarted && (
+        <div className="fixed top-5 left-5 z-[999] fade-in-slide">
           <button
             onClick={() => {
               if (socket) {
