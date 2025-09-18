@@ -1100,7 +1100,7 @@ const Experience = () => {
         </div>
       )}
 
-      {hasJoinedRoom && !isPracticeMode && !countdownStarted && (
+      {hasJoinedRoom && !isPracticeMode && countdown === null && (
         <div className="fixed top-5 left-5 z-[999] fade-in-slide">
           <button
             onClick={() => {
