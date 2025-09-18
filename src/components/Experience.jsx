@@ -967,7 +967,7 @@ const Experience = () => {
       </KeyboardControls>
       {showWelcomeScreen && (
         <div
-          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/90git bg-opacity-80 z-50 start"
+          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/60 bg-opacity-80 z-50 start"
           onClick={(e) => {
             if (!hasTappedToBegin) {
               e.stopPropagation();
@@ -1100,17 +1100,10 @@ const Experience = () => {
         </div>
       )}
 
-      {isGameStarted && !isPracticeMode && hasJoinedRoom && (
-        <div className="fixed top-5 left-5 z-[999] fade-in-slide">
+      {hasJoinedRoom && !isPracticeMode && (
+        <div className="fixed top-[40%] left-5 z-[999] fade-in-slide">
           <button
-            onClick={() => {
-              const confirmQuit = window.confirm(
-                "Are you sure you want to quit the game?"
-              );
-              if (confirmQuit) {
-                window.location.reload();
-              }
-            }}
+            onClick={() => window.location.reload()}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
           >
             Exit
