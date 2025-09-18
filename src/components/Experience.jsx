@@ -1103,7 +1103,12 @@ const Experience = () => {
       {hasJoinedRoom && !isPracticeMode && (
         <div className="fixed top-[40%] left-5 z-[999] fade-in-slide">
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              if (socket) {
+                socket.emit("playerLeft", { playerId: socket.id });
+              }
+              window.location.reload();
+            }}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
           >
             Exit

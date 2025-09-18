@@ -348,6 +348,22 @@ const PlayerController = forwardRef(
     }, [socket, practiceMode]);
 
     useEffect(() => {
+      if (!socket || practiceMode) return;
+
+      const handlePlayerLeft = ({ playerId }) => {
+        if (opponentRef.current && opponentRef.current.id === playerId) {
+          console.log("Opponent has left the game");
+          setMatchResult("won"); // Show victory UI
+          setCurrentAnimation("victory");
+          movementEnabled.current = false;
+        }
+      };
+
+      socket.on("playerLeft", handlePlayerLeft);
+      return () => socket.off("playerLeft", handlePlayerLeft);
+    }, [socket, practiceMode]);
+
+    useEffect(() => {
       if (!socket) return;
 
       const handleStartGame = () => {
