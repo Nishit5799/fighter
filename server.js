@@ -157,8 +157,9 @@ Promise.all([pubClient.connect(), subClient.connect()])
           };
 
           if (otherPlayerId) {
+            io.to(otherPlayerId).emit("playerHit", hitData);
           }
-          socket.emit("playerHit", hitData); // also send back to attacker
+          io.to(roomId).emit("playerHit", hitData);
 
           roomState.lastAttacks[socket.id] = serverTime;
         });
