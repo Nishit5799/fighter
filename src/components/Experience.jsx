@@ -967,7 +967,7 @@ const Experience = () => {
       </KeyboardControls>
       {showWelcomeScreen && (
         <div
-          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/60 bg-opacity-80 z-50 start"
+          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/30 bg-opacity-80 z-50 start"
           onClick={(e) => {
             if (!hasTappedToBegin) {
               e.stopPropagation();
