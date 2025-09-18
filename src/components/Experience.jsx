@@ -1102,7 +1102,7 @@ const Experience = () => {
       {hasJoinedRoom &&
         !isPracticeMode &&
         (countdown === null || isGameStarted) && (
-          <div className="fixed top-[30%] left-5 z-[999] fade-in-slide">
+          <div className="fixed top-[40%] left-5 z-[999] fade-in-slide">
             <button
               onClick={() => {
                 if (socket) {
