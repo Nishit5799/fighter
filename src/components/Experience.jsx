@@ -1099,22 +1099,23 @@ const Experience = () => {
           </div>
         </div>
       )}
-
-      {hasJoinedRoom && !isPracticeMode && countdown === null && (
-        <div className="fixed top-5 left-5 z-[999] fade-in-slide">
-          <button
-            onClick={() => {
-              if (socket) {
-                socket.emit("playerLeft", { playerId: socket.id });
-              }
-              window.location.reload();
-            }}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
-          >
-            Exit
-          </button>
-        </div>
-      )}
+      {hasJoinedRoom &&
+        !isPracticeMode &&
+        (countdown === null || isGameStarted) && (
+          <div className="fixed top-5 left-5 z-[999] fade-in-slide">
+            <button
+              onClick={() => {
+                if (socket) {
+                  socket.emit("playerLeft", { playerId: socket.id });
+                }
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+            >
+              Exit
+            </button>
+          </div>
+        )}
 
       {isGameStarted && (
         <div className="fixed font-[Bebas] top-0 left-0 right-0 flex justify-between p-4 z-50">
