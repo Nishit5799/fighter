@@ -149,50 +149,18 @@ Promise.all([pubClient.connect(), subClient.connect()])
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
 
-          if (!otherPlayerId) return;
+          const hitData = {
+            ...data,
+            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
+            attackTime: data.attackTime ?? serverTime,
+            serverTime,
+          };
 
-          const attackerId = socket.id;
-          const victimId = otherPlayerId;
-          const attackTime = data.attackTime ?? serverTime;
-
-          // Store or retrieve recent attacks for comparison
-          if (!roomState.lastAttacks) {
-            roomState.lastAttacks = {};
+          if (otherPlayerId) {
           }
+          socket.emit("playerHit", hitData); // also send back to attacker
 
-          // Save this attack
-          roomState.lastAttacks[attackerId] = attackTime;
-
-          const opponentAttackTime = roomState.lastAttacks[victimId];
-
-          // Compare attack times
-          const attackWindow = 150; // milliseconds within which attacks are considered simultaneous
-
-          const isFaster =
-            !opponentAttackTime ||
-            attackTime < opponentAttackTime - attackWindow;
-
-          if (isFaster) {
-            const hitData = {
-              ...data,
-              victimId,
-              attackerId,
-              serverTime,
-            };
-
-            // Send hit to both players
-            io.to(attackerId).emit("playerHit", hitData);
-            io.to(victimId).emit("playerHit", hitData);
-
-            // Log and cache
-            console.log(
-              `[Server] Registered hit from ${attackerId} → ${victimId} at ${attackTime}`
-            );
-          } else {
-            console.log(
-              `[Server] Ignored slower hit from ${attackerId} (opponent was faster)`
-            );
-          }
+          roomState.lastAttacks[socket.id] = serverTime;
         });
 
         socket.on("updateHealth", (data) => {
