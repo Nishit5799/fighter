@@ -20,6 +20,23 @@ import Info from "./Info";
 import PlayerController from "./PlayerController";
 import Ring from "./Ring";
 import Background from "./Background";
+import { Leva, useCreateStore } from "leva";
+import audioPool from "@/utils/audioPool";
+
+const unlockAudio = (audio) => {
+  if (!audio) return;
+
+  Object.values(audio).forEach((sound) => {
+    try {
+      const silentClone = sound.cloneNode(); // create a clone
+      silentClone.muted = true; // ensure it's muted
+      silentClone.volume = 0; // double safety
+      silentClone.play().catch(() => {});
+    } catch (err) {
+      console.warn("Silent audio unlock failed:", err);
+    }
+  });
+};
 
 // (near the top, after other imports)
 const SOUND_FILES = {
@@ -46,6 +63,7 @@ const Experience = () => {
   const socket = useSocket();
 
   // --- State ---
+  const levaStore = useCreateStore();
   const [joystickInput, setJoystickInput] = useState({ x: 0, y: 0 });
   const [isPunching, setIsPunching] = useState(false);
   const [isKicking, setIsKicking] = useState(false);
@@ -67,9 +85,22 @@ const Experience = () => {
   const [playerLeft, setPlayerLeft] = useState(false);
   const [isUsernameValid, setIsUsernameValid] = useState(true);
   const [restartCountdown, setRestartCountdown] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [swipeRotationDelta, setSwipeRotationDelta] = useState(0);
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [hasTappedToBegin, setHasTappedToBegin] = useState(false);
+  const [showJoinWarning, setShowJoinWarning] = useState(false);
+  const [roomId, setRoomId] = useState(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false); // 🔄 was `true`, now false
+
   const localPlayer = players.find((p) => p.id === socket?.id);
 
   // --- Refs ---
+  const settingsRef = useRef();
+  const settingsPanelRef = useRef(null); // for Leva panel container
+  const settingsButtonRef = useRef(null); // for settings icon button
+  const hasStartedGameRef = useRef(false); // put this above useEffect if not already there
+
   const unlockRetryRef = useRef(0);
   const audioUnlockedRef = useRef(false);
   const audioContextRef = useRef(null);
@@ -94,9 +125,134 @@ const Experience = () => {
   const blockRef = useRef();
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
+  const joystickRef = useRef();
+  const bgMusicRef = useRef(null);
 
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
+
+  const toggleSettings = () => {
+    setShowSettings((prev) => !prev);
+  };
+
+  useEffect(() => {
+    let swipeTouchId = null;
+    let startX = 0;
+
+    const handleTouchStart = (e) => {
+      const joystickTouchId = joystickRef.current?.getTouchId?.();
+      const candidateTouch = Array.from(e.touches).find(
+        (t) => t.identifier !== joystickTouchId
+      );
+
+      if (candidateTouch) {
+        swipeTouchId = candidateTouch.identifier;
+        startX = candidateTouch.clientX;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (swipeTouchId !== null) {
+        const touch = Array.from(e.touches).find(
+          (t) => t.identifier === swipeTouchId
+        );
+        if (touch) {
+          const deltaX = touch.clientX - startX;
+          const normalizedDelta = deltaX / window.innerWidth;
+          setSwipeRotationDelta(normalizedDelta);
+        }
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (
+        swipeTouchId !== null &&
+        !Array.from(e.touches).some((t) => t.identifier === swipeTouchId)
+      ) {
+        swipeTouchId = null;
+        setSwipeRotationDelta(0);
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: false });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, []);
+  useEffect(() => {
+    const audio = bgMusicRef.current;
+    if (audio) {
+      const playMusic = () => {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      };
+
+      // Attempt to play immediately
+      playMusic();
+
+      // Unlock on interaction
+      const unlock = () => {
+        audio.play().catch(() => {});
+        document.removeEventListener("click", unlock);
+        document.removeEventListener("touchstart", unlock);
+      };
+
+      document.addEventListener("click", unlock);
+      document.addEventListener("touchstart", unlock);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedOutsidePanel =
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target);
+      const clickedOutsideButton =
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target);
+
+      if (clickedOutsidePanel && clickedOutsideButton) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSettings]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedOutsidePanel =
+        settingsPanelRef.current &&
+        !settingsPanelRef.current.contains(event.target);
+
+      const clickedOutsideButton =
+        settingsButtonRef.current &&
+        !settingsButtonRef.current.contains(event.target);
+
+      if (clickedOutsidePanel && clickedOutsideButton) {
+        setShowSettings(false);
+      }
+    };
+
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showSettings]);
 
   // --- Helpers ---
   const unlockAllAudio = useCallback(() => {
@@ -114,47 +270,32 @@ const Experience = () => {
     const warm = () => {
       const items = Object.values(soundsRef.current).filter(Boolean);
 
-      // 🔁 If sounds aren't created yet, retry a few times instead of marking unlocked
       if (items.length === 0) {
         unlockRetryRef.current += 1;
         if (unlockRetryRef.current <= 10) {
-          setTimeout(warm, 50); // try again in ~1 frame
+          setTimeout(warm, 50); // Try again
         }
-        return; // DO NOT flip audioUnlockedRef yet
+        return;
       }
 
-      const warmups = items.map((a) => {
-        const prevVol = a.volume;
-        a.muted = true; // hard mute
-        a.volume = 0; // belt-and-suspenders
-        a.currentTime = 0;
-
-        return a
-          .play()
-          .then(() => {
-            a.pause();
-            a.currentTime = 0;
-            a.muted = false; // restore after playback is fully stopped
-            a.volume = prevVol;
-            return true;
-          })
-          .catch(() => {
-            // If play is blocked, still restore safely and continue
-            a.muted = false;
-            a.volume = prevVol;
-            return false;
-          });
+      // ✅ Silent warmup logic
+      items.forEach((a) => {
+        try {
+          const silentClone = a.cloneNode(); // Clone each audio tag
+          silentClone.muted = true;
+          silentClone.volume = 0;
+          silentClone.currentTime = 0;
+          silentClone.play().catch(() => {});
+        } catch (err) {
+          console.warn("Silent warmup failed:", err);
+        }
       });
 
-      Promise.allSettled(warmups).finally(() => {
-        audioUnlockedRef.current = true;
-      });
+      audioUnlockedRef.current = true; // ✅ Prevent re-unlocking
     };
 
-    // 1) Make sure WebAudio is resumed (if present)
-    ensureAudioContext();
-    // 2) Warm the EXACT elements (with retry if not ready yet)
-    warm();
+    ensureAudioContext(); // Resume WebAudio if needed
+    warm(); // Perform silent warmup
   }, []);
 
   useEffect(() => {
@@ -173,34 +314,6 @@ const Experience = () => {
       events.forEach((ev) => document.removeEventListener(ev, handler, opts));
   }, [unlockAllAudio]);
 
-  useEffect(() => {
-    const make = (src, vol = 0.8) => {
-      const a = new Audio(src);
-      a.preload = "auto";
-      // @ts-ignore
-      a.playsInline = true;
-      a.crossOrigin = "anonymous";
-      a.volume = vol;
-      return a;
-    };
-
-    soundsRef.current.punch = make(SOUND_FILES.punch, 0.7);
-    soundsRef.current.kick = make(SOUND_FILES.kick, 0.7);
-    soundsRef.current.hit = make(SOUND_FILES.hit, 0.4);
-    soundsRef.current.victory = make(SOUND_FILES.victory, 0.85);
-    soundsRef.current.lost = make(SOUND_FILES.lost, 0.85);
-    soundsRef.current.begin = make(SOUND_FILES.begin, 0.75);
-
-    return () => {
-      Object.values(soundsRef.current).forEach((a) => {
-        try {
-          a?.pause();
-          a?.remove?.();
-        } catch {}
-      });
-    };
-  }, []);
-
   const isUsernameUnique = useCallback(
     (name) => !players.some((player) => player.name === name),
     [players]
@@ -218,7 +331,12 @@ const Experience = () => {
     unlockAllAudio();
 
     const trimmedName = playerName.trim();
-    if (trimmedName !== "" && !hasJoinedRoom) {
+    if (trimmedName === "") {
+      setShowJoinWarning(true);
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (!hasJoinedRoom) {
       if (players.length >= 2) {
         setPopupMessage("Room is already full. Please try again later.");
         setShowPopup(true);
@@ -227,7 +345,10 @@ const Experience = () => {
       }
 
       if (isUsernameUnique(trimmedName)) {
-        socket.emit("joinRoom", trimmedName);
+        if (!isPracticeMode) {
+          socket.emit("joinRoom", trimmedName);
+        }
+
         setHasJoinedRoom(true);
         setIsUsernameValid(true);
       } else {
@@ -242,6 +363,12 @@ const Experience = () => {
     players.length,
     isUsernameUnique,
   ]);
+  useEffect(() => {
+    if (showJoinWarning) {
+      const timer = setTimeout(() => setShowJoinWarning(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [showJoinWarning]);
 
   const handleReset = useCallback(() => {
     hasLoggedResult.current = false;
@@ -262,7 +389,7 @@ const Experience = () => {
       setPlayerName("");
       setHealth1(100);
       setHealth2(100);
-      if (socket) socket.emit("restartGame");
+      if (!isPracticeMode && socket) socket.emit("restartGame");
     }, 2000);
   }, [socket]);
 
@@ -272,25 +399,42 @@ const Experience = () => {
 
   const handleReady = useCallback(() => {
     if (socket) {
-      socket.emit("playerReady", playerName);
+      if (!isPracticeMode) {
+        socket.emit("playerReady", playerName);
+      }
+      audioPool.unlockAll();
+      audioUnlockedRef.current = true;
       setIsReady(true);
     }
   }, [socket, playerName]);
 
+  const startPracticeMode = () => {
+    audioPool.unlockAll(); // ✅ Unlock all sounds
+    audioPool.play("begin"); // ✅ Play "begin" sound
+    setIsPracticeMode(true);
+    setPlayers([
+      { id: "practice-player", name: "You" },
+      { id: "bot-player", name: "BOT" },
+    ]);
+    setShowWelcomeScreen(false);
+    setIsGameStarted(true);
+  };
+
   const onPlayerHit = useCallback(
     (data) => {
       if (winner || loser) return;
-
-      socket.emit("updateHealth", {
-        health1:
-          data.attackerId === players[0]?.id
-            ? health1
-            : Math.max(0, health1 - data.damage),
-        health2:
-          data.attackerId === players[1]?.id
-            ? health2
-            : Math.max(0, health2 - data.damage),
-      });
+      if (!isPracticeMode) {
+        socket.emit("updateHealth", {
+          health1:
+            data.attackerId === players[0]?.id
+              ? health1
+              : Math.max(0, health1 - data.damage),
+          health2:
+            data.attackerId === players[1]?.id
+              ? health2
+              : Math.max(0, health2 - data.damage),
+        });
+      }
 
       if (players[0]?.id === data.attackerId) {
         setHealth2((prev) => {
@@ -468,7 +612,7 @@ const Experience = () => {
 
   // Socket events: players, start, restart, username taken, combat
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || isPracticeMode) return;
 
     const updatePlayersHandler = (playersList) => {
       if (playersList.length > 2) {
@@ -491,7 +635,16 @@ const Experience = () => {
     };
 
     const startGameHandler = () => {
-      unlockAllAudio();
+      if (!hasJoinedRoom) {
+        console.log("Ignoring startGame — not joined");
+        return;
+      }
+
+      if (hasStartedGameRef.current) return;
+      hasStartedGameRef.current = true;
+
+      console.log("[Socket] startGame event received at", Date.now());
+
       let count = 3;
       setCountdown(count);
 
@@ -503,11 +656,26 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
-          const begin = soundsRef.current.begin;
-          if (begin) {
-            begin.currentTime = 0;
-            begin.play().catch((e) => console.log("Begin sound failed:", e));
+          const audio = bgMusicRef.current;
+          if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
           }
+
+          // Play start sound
+          setTimeout(() => {
+            try {
+              audioPool.unlockAll();
+              setTimeout(() => {
+                if (typeof window !== "undefined") {
+                  audioPool.unlockAll();
+                  audioPool.play("begin");
+                }
+              }, 100);
+            } catch (err) {
+              console.warn("Audio unlock/play error on startGame", err);
+            }
+          }, 100);
         }
       }, 1000);
     };
@@ -536,6 +704,30 @@ const Experience = () => {
       socket.off("playerDefeated", onPlayerDefeated);
     };
   }, [socket, isGameStarted, handleReset, onPlayerHit, onPlayerDefeated]);
+
+  useEffect(() => {
+    if (!socket || isPracticeMode) return;
+
+    const roomStateHandler = (state) => {
+      if (state?.roomId) {
+        setRoomId(state.roomId); // ✅ Save the current room ID
+      }
+
+      if (Array.isArray(state.players)) {
+        setPlayers(state.players);
+      }
+
+      if (typeof state.gameStarted === "boolean") {
+        setIsGameStarted(state.gameStarted);
+      }
+    };
+
+    socket.on("roomState", roomStateHandler);
+
+    return () => {
+      socket.off("roomState", roomStateHandler);
+    };
+  }, [socket, isPracticeMode]);
 
   // Cross-link player controllers when game starts
   useEffect(() => {
@@ -576,10 +768,53 @@ const Experience = () => {
       handleReset();
     }
   }, [restartCountdown, handleReset]);
+  // 🔁 Reset audio unlock flag so it can retry next match
+  useEffect(() => {
+    if (restartCountdown === 0) {
+      audioUnlockedRef.current = false;
+      console.log("[Audio] Unlock state reset for new match");
+    }
+  }, [restartCountdown]);
+
+  const handleStart = () => {
+    audioPool.unlockAll();
+    setHasTappedToBegin(true);
+
+    const audio = bgMusicRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch((e) => {
+        console.warn("Autoplay failed:", e);
+      });
+    }
+  };
 
   // --- Render ---
   return (
     <>
+      <div ref={settingsPanelRef}>
+        <Leva
+          store={levaStore}
+          hidden={!showSettings}
+          titleBar={false}
+          style={{
+            position: "fixed",
+            top: 96,
+            right: 12,
+            left: "auto",
+            zIndex: 1000,
+            width: 260,
+            maxWidth: "90vw",
+          }}
+          theme={{
+            sizes: {
+              controlWidth: 220,
+            },
+          }}
+        />
+      </div>
+
+      {/* ✅ Only visible when toggled */}
       <KeyboardControls map={memoizedKeyboardMap}>
         <Canvas camera={{ position: [0, 5, 10], fov: 60 }} shadows>
           <ambientLight intensity={2.3} />
@@ -610,90 +845,187 @@ const Experience = () => {
             {isGameStarted && (
               <>
                 <PlayerController
+                  // 🟢 let swipe-to-turn work for you in practice too
+                  swipeRotationDelta={
+                    isPracticeMode
+                      ? swipeRotationDelta
+                      : players[0]?.id === socket?.id
+                      ? swipeRotationDelta
+                      : 0
+                  }
+                  levaStore={levaStore}
+                  showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef1.current = el;
-                    if (players[0]?.id === socket?.id) {
-                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    // 🟢 make this the camera target in Practice (or when you are player 1 in multiplayer)
+                    if (isPracticeMode || players[0]?.id === socket?.id) {
+                      cameraToggleRef.current = el;
                     }
                   }}
                   key={players[0]?.id || "player1"}
                   playerId={players[0]?.id}
                   characterType="cena"
+                  // 🟢 ALWAYS route your joystick to player 1 in Practice
                   joystickInput={
-                    players[0]?.id === socket?.id ? joystickInput : null
+                    isPracticeMode
+                      ? joystickInput
+                      : players[0]?.id === socket?.id
+                      ? joystickInput
+                      : null
                   }
+                  // 🟢 game must be started
                   disabled={!isGameStarted}
                   position={[1.2, 0, 0]}
-                  isPlayer1={players[0]?.id === socket?.id}
-                  color={0x90902d}
-                  isPunching={
-                    players[0]?.id === socket?.id ? isPunching : false
+                  // 🟢 Treat player 1 as the local driver in Practice so the camera follows you
+                  isPlayer1={
+                    isPracticeMode ? true : players[0]?.id === socket?.id
                   }
-                  isKicking={players[0]?.id === socket?.id ? isKicking : false}
+                  color={0x90902d}
+                  // 🟢 Route buttons to you in Practice
+                  isPunching={
+                    isPracticeMode
+                      ? isPunching
+                      : players[0]?.id === socket?.id
+                      ? isPunching
+                      : false
+                  }
+                  isKicking={
+                    isPracticeMode
+                      ? isKicking
+                      : players[0]?.id === socket?.id
+                      ? isKicking
+                      : false
+                  }
                   health={health1}
                   opponentHealth={health2}
-                  isLocalPlayer={players[0]?.id === socket?.id}
+                  // 🟢 You are the local player in Practice
+                  isLocalPlayer={
+                    isPracticeMode ? true : players[0]?.id === socket?.id
+                  }
                   playerName={players[0]?.name || "Player 1"}
                   opponentName={players[1]?.name || "Player 2"}
                   audio={soundsRef.current}
+                  // 🟢 Practice-only local hit path
+                  practiceMode={isPracticeMode}
+                  onPracticeHit={(data) => {
+                    // Always show hit animation on bot
+                    carControllerRef2.current?.receiveHit(
+                      data.attackType,
+                      data.attackTime
+                    );
+
+                    setHealth2((prev) => {
+                      const newHealth = Math.max(0, prev - data.damage);
+
+                      if (newHealth === 0) {
+                        // Trigger bot fall + player victory
+                        setTimeout(() => {
+                          carControllerRef2.current?.setDefeat(true);
+                          carControllerRef1.current?.setVictory(true);
+                        }, 200);
+
+                        // Reload after short delay
+                        setTimeout(() => {
+                          window.location.reload();
+                        }, 2500);
+                      }
+
+                      return newHealth;
+                    });
+                  }}
                 />
 
                 <PlayerController
+                  // ❌ No swipe turning for BOT in practice
+                  swipeRotationDelta={
+                    isPracticeMode
+                      ? 0
+                      : players[1]?.id === socket?.id
+                      ? swipeRotationDelta
+                      : 0
+                  }
+                  levaStore={levaStore}
+                  showSettings={showSettings}
                   ref={(el) => {
                     carControllerRef2.current = el;
-                    if (players[1]?.id === socket?.id) {
-                      cameraToggleRef.current = el; // 👈 only assign for local player
+                    // keep default camera assignment for multiplayer only
+                    if (players[1]?.id === socket?.id && !isPracticeMode) {
+                      cameraToggleRef.current = el;
                     }
                   }}
                   key={players[1]?.id || "player2"}
                   playerId={players[1]?.id}
                   characterType="austin"
+                  // ❌ No joystick for BOT in practice
                   joystickInput={
-                    players[1]?.id === socket?.id ? joystickInput : null
+                    isPracticeMode
+                      ? null
+                      : players[1]?.id === socket?.id
+                      ? joystickInput
+                      : null
                   }
-                  disabled={!isGameStarted}
+                  // optional: marking disabled is fine but not strictly required
+                  disabled={
+                    !isGameStarted /* || (isPracticeMode ? true : false) */
+                  }
                   position={[-1.2, 0, 0]}
-                  isPlayer1={players[1]?.id === socket?.id}
-                  color={0x2b2ba1}
-                  isPunching={
-                    players[1]?.id === socket?.id ? isPunching : false
+                  // ❌ BOT is not the driving player in practice
+                  isPlayer1={
+                    isPracticeMode ? false : players[1]?.id === socket?.id
                   }
-                  isKicking={players[1]?.id === socket?.id ? isKicking : false}
+                  color={0x2b2ba1}
+                  // ❌ No attack inputs for BOT in practice
+                  isPunching={
+                    isPracticeMode
+                      ? false
+                      : players[1]?.id === socket?.id
+                      ? isPunching
+                      : false
+                  }
+                  isKicking={
+                    isPracticeMode
+                      ? false
+                      : players[1]?.id === socket?.id
+                      ? isKicking
+                      : false
+                  }
                   health={health2}
                   opponentHealth={health1}
-                  isLocalPlayer={players[1]?.id === socket?.id}
+                  isLocalPlayer={
+                    isPracticeMode ? false : players[1]?.id === socket?.id
+                  }
                   playerName={players[1]?.name || "Player 2"}
                   opponentName={players[0]?.name || "Player 1"}
                   audio={soundsRef.current}
+                  // 🟢 Practice mode flag (so it silences sockets etc.)
+                  practiceMode={isPracticeMode}
                 />
               </>
             )}
           </Physics>
         </Canvas>
       </KeyboardControls>
-
       {showWelcomeScreen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 start">
-          <div className="text-center">
-            {hasJoinedRoom && (
-              <button
-                onClick={() => {
-                  if (socket) {
-                    socket.emit("playerRestart", {
-                      playerId: socket.id,
-                      playerName,
-                    });
-                  }
-                  window.location.reload();
-                }}
-                className="absolute top-4 left-4 px-4 py-2 bg-red-500 text-white rounded-lg"
-              >
-                Exit
-              </button>
-            )}
+        <div
+          className="fixed font-[Bebas] inset-0 flex items-center justify-center bg-black/95  z-50 start"
+          onClick={(e) => {
+            if (!hasTappedToBegin) {
+              e.stopPropagation();
+              handleStart();
+            }
+          }}
+        >
+          <div
+            className={`text-center ${
+              !hasTappedToBegin ? "pointer-events-none" : ""
+            }`}
+          >
+            {" "}
+            {/* prevent double click issues */}
+            {/* Welcome Title */}
             <div
               ref={welcomeTextRef}
-              className="font-choco tracking-wider text-5xl font-bold text-yellow-400 mb-8 flex"
+              className="font-[Bangers] tracking-wide sm:tracking-wider md:tracking-widest text-3xl sm:text-5xl md:text-6xl font-bold text-yellow-400 mb-8 flex justify-center transition-all duration-500"
             >
               {"Welcome to NishFight".split("").map((letter, index) => (
                 <span key={index} className="inline-block">
@@ -701,57 +1033,96 @@ const Experience = () => {
                 </span>
               ))}
             </div>
-            <div>
-              <input
-                ref={nameInputRef}
-                type="text"
-                placeholder="Enter your name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                onPointerDown={unlockAllAudio}
-                className="px-4 py-2 mb-4 rounded-lg"
-              />
-            </div>
-            <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto">
-              <button
-                ref={joinBtnRef}
-                onClick={handleJoinRoom}
-                onPointerDown={unlockAllAudio}
-                disabled={
-                  hasJoinedRoom ||
-                  !isUsernameValid ||
-                  playerName.trim().length === 0
-                }
-                className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
-                  hasJoinedRoom ||
-                  !isUsernameValid ||
-                  playerName.trim().length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-orange-600"
-                } transition-colors`}
+            {/* Tap to Begin */}
+            {!hasTappedToBegin && (
+              <div
+                className={`text-white text-xl mt-4 ${
+                  hasTappedToBegin ? "fade-out" : "animate-blink"
+                }`}
               >
-                JOIN ROOM
-              </button>
-            </div>
+                Tap to Begin
+              </div>
+            )}
+            {/* Inputs and Buttons (Hidden until tap) */}
             <div
-              onClick={handleInfoClick}
-              className="mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              className={`mt-8 transition-all duration-700 ease-out ${
+                hasTappedToBegin
+                  ? "opacity-100 translate-y-0 animate-bounceInUp"
+                  : "opacity-0 translate-y-10 pointer-events-none"
+              }`}
             >
-              HOW TO PLAY?
+              <div>
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  placeholder="Enter your name"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  onPointerDown={unlockAllAudio}
+                  className="font-[Bebas] px-4 py-2 text-center mb-4 bg-white text-black rounded-lg"
+                />
+              </div>
+              <div className="flex flex-col gap-4 sm:w-[70%] w-[80%] mx-auto font-[Bebas]">
+                <button
+                  ref={joinBtnRef}
+                  onClick={() => {
+                    const trimmedName = playerName.trim();
+                    if (
+                      hasJoinedRoom ||
+                      !isUsernameValid ||
+                      trimmedName.length === 0
+                    ) {
+                      setShowJoinWarning(true);
+                      nameInputRef.current?.focus();
+                      return;
+                    }
+                    handleJoinRoom();
+                  }}
+                  onPointerDown={unlockAllAudio}
+                  className={`px-8 py-2 font-choco tracking-widest bg-orange-500 text-white sm:text-2xl text-3xl font-bold rounded-lg ${
+                    hasJoinedRoom ||
+                    !isUsernameValid ||
+                    playerName.trim().length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-orange-600"
+                  } transition-colors`}
+                >
+                  JOIN ROOM
+                </button>
+
+                {showJoinWarning && (
+                  <div className="text-yellow-300 text-center mt-2 text-lg animate-pulse">
+                    Please enter your name to join
+                  </div>
+                )}
+
+                <button
+                  onClick={startPracticeMode}
+                  className="px-8 py-2 font-choco tracking-widest bg-green-600 text-white sm:text-2xl text-3xl font-bold rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  PRACTICE
+                </button>
+              </div>
+              <div
+                onClick={handleInfoClick}
+                className="font-[Bebas] mt-4 py-2 font-choco text-white sm:text-2xl text-3xl tracking-widest cursor-pointer bg-blue-500 hover:bg-blue-600 sm:w-[70%] w-[80%] mx-auto rounded-lg transition-colors"
+              >
+                HOW TO PLAY?
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {hasJoinedRoom && !isGameStarted && (
-        <div className="fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
+      {!isPracticeMode && hasJoinedRoom && !isGameStarted && (
+        <div className="font-[Bebas] fixed bottom-5 right-5 bg-black bg-opacity-50 text-white p-4 rounded-lg z-[100]">
           <h3>Lobby</h3>
           {players.map((player, index) => (
             <div key={index}>
               {player.name} {player.isReady ? "✅" : "❌"}
             </div>
           ))}
-          {players.length === 2 && !isReady && (
+          {!isPracticeMode && players.length === 2 && !isReady && (
             <button
               onClick={handleReady}
               className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg"
@@ -761,17 +1132,42 @@ const Experience = () => {
           )}
         </div>
       )}
-
-      {countdown !== null && !isGameStarted && (
+      {!isPracticeMode && countdown !== null && !isGameStarted && (
         <div className="fixed inset-0 flex items-center justify-center z-[101]">
           <div className="w-[80vw] h-[80vw] rounded-full bg-black text-white text-9xl flex items-center justify-center">
             {countdown}
           </div>
         </div>
       )}
+      {hasJoinedRoom &&
+        !isPracticeMode &&
+        (countdown === null || isGameStarted) && (
+          <div className="fixed top-[40%] left-5 z-[999] fade-in-slide">
+            <button
+              onClick={() => {
+                if (socket) {
+                  socket.emit("playerLeft", { playerId: socket.id });
+                }
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+            >
+              Exit
+            </button>
+          </div>
+        )}
 
       {isGameStarted && (
-        <div className="fixed top-0 left-0 right-0 flex justify-between p-4 z-50">
+        <div className="fixed font-[Bebas] top-0 left-0 right-0 flex justify-between p-4 z-50">
+          {isPracticeMode && isGameStarted && (
+            <button
+              onClick={() => window.location.reload()}
+              className="fixed top-20 left-5 px-4 py-2 bg-red-600 text-white rounded-lg z-50"
+            >
+              Exit Practice
+            </button>
+          )}
+
           {/* Player 1 */}
           <div className="flex flex-col items-start">
             <div className="w-40 h-6 bg-red-500 rounded-md overflow-hidden">
@@ -801,7 +1197,6 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       {showPopup && (
         <div className="fixed inset-0 flex top-[10%] items-start justify-center bg-opacity-80 z-[103]">
           <div className="bg-white p-8 rounded-lg text-center">
@@ -829,8 +1224,9 @@ const Experience = () => {
           </div>
         </div>
       )}
-
       <Joystick
+        ref={joystickRef} // ✅ attach ref here
+        onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         onMove={(data) => {
           setJoystickInput({ x: data.x, y: data.y, isRunning: data.isRunning });
         }}
@@ -840,24 +1236,91 @@ const Experience = () => {
         onStart={() => {}}
         disabled={!isGameStarted || players.length !== 2}
       />
-
       {isGameStarted && (
         <AttackButtons
           key={localPlayer?.id || playerName} // 👈 unique per match or player
           onPunch={setIsPunching}
           onKick={setIsKicking}
-          onToggleCamera={() => cameraToggleRef.current?.toggleFppTpp()}
         />
       )}
-
       <Info
+        settingsButtonRef={settingsButtonRef}
+        toggleSettings={toggleSettings}
         onReset={handleReset}
         showPopup={showPopup}
         popupMessage={popupMessage}
         showInfoPopup={showInfoPopup}
         setShowInfoPopup={setShowInfoPopup}
-        onInfoClick={handleInfoClick}
+        onInfoClick={
+          isPracticeMode ? () => setShowInfoPopup((prev) => !prev) : null // 🔒 don't show button outside practice
+        }
       />
+
+      <button
+        onClick={() => {
+          const audio = bgMusicRef.current;
+          if (!audio) return;
+
+          if (isMusicPlaying) {
+            audio.pause();
+            audio.currentTime = 0;
+            setIsMusicPlaying(false);
+          } else {
+            audio.currentTime = 0;
+            audio
+              .play()
+              .then(() => {
+                setIsMusicPlaying(true);
+              })
+              .catch((err) => {
+                console.warn("Audio play failed:", err);
+              });
+          }
+        }}
+        className="fixed top-[20%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
+      >
+        {isMusicPlaying ? (
+          // 🔊 Volume ON icon
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5L6 9H2v6h4l5 4V5z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a9 9 0 010 12.73"
+            />
+          </svg>
+        ) : (
+          // 🔇 Volume OFF icon
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.25 9.25L4 14.5h4l5 4V5l-5 4H4l5.25 5.25M16 12h.01M19 9l-3 3 3 3"
+            />
+          </svg>
+        )}
+      </button>
+
+      <audio ref={bgMusicRef} src="/bgmusic.mp3" loop preload="auto" />
     </>
   );
 };
