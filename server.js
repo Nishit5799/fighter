@@ -147,21 +147,61 @@ Promise.all([pubClient.connect(), subClient.connect()])
         socket.on("playerHit", (data) => {
           const serverTime = Date.now();
           const players = Array.from(roomState.players.keys());
-          const otherPlayerId = players.find((id) => id !== socket.id);
+          const attackerId = socket.id;
+          const victimId = players.find((id) => id !== attackerId);
+          const attackTime = data.attackTime ?? serverTime;
 
-          const hitData = {
-            ...data,
-            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
-            attackTime: data.attackTime ?? serverTime,
-            serverTime,
+          // Save attack time
+          roomState.lastAttacks[attackerId] = {
+            attackTime,
+            data,
           };
 
-          if (otherPlayerId) {
-            io.to(otherPlayerId).emit("playerHit", hitData);
-          }
-          socket.emit("playerHit", hitData); // also send back to attacker
+          // Wait to see if opponent also attacked
+          const opponent = victimId;
+          const opponentAttack = roomState.lastAttacks[opponent];
 
-          roomState.lastAttacks[socket.id] = serverTime;
+          // If both attacks exist, compare timestamps
+          if (opponentAttack) {
+            const timeDiff = attackTime - opponentAttack.attackTime;
+
+            if (Math.abs(timeDiff) < 300) {
+              // Simultaneous attacks
+              const winnerId = timeDiff < 0 ? attackerId : opponent;
+              const loserId = timeDiff < 0 ? opponent : attackerId;
+              const winningAttack = timeDiff < 0 ? data : opponentAttack.data;
+
+              // Notify only loser to play hit animation
+              const hitData = {
+                ...winningAttack,
+                victimId: loserId,
+                attackTime: winningAttack.attackTime,
+                serverTime,
+              };
+
+              io.to(loserId).emit("playerHit", hitData);
+              io.to(winnerId).emit("playerHit", hitData); // Send to attacker too
+
+              // Clear both attack times
+              delete roomState.lastAttacks[attackerId];
+              delete roomState.lastAttacks[opponent];
+            }
+          } else {
+            // If opponent hasn’t attacked yet, set a timeout to process solo hit
+            setTimeout(() => {
+              if (roomState.lastAttacks[attackerId]) {
+                const soloHitData = {
+                  ...data,
+                  victimId,
+                  attackTime,
+                  serverTime,
+                };
+                io.to(victimId).emit("playerHit", soloHitData);
+                io.to(attackerId).emit("playerHit", soloHitData);
+                delete roomState.lastAttacks[attackerId];
+              }
+            }, 150); // wait a bit to check for counter-attack
+          }
         });
 
         socket.on("updateHealth", (data) => {
