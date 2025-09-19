@@ -1275,7 +1275,7 @@ const Experience = () => {
               });
           }
         }}
-        className="fixed top-[10%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
+        className="fixed top-[20%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
       >
         {isMusicPlaying ? (
           // 🔊 Volume ON icon
