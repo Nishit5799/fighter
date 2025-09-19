@@ -776,8 +776,16 @@ const Experience = () => {
   }, [restartCountdown]);
 
   const handleStart = () => {
-    audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
-    setHasTappedToBegin(true); // ✅ Start the welcome screen
+    audioPool.unlockAll();
+    setHasTappedToBegin(true);
+
+    const audio = bgMusicRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch((e) => {
+        console.warn("Autoplay failed:", e);
+      });
+    }
   };
 
   // --- Render ---
