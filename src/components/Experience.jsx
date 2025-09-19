@@ -186,8 +186,23 @@ const Experience = () => {
   useEffect(() => {
     const audio = bgMusicRef.current;
     if (audio) {
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
+      const playMusic = () => {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      };
+
+      // Attempt to play immediately
+      playMusic();
+
+      // Unlock for iOS or browser restrictions
+      const unlock = () => {
+        audio.play().catch(() => {});
+        document.removeEventListener("click", unlock);
+        document.removeEventListener("touchstart", unlock);
+      };
+
+      document.addEventListener("click", unlock);
+      document.addEventListener("touchstart", unlock);
     }
   }, []);
 
