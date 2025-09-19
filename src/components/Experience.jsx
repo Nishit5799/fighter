@@ -1262,14 +1262,20 @@ const Experience = () => {
           if (isMusicPlaying) {
             audio.pause();
             audio.currentTime = 0;
+            setIsMusicPlaying(false);
           } else {
             audio.currentTime = 0;
-            audio.play().catch(() => {});
+            audio
+              .play()
+              .then(() => {
+                setIsMusicPlaying(true);
+              })
+              .catch((err) => {
+                console.warn("Audio play failed:", err);
+              });
           }
-
-          setIsMusicPlaying(!isMusicPlaying);
         }}
-        className="fixed top-[15%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
+        className="fixed top-[10%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
       >
         {isMusicPlaying ? (
           // 🔊 Volume ON icon
