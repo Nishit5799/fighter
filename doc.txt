@@ -1864,6 +1864,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
           players: new Map(),
           gameStarted: false,
           createdAt: Date.now(),
+          // kept for potential future use, but no longer used to filter hits
           lastAttacks: {},
         });
         return newRoomId;
@@ -1877,7 +1878,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
             console.log(`Cleaned up empty room: ${roomId}`);
           }
 
-          // Clear old attack times
+          // Clear old attack times (legacy; harmless to keep)
           if (state.lastAttacks) {
             for (const [playerId, time] of Object.entries(state.lastAttacks)) {
               if (now - time > 5000) {
@@ -1902,6 +1903,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
         const roomState = roomStates.get(roomId);
 
         socket.emit("roomState", {
+          roomId, // ✅ NEW!
           players: Array.from(roomState.players.values()),
           gameStarted: roomState.gameStarted,
         });
@@ -1942,7 +1944,7 @@ Promise.all([pubClient.connect(), subClient.connect()])
               Array.from(roomState.players.values()).every((p) => p.isReady)
             ) {
               roomState.gameStarted = true;
-              io.to(roomId).emit("startGame");
+              io.to(roomId).emit("startGame", { roomId }); // ✅ include roomId
             }
           }
         });
@@ -1951,33 +1953,25 @@ Promise.all([pubClient.connect(), subClient.connect()])
           socket.to(roomId).emit("carMove", data);
         });
 
+        // 🔧 Always forward hits; don't filter by client clocks
         socket.on("playerHit", (data) => {
-          const hitData = {
-            ...data,
-            attackTime: data.attackTime || Date.now(),
-          };
-
-          // Get both players in the room
+          const serverTime = Date.now();
           const players = Array.from(roomState.players.keys());
           const otherPlayerId = players.find((id) => id !== socket.id);
 
+          const hitData = {
+            ...data,
+            victimId: otherPlayerId, // ✅ NEW — send who should take the hit
+            attackTime: data.attackTime ?? serverTime,
+            serverTime,
+          };
+
           if (otherPlayerId) {
-            // Check if the other player recently attacked
-            const otherPlayerLastAttack =
-              roomState.lastAttacks?.[otherPlayerId] || 0;
-            const HIT_PRIORITY_BUFFER = 100; // ms
-
-            // Only emit to the slower player
-            if (
-              hitData.attackTime >
-              otherPlayerLastAttack + HIT_PRIORITY_BUFFER
-            ) {
-              socket.to(otherPlayerId).emit("playerHit", hitData);
-            }
+            io.to(otherPlayerId).emit("playerHit", hitData);
           }
+          socket.emit("playerHit", hitData); // also send back to attacker
 
-          // Store the last attack time for this player
-          roomState.lastAttacks[socket.id] = hitData.attackTime;
+          roomState.lastAttacks[socket.id] = serverTime;
         });
 
         socket.on("updateHealth", (data) => {
