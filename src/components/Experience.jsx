@@ -1312,7 +1312,7 @@ const Experience = () => {
         )}
       </button>
 
-      <audio ref={bgMusicRef} src="/bgmusic.mp3" loop preload="auto" />
+      <audio ref={bgMusicRef} src="/bgmusicc.mp3" loop preload="auto" />
     </>
   );
 };
