@@ -1269,7 +1269,7 @@ const Experience = () => {
 
           setIsMusicPlaying(!isMusicPlaying);
         }}
-        className="fixed top-[30%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
+        className="fixed top-[15%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
       >
         {isMusicPlaying ? (
           // 🔊 Volume ON icon
