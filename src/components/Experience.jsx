@@ -89,6 +89,7 @@ const Experience = () => {
   const [hasTappedToBegin, setHasTappedToBegin] = useState(false);
   const [showJoinWarning, setShowJoinWarning] = useState(false);
   const [roomId, setRoomId] = useState(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false); // 🔄 was `true`, now false
 
   const localPlayer = players.find((p) => p.id === socket?.id);
 
@@ -123,6 +124,7 @@ const Experience = () => {
   const hasStarted = useRef(false);
   const welcomeTextRef = useRef();
   const joystickRef = useRef();
+  const bgMusicRef = useRef(null);
 
   // --- Memo ---
   const memoizedKeyboardMap = useMemo(() => keyboardMap, []);
@@ -179,6 +181,28 @@ const Experience = () => {
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleTouchEnd);
     };
+  }, []);
+  useEffect(() => {
+    const audio = bgMusicRef.current;
+    if (audio) {
+      const playMusic = () => {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      };
+
+      // Attempt to play immediately
+      playMusic();
+
+      // Unlock on interaction
+      const unlock = () => {
+        audio.play().catch(() => {});
+        document.removeEventListener("click", unlock);
+        document.removeEventListener("touchstart", unlock);
+      };
+
+      document.addEventListener("click", unlock);
+      document.addEventListener("touchstart", unlock);
+    }
   }, []);
 
   useEffect(() => {
@@ -630,6 +654,12 @@ const Experience = () => {
           setShowWelcomeScreen(false);
           setIsGameStarted(true);
 
+          const audio = bgMusicRef.current;
+          if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+          }
+
           // Play start sound
           setTimeout(() => {
             try {
@@ -745,8 +775,16 @@ const Experience = () => {
   }, [restartCountdown]);
 
   const handleStart = () => {
-    audioPool.unlockAll(); // ✅ Unlock sounds on first user interaction
-    setHasTappedToBegin(true); // ✅ Start the welcome screen
+    audioPool.unlockAll();
+    setHasTappedToBegin(true);
+
+    const audio = bgMusicRef.current;
+    if (audio) {
+      audio.currentTime = 0;
+      audio.play().catch((e) => {
+        console.warn("Autoplay failed:", e);
+      });
+    }
   };
 
   // --- Render ---
@@ -1215,6 +1253,72 @@ const Experience = () => {
           isPracticeMode ? () => setShowInfoPopup((prev) => !prev) : null // 🔒 don't show button outside practice
         }
       />
+
+      <button
+        onClick={() => {
+          const audio = bgMusicRef.current;
+          if (!audio) return;
+
+          if (isMusicPlaying) {
+            audio.pause();
+            audio.currentTime = 0;
+            setIsMusicPlaying(false);
+          } else {
+            audio.currentTime = 0;
+            audio
+              .play()
+              .then(() => {
+                setIsMusicPlaying(true);
+              })
+              .catch((err) => {
+                console.warn("Audio play failed:", err);
+              });
+          }
+        }}
+        className="fixed top-[20%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
+      >
+        {isMusicPlaying ? (
+          // 🔊 Volume ON icon
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5L6 9H2v6h4l5 4V5z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a9 9 0 010 12.73"
+            />
+          </svg>
+        ) : (
+          // 🔇 Volume OFF icon
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            className="w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.25 9.25L4 14.5h4l5 4V5l-5 4H4l5.25 5.25M16 12h.01M19 9l-3 3 3 3"
+            />
+          </svg>
+        )}
+      </button>
+
+      <audio ref={bgMusicRef} src="/musicbg.mp3" loop preload="auto" />
     </>
   );
 };
