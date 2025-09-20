@@ -1275,7 +1275,7 @@ const Experience = () => {
               });
           }
         }}
-        className={`fixed top-[14%] right-3 z-[9999] p-1 rounded-full text-white text-sm transition-all duration-300 ${
+        className={`fixed top-[14%] right-3 z-[9999] p-2 rounded-full text-white text-md transition-all duration-300 ${
           isMusicPlaying ? "bg-blue-200" : "bg-red-200"
         }`}
       >
