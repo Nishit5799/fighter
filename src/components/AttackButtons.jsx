@@ -2,6 +2,18 @@ import React, { useRef, useEffect, useState } from "react";
 import { useSocket } from "../context/SocketContext";
 import audioPool from "@/utils/audioPool";
 
+const [isLandscape, setIsLandscape] = useState(
+  window.innerWidth > window.innerHeight
+);
+
+useEffect(() => {
+  const handleResize = () => {
+    setIsLandscape(window.innerWidth > window.innerHeight);
+  };
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
+
 const AttackButtons = ({ onPunch, onKick }) => {
   const punchRef = useRef();
   const kickRef = useRef();
@@ -135,7 +147,13 @@ const AttackButtons = ({ onPunch, onKick }) => {
   );
 
   return (
-    <div className="fixed bottom-5 right-5 flex flex-col items-center gap-4 select-none z-[100]">
+    <div
+      className={`fixed z-[100] select-none ${
+        isLandscape
+          ? "top-5 right-5 flex-row gap-6"
+          : "bottom-5 right-5 flex-col gap-4"
+      } flex items-center`}
+    >
       {renderButton("punch", punchRef, "👊", punchCooldown, 2.5)}
       {renderButton("kick", kickRef, "🦵", kickCooldown, 3)}
 

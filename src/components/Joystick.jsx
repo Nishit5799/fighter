@@ -6,6 +6,18 @@ import React, {
   useImperativeHandle,
 } from "react";
 
+const [isLandscape, setIsLandscape] = useState(
+  window.innerWidth > window.innerHeight
+);
+
+useEffect(() => {
+  const handleResize = () => {
+    setIsLandscape(window.innerWidth > window.innerHeight);
+  };
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
+
 const Joystick = forwardRef(
   (
     { onMove, onStart = () => {}, disabled, onToggleRun, onToggleCamera },
@@ -143,7 +155,13 @@ const Joystick = forwardRef(
 
     return (
       <>
-        <div className="fixed bottom-5 left-5 flex flex-col items-center gap-4">
+        <div
+          className={`fixed z-[100] ${
+            isLandscape
+              ? "top-5 left-5 flex-row gap-6"
+              : "bottom-5 left-5 flex-col gap-4"
+          } flex items-center`}
+        >
           <button
             onClick={() => {
               setIsFpp(!isFpp);
