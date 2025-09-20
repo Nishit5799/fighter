@@ -1275,47 +1275,11 @@ const Experience = () => {
               });
           }
         }}
-        className="fixed top-[20%] right-3 z-[9999] p-2 bg-black/60 rounded-full text-white"
+        className={`fixed top-[10%] right-3 z-[9999] p-3 rounded-full text-white text-2xl transition-all duration-300 ${
+          isMusicPlaying ? "bg-blue-200" : "bg-red-200"
+        }`}
       >
-        {isMusicPlaying ? (
-          // 🔊 Volume ON icon
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            className="w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 5L6 9H2v6h4l5 4V5z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a9 9 0 010 12.73"
-            />
-          </svg>
-        ) : (
-          // 🔇 Volume OFF icon
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            className="w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.25 9.25L4 14.5h4l5 4V5l-5 4H4l5.25 5.25M16 12h.01M19 9l-3 3 3 3"
-            />
-          </svg>
-        )}
+        {isMusicPlaying ? "🔊" : "🔇"}
       </button>
 
       <audio ref={bgMusicRef} src="/musicbg.mp3" loop preload="auto" />
