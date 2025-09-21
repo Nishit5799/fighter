@@ -781,9 +781,14 @@ const Experience = () => {
     const audio = bgMusicRef.current;
     if (audio) {
       audio.currentTime = 0;
-      audio.play().catch((e) => {
-        console.warn("Autoplay failed:", e);
-      });
+      audio
+        .play()
+        .then(() => {
+          setIsMusicPlaying(true); // ✅ UPDATE STATE HERE
+        })
+        .catch((e) => {
+          console.warn("Autoplay failed:", e);
+        });
     }
   };
 
